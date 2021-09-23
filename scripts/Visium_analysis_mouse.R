@@ -25,6 +25,12 @@ require(tibble)
 require(dplyr)
 library(patchwork)
 
+firstup <- function(x) {
+  substr(x, 1, 1) <- toupper(substr(x, 1, 1))
+  x
+}
+
+
 ########################################################
 ########################################################
 # Section : import the processed visium data by spaceranger
@@ -33,14 +39,16 @@ library(patchwork)
 ########################################################
 #design = data.frame(seq(166904, 166911), c(paste0("adult.day", c(14, 7, 4, 1)), 
 #                                      paste0('neonatal.day', c(1, 4, 7, 14))), stringsAsFactors = FALSE)
+#design = data.frame(seq(166907, 166904), c(paste0("adult.day", c(1, 4, 7, 14))), stringsAsFactors = FALSE)
+
 design = data.frame(seq(166908, 166911), c(paste0('neonatal.day', c(1, 4, 7, 14))), stringsAsFactors = FALSE)
-design = data.frame(seq(166904, 166907), c(paste0("adult.day", c(14, 7, 4, 1))), stringsAsFactors = FALSE)
+
 colnames(design) = c('sampleID', 'condition')
 
 varibleGenes = c()
 for(n in 1:nrow(design))
 {
-  # n = 4
+  # n = 1
   
   # load output from spaceranger
   aa = Seurat::Load10X_Spatial(
@@ -50,6 +58,7 @@ for(n in 1:nrow(design))
     slice =  design$condition[n],
     filter.matrix = TRUE,
     to.upper = FALSE
+    
   )
   
   aa$condition = design$condition[n]
@@ -80,54 +89,86 @@ for(n in 1:nrow(design))
     st = merge(st, aa)
   }
   
+  remove(aa)
 }
 
+# save(design, varibleGenes, st, file = paste0(RdataDir, 'seuratObject_design_variableGenes_mouse_adult.Rdata'))
+save(design, varibleGenes, st, file = paste0(RdataDir, 'seuratObject_design_variableGenes_mouse_neonadal.Rdata'))
 
 ##########################################
 # cell and gene filtering
 ##########################################
-#st[["percent.mt"]] <- PercentageFeatureSet(st, pattern = "^Mt-")
-# Visualize QC metrics as a violin plot
-VlnPlot(st, features = c("nCount_Spatial", "nFeature_Spatial"), ncol = 2)
+species = 'mouse_adult'
+#species = 'mouse_neonadal'
 
-Idents(st) = st$condition
-FeatureScatter(st, feature1 = "nCount_Spatial", feature2 = "nFeature_Spatial")
+#load(file = paste0(RdataDir, 'seuratObject_design_variableGenes_mouse_adult.Rdata'))
+load(file = paste0(RdataDir, 'seuratObject_design_variableGenes_', species, '.Rdata'))
+
+##########################################
+# gene and cell filtering (to add later)
+##########################################
+Filtering.cells.genes = FALSE
+if(Filtering.cells.genes){
+  #st[["percent.mt"]] <- PercentageFeatureSet(st, pattern = "^Mt-")
+  # Visualize QC metrics as a violin plot
+  VlnPlot(st, features = c("nCount_Spatial", "nFeature_Spatial"), ncol = 2)
+  
+  Idents(st) = st$condition
+  FeatureScatter(st, feature1 = "nCount_Spatial", feature2 = "nFeature_Spatial")
+  
+  #plot1 <- VlnPlot(st, features = "nCount_Spatial", pt.size = 0.1) + NoLegend()
+  #plot2 <- SpatialFeaturePlot(aa, features = "nCount_Spatial") + theme(legend.position = "right")
+  #wrap_plots(plot1, plot2)
+  
+}
 
 #st = SCTransform(st, assay = "Spatial", verbose = FALSE)
 
 DefaultAssay(st) <- "SCT"
-
 VariableFeatures(st) <- varibleGenes
 
 st <- RunPCA(st, verbose = FALSE)
-st <- FindNeighbors(st, dims = 1:30)
+ElbowPlot(st)
+st <- FindNeighbors(st, dims = 1:20)
 st <- FindClusters(st, verbose = FALSE)
-st <- RunUMAP(st, dims = 1:30, n.neighbors = 30, min.dist = 0.1)
+
+st <- RunUMAP(st, dims = 1:10, n.neighbors = 20, min.dist = 0.1)
 
 DimPlot(st, reduction = "umap", group.by = c("ident", "condition"))
 
 
-#plot1 <- VlnPlot(st, features = "nCount_Spatial", pt.size = 0.1) + NoLegend()
-#plot2 <- SpatialFeaturePlot(aa, features = "nCount_Spatial") + theme(legend.position = "right")
-#wrap_plots(plot1, plot2)
+# import marker genes
+library(openxlsx)
+aa = read.xlsx('../data/Markers_updated_v2.xlsx', sheet = 1, colNames = TRUE)
+markers = c()
+for(n in 1:ncol(aa))
+{
+  markers = c(markers, aa[!is.na(aa[,n]), n])
+}
+markers = firstup(tolower(unique(markers)))
+markers[is.na(match(markers, rownames(st)))]
+markers = unique(c(markers, rownames(st)[grep('Ly6g', rownames(st))]))
 
-SpatialDimPlot(st)
+markers = c('Timp1', 'Timp2', 'Timp3', 'Timp4')
 
-SpatialFeaturePlot(st, features = c("Myh6"), image.alpha = 0.5)
-SpatialFeaturePlot(st, features = c("Tcf21"), image.alpha = 0.5)
-SpatialFeaturePlot(st, features = c("Vim"), image.alpha = 0.5)
+pdfname = paste0(resDir, "/check_detected_celltypes_using_AdditionalMarkerGenes_", species, ".pdf")
+pdf(pdfname, width = 16, height = 8)
+par(cex = 1.0, las = 1, mgp = c(2,0.2,0), mar = c(3,2,2,0.2), tcl = -0.3)
 
-SpatialFeaturePlot(st, features = c("Ddr2"), image.alpha = 0.5)
-SpatialFeaturePlot(st, features = c("Acta2"), image.alpha = 0.5)
+# p1 = DimPlot(st, reduction = "umap", group.by = c("ident", "condition"))
+# plot(p1)
+# p2 = SpatialDimPlot(st)
+# plot(p2)
 
-SpatialFeaturePlot(st, features = c("Emcn"), image.alpha = 0.5)
-SpatialFeaturePlot(st, features = c("Kdr"), image.alpha = 0.5)
-SpatialFeaturePlot(st, features = c("Ptprc"), image.alpha = 0.5)
-SpatialFeaturePlot(st, features = c("Cd68"), image.alpha = 0.5)
+for(n in 1:length(markers))
+{
+  cat(markers[n], '\n')
+  p3 = SpatialFeaturePlot(st, features = markers[n], image.alpha = 0.5)
+  
+  plot(p3)
+}
 
-SpatialFeaturePlot(st, features = c("Itgam"), image.alpha = 0.5)
-SpatialFeaturePlot(st, features = c(""), image.alpha = 0.5)
+dev.off()
 
-SpatialFeaturePlot(st, features = c("Fstl1"), image.alpha = 0.5)
-SpatialFeaturePlot(st, features = c("Wt1"), image.alpha = 0.5)
-SpatialFeaturePlot(st, features = c("Agrn"), image.alpha = 0.5)
+
+
