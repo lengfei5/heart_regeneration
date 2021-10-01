@@ -9,7 +9,7 @@
 ##########################################################################
 # setup for data import and sequencing QCs
 rm(list = ls())
-version.analysis = '_R11934_20210827'
+version.analysis = '_R11934_20210827_neonatal'
 
 resDir = paste0("../results/visium_mouse", version.analysis)
 RdataDir = paste0('../results/Rdata/')
@@ -36,6 +36,8 @@ design = data.frame(seq(166908, 166911), c(paste0('neonatal.day', c(1, 4, 7, 14)
 colnames(design) = c('sampleID', 'condition')
 
 varibleGenes = c()
+
+
 for(n in 1:nrow(design))
 {
   # n = 1
@@ -49,8 +51,32 @@ for(n in 1:nrow(design))
     filter.matrix = TRUE,
     to.upper = FALSE
   )
+  cat(design$condition[n], ' -- ', design$sampleID[n], ' :\n')
+  cat(ncol(aa), ' spots ', nrow(aa), 'genes detected \n')
   
   aa$condition = design$condition[n]
+  
+  ##########################################
+  # gene and cell filtering (to add later)
+  ##########################################
+  Filtering.cells.genes = FALSE
+  if(Filtering.cells.genes){
+    #st[["percent.mt"]] <- PercentageFeatureSet(st, pattern = "^Mt-")
+    # Visualize QC metrics as a violin plot
+    VlnPlot(st, features = c("nCount_Spatial", "nFeature_Spatial"), ncol = 2)
+    
+    Idents(st) = st$condition
+    FeatureScatter(st, feature1 = "nCount_Spatial", feature2 = "nFeature_Spatial")
+    
+    #plot1 <- VlnPlot(st, features = "nCount_Spatial", pt.size = 0.1) + NoLegend()
+    #plot2 <- SpatialFeaturePlot(aa, features = "nCount_Spatial") + theme(legend.position = "right")
+    #wrap_plots(plot1, plot2)
+    
+  }
+  
+  ##########################################
+  # normalization 
+  ##########################################
   #aa <- SCTransform(aa, assay = "Spatial",  method = "glmGamPoi", verbose = FALSE)
   aa <- SCTransform(aa, assay = "Spatial", verbose = FALSE, variable.features.n = 3000, return.only.var.genes = FALSE)
   
@@ -69,6 +95,8 @@ for(n in 1:nrow(design))
   
   varibleGenes = unique(c(varibleGenes, VariableFeatures(aa)))
   cat(design$condition[n], ' : ',  ncol(aa), ' spot found \n')
+  
+  
   
   # merge slices from different time points and 
   if(n == 1) {
@@ -92,23 +120,7 @@ species = 'mouse_neonadal'
 #load(file = paste0(RdataDir, 'seuratObject_design_variableGenes_mouse_adult.Rdata'))
 load(file = paste0(RdataDir, 'seuratObject_design_variableGenes_', species, '.Rdata'))
 
-##########################################
-# gene and cell filtering (to add later)
-##########################################
-Filtering.cells.genes = FALSE
-if(Filtering.cells.genes){
-  #st[["percent.mt"]] <- PercentageFeatureSet(st, pattern = "^Mt-")
-  # Visualize QC metrics as a violin plot
-  VlnPlot(st, features = c("nCount_Spatial", "nFeature_Spatial"), ncol = 2)
-  
-  Idents(st) = st$condition
-  FeatureScatter(st, feature1 = "nCount_Spatial", feature2 = "nFeature_Spatial")
-  
-  #plot1 <- VlnPlot(st, features = "nCount_Spatial", pt.size = 0.1) + NoLegend()
-  #plot2 <- SpatialFeaturePlot(aa, features = "nCount_Spatial") + theme(legend.position = "right")
-  #wrap_plots(plot1, plot2)
-  
-}
+
 
 #st = SCTransform(st, assay = "Spatial", verbose = FALSE)
 
