@@ -8,6 +8,7 @@
 ##########################################################################
 ##########################################################################
 # setup for data import and sequencing QCs
+rm(list = ls())
 version.analysis = '_R11934_20210827'
 
 resDir = paste0("../results/visium_mouse", version.analysis)
@@ -29,7 +30,6 @@ firstup <- function(x) {
   substr(x, 1, 1) <- toupper(substr(x, 1, 1))
   x
 }
-
 
 ########################################################
 ########################################################
@@ -99,7 +99,7 @@ save(design, varibleGenes, st, file = paste0(RdataDir, 'seuratObject_design_vari
 # cell and gene filtering
 ##########################################
 species = 'mouse_adult'
-#species = 'mouse_neonadal'
+species = 'mouse_neonadal'
 
 #load(file = paste0(RdataDir, 'seuratObject_design_variableGenes_mouse_adult.Rdata'))
 load(file = paste0(RdataDir, 'seuratObject_design_variableGenes_', species, '.Rdata'))
@@ -139,19 +139,30 @@ DimPlot(st, reduction = "umap", group.by = c("ident", "condition"))
 
 # import marker genes
 library(openxlsx)
-aa = read.xlsx('../data/Markers_updated_v2.xlsx', sheet = 1, colNames = TRUE)
+#aa = read.xlsx('../data/Markers_updated_v2.xlsx', sheet = 1, colNames = TRUE)
+aa = read.csv('../data/Tzahor_geneList.csv', header = TRUE)
+
+aa = aa[-c(1), c(1:2)]
+#aa = aa[-c(1), -c(1:3)]
+
 markers = c()
 for(n in 1:ncol(aa))
 {
   markers = c(markers, aa[!is.na(aa[,n]), n])
 }
+markers = markers[which(markers != '')]
 markers = firstup(tolower(unique(markers)))
+markers = gsub(' ', '', markers)
+
 markers[is.na(match(markers, rownames(st)))]
-markers = unique(c(markers, rownames(st)[grep('Ly6g', rownames(st))]))
 
-markers = c('Timp1', 'Timp2', 'Timp3', 'Timp4')
+markers = markers[!is.na(match(markers, rownames(st)))]
 
-pdfname = paste0(resDir, "/check_detected_celltypes_using_AdditionalMarkerGenes_", species, ".pdf")
+#markers = unique(c(markers, rownames(st)[grep('Ly6g', rownames(st))]))
+
+#markers = c('Timp1', 'Timp2', 'Timp3', 'Timp4')
+
+pdfname = paste0(resDir, "/check_detected_celltypes_using_AdditionalMarkerGenes_", species, '_', colnames(aa)[1],   ".pdf")
 pdf(pdfname, width = 16, height = 8)
 par(cex = 1.0, las = 1, mgp = c(2,0.2,0), mar = c(3,2,2,0.2), tcl = -0.3)
 
@@ -169,6 +180,5 @@ for(n in 1:length(markers))
 }
 
 dev.off()
-
 
 
