@@ -19,17 +19,7 @@ if(!dir.exists(RdataDir)) dir.create(RdataDir)
 
 dataDir = '../R11934_visium'
 
-require(Seurat)
-require(SeuratObject)
-require(ggplot2)
-require(tibble)
-require(dplyr)
-library(patchwork)
-
-firstup <- function(x) {
-  substr(x, 1, 1) <- toupper(substr(x, 1, 1))
-  x
-}
+source('functions_Visium.R')
 
 ########################################################
 ########################################################
@@ -58,7 +48,6 @@ for(n in 1:nrow(design))
     slice =  design$condition[n],
     filter.matrix = TRUE,
     to.upper = FALSE
-    
   )
   
   aa$condition = design$condition[n]
@@ -79,7 +68,6 @@ for(n in 1:nrow(design))
   }
   
   varibleGenes = unique(c(varibleGenes, VariableFeatures(aa)))
-  
   cat(design$condition[n], ' : ',  ncol(aa), ' spot found \n')
   
   # merge slices from different time points and 
