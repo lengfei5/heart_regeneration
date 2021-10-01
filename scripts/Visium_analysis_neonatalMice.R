@@ -56,14 +56,36 @@ for(n in 1:nrow(design))
   
   aa$condition = design$condition[n]
   
+  
   ##########################################
   # gene and cell filtering (to add later)
   ##########################################
   Filtering.cells.genes = FALSE
   if(Filtering.cells.genes){
+    
+    # remove some spots
+    cd = aa@images$neonatal.day1@coordinates
+    if(n ==1 ){
+      cropped = which(cd$imagerow > 6000 & cd$imagecol > 6000)
+      aa = aa[, cropped]
+      cat(ncol(aa), ' spots ', nrow(aa), 'genes left after spot removal\n')
+      #aa = subset(aa, neonatal.day1_imagerow > 8000 & neonatal.day1_imagecol > 8000, invert = FALSE)
+    }
+    
+    
+    aa[['percent.mt']] = PercentageFeatureSet(aa, pattern = "^Mt", assay = 'Spatial')
+    
+    VlnPlot(aa, features = c("nCount_Spatial", "nFeature_Spatial", "percent.mt"), ncol = 3)
+    
+    plot1 <- SpatialFeaturePlot(aa, features = "nCount_Spatial") + theme(legend.position = "bottom")
+    plot2 <- SpatialFeaturePlot(aa, features = "nFeature_Spatial") + theme(legend.position = "bottom")
+    plot3 <- SpatialFeaturePlot(aa, features = "percent.mt") + theme(legend.position = "bottom")
+    wrap_plots(plot1, plot2, plot3)
+    
+    
     #st[["percent.mt"]] <- PercentageFeatureSet(st, pattern = "^Mt-")
     # Visualize QC metrics as a violin plot
-    VlnPlot(st, features = c("nCount_Spatial", "nFeature_Spatial"), ncol = 2)
+    #VlnPlot(st, features = c("nCount_Spatial", "nFeature_Spatial"), ncol = 2)
     
     Idents(st) = st$condition
     FeatureScatter(st, feature1 = "nCount_Spatial", feature2 = "nFeature_Spatial")
