@@ -56,7 +56,6 @@ for(n in 1:nrow(design))
   
   aa$condition = design$condition[n]
   
-  
   ##########################################
   # gene and cell filtering (to add later)
   ##########################################
@@ -70,8 +69,8 @@ for(n in 1:nrow(design))
       aa = aa[, cropped]
       cat(ncol(aa), ' spots ', nrow(aa), 'genes left after spot removal\n')
       #aa = subset(aa, neonatal.day1_imagerow > 8000 & neonatal.day1_imagecol > 8000, invert = FALSE)
+      
     }
-    
     
     aa[['percent.mt']] = PercentageFeatureSet(aa, pattern = "^Mt", assay = 'Spatial')
     
@@ -96,6 +95,7 @@ for(n in 1:nrow(design))
     
   }
   
+  
   ##########################################
   # normalization 
   ##########################################
@@ -114,6 +114,21 @@ for(n in 1:nrow(design))
     DimPlot(aa, reduction = "umap", group.by = c("ident"))
     
   }
+  
+  DefaultAssay(st) <- "SCT"
+  VariableFeatures(st) <- varibleGenes
+  
+  st <- RunPCA(st, verbose = FALSE)
+  ElbowPlot(st)
+  st <- FindNeighbors(st, dims = 1:20)
+  st <- FindClusters(st, verbose = FALSE)
+  
+  st <- RunUMAP(st, dims = 1:10, n.neighbors = 20, min.dist = 0.1)
+  
+  DimPlot(st, reduction = "umap", group.by = c("ident", "condition"))
+  
+  SpatialFeaturePlot(st, features = 'Cd24a', image.alpha = 0.5)
+  
   
   varibleGenes = unique(c(varibleGenes, VariableFeatures(aa)))
   cat(design$condition[n], ' : ',  ncol(aa), ' spot found \n')
@@ -136,13 +151,9 @@ save(design, varibleGenes, st, file = paste0(RdataDir, 'seuratObject_design_vari
 ##########################################
 # cell and gene filtering
 ##########################################
-species = 'mouse_adult'
 species = 'mouse_neonadal'
 
-#load(file = paste0(RdataDir, 'seuratObject_design_variableGenes_mouse_adult.Rdata'))
 load(file = paste0(RdataDir, 'seuratObject_design_variableGenes_', species, '.Rdata'))
-
-
 
 #st = SCTransform(st, assay = "Spatial", verbose = FALSE)
 
@@ -158,6 +169,7 @@ st <- RunUMAP(st, dims = 1:10, n.neighbors = 20, min.dist = 0.1)
 
 DimPlot(st, reduction = "umap", group.by = c("ident", "condition"))
 
+SpatialFeaturePlot(st, features = 'Cd24a', image.alpha = 0.5)
 
 # import marker genes
 library(openxlsx)
