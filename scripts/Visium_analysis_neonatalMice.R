@@ -27,21 +27,16 @@ source('functions_Visium.R')
 # first start with neonatal mice samples
 ########################################################
 ########################################################
-#design = data.frame(seq(166904, 166911), c(paste0("adult.day", c(14, 7, 4, 1)), 
-#                                      paste0('neonatal.day', c(1, 4, 7, 14))), stringsAsFactors = FALSE)
-#design = data.frame(seq(166907, 166904), c(paste0("adult.day", c(1, 4, 7, 14))), stringsAsFactors = FALSE)
-
 design = data.frame(seq(166908, 166911), c(paste0('neonatal.day', c(1, 4, 7, 14))), stringsAsFactors = FALSE)
-
 colnames(design) = c('sampleID', 'condition')
+design.adult = data.frame(seq(166907, 166904), c(paste0("adult.day", c(1, 4, 7, 14))), stringsAsFactors = FALSE)
+colnames(design.adult) = colnames(design)
 
-varibleGenes = c()
-
+design = data.frame(rbind(design, design.adult))
 
 for(n in 1:nrow(design))
 {
-  # n = 1
-  
+  n = 3
   # load output from spaceranger
   aa = Seurat::Load10X_Spatial(
     data.dir = paste0(dataDir, '/output_', design$sampleID[n], '/', design$sampleID[n],  '/outs'),
@@ -51,6 +46,7 @@ for(n in 1:nrow(design))
     filter.matrix = TRUE,
     to.upper = FALSE
   )
+  
   cat(design$condition[n], ' -- ', design$sampleID[n], ' :\n')
   cat(ncol(aa), ' spots ', nrow(aa), 'genes detected \n')
   
@@ -59,99 +55,143 @@ for(n in 1:nrow(design))
   ##########################################
   # gene and cell filtering (to add later)
   ##########################################
-  Filtering.cells.genes = FALSE
+  pdfname = paste0(resDir, '/QCs_gene_marker_check_', design$condition[n], '.pdf')
+  pdf(pdfname, width=16, height = 8)
+  
+  #cd = aa@images$neonatal.day1@coordinates
+  cd = eval(parse(text = paste0('aa@images$', design$condition[n], '@coordinates')))
+  plot(cd$imagerow, cd$imagecol)
+  
+  Filtering.cells.genes = TRUE
   if(Filtering.cells.genes){
-    
-    # remove some spots
-    cd = aa@images$neonatal.day1@coordinates
+    # remove some spots that don't need to be considered 
     if(n ==1 ){
+      plot(cd$imagerow, cd$imagecol)
+      abline(v = 6000, col = 'red')
+      abline(h = 6000, col = 'red')
+      
       cropped = which(cd$imagerow > 6000 & cd$imagecol > 6000)
       aa = aa[, cropped]
       cat(ncol(aa), ' spots ', nrow(aa), 'genes left after spot removal\n')
       #aa = subset(aa, neonatal.day1_imagerow > 8000 & neonatal.day1_imagecol > 8000, invert = FALSE)
+    }
+    
+    if(n == 2){
+      plot(cd$imagerow, cd$imagecol)
+      abline(v = 6000, col = 'red')
+      abline(h = 15000, col = 'red')
+      
+      cropped = which(cd$imagecol < 15000)
+      aa = aa[, cropped]
+      cat(ncol(aa), ' spots ', nrow(aa), 'genes left after spot removal\n')
       
     }
     
+    if(n == 3){
+      plot(cd$imagerow, cd$imagecol)
+      abline(v = 6000, col = 'red')
+      abline(h = 15000, col = 'red')
+      
+      cropped = which(cd$imagerow > 6000)
+      aa = aa[, cropped]
+      cat(ncol(aa), ' spots ', nrow(aa), 'genes left after spot removal\n')
+      
+    }
+    
+    
     aa[['percent.mt']] = PercentageFeatureSet(aa, pattern = "^Mt", assay = 'Spatial')
     
-    VlnPlot(aa, features = c("nCount_Spatial", "nFeature_Spatial", "percent.mt"), ncol = 3)
+    Idents(aa) = design$condition[n]
+    
+    p1 = VlnPlot(aa, features = c("nCount_Spatial", "nFeature_Spatial", "percent.mt"), ncol = 3, pt.size = 1.0)
+    plot(p1)
+    
+    p1 = FeatureScatter(aa, feature1 = "nCount_Spatial", feature2 = "nFeature_Spatial")
+    p2 = FeatureScatter(aa, feature1 = "nCount_Spatial", feature2 = "percent.mt")
+    p3 = FeatureScatter(aa, feature1 = "nFeature_Spatial", feature2 = "percent.mt")
+    plot(wrap_plots(p1, p2, p3))
     
     plot1 <- SpatialFeaturePlot(aa, features = "nCount_Spatial") + theme(legend.position = "bottom")
     plot2 <- SpatialFeaturePlot(aa, features = "nFeature_Spatial") + theme(legend.position = "bottom")
     plot3 <- SpatialFeaturePlot(aa, features = "percent.mt") + theme(legend.position = "bottom")
-    wrap_plots(plot1, plot2, plot3)
-    
-    
-    #st[["percent.mt"]] <- PercentageFeatureSet(st, pattern = "^Mt-")
-    # Visualize QC metrics as a violin plot
-    #VlnPlot(st, features = c("nCount_Spatial", "nFeature_Spatial"), ncol = 2)
-    
-    Idents(st) = st$condition
-    FeatureScatter(st, feature1 = "nCount_Spatial", feature2 = "nFeature_Spatial")
+    plot(wrap_plots(plot1, plot2, plot3))
     
     #plot1 <- VlnPlot(st, features = "nCount_Spatial", pt.size = 0.1) + NoLegend()
     #plot2 <- SpatialFeaturePlot(aa, features = "nCount_Spatial") + theme(legend.position = "right")
     #wrap_plots(plot1, plot2)
-    
   }
-  
   
   ##########################################
   # normalization 
   ##########################################
   #aa <- SCTransform(aa, assay = "Spatial",  method = "glmGamPoi", verbose = FALSE)
-  aa <- SCTransform(aa, assay = "Spatial", verbose = FALSE, variable.features.n = 3000, return.only.var.genes = FALSE)
+  # min_cells = 5 only use genes that have been detected in at least this many cells (determine the gene nb of output)
+  aa <- SCTransform(aa, assay = "Spatial", verbose = FALSE, variable.features.n = 3000, return.only.var.genes = FALSE, 
+                    min_cells=5) 
   
-  test.clustering.each.condtiion = FALSE
-  if(test.clustering.each.condtiion){
-    aa <- RunPCA(aa, verbose = FALSE, weight.by.var = TRUE)
-    ElbowPlot(aa)
-    
-    aa <- FindNeighbors(aa, dims = 1:10)
-    aa <- FindClusters(aa, verbose = FALSE, algorithm = 3, resolution = 0.7)
-    aa <- RunUMAP(aa, dims = 1:10, n.neighbors = 30, min.dist = 0.05)
-    
-    DimPlot(aa, reduction = "umap", group.by = c("ident"))
+  aa <- RunPCA(aa, verbose = FALSE, weight.by.var = TRUE)
+  ElbowPlot(aa)
+  
+  aa <- FindNeighbors(aa, dims = 1:20)
+  aa <- FindClusters(aa, verbose = FALSE, algorithm = 3, resolution = 1.0)
+  aa <- RunUMAP(aa, dims = 1:20, n.neighbors = 20, min.dist = 0.1)
+  
+  DimPlot(aa, reduction = "umap", group.by = c("ident"))
+  
+  examples  = c('Mki67', 'Cdk1', 'Cdk4', 'Birc5',  
+                'Myh6', 'Tnnc1', 'Nppa', 'Col1a2', 'Vim', 'Emcn', 'Cd68', 'Csf1r')
+  
+  for(m in 1:length(examples)){
+    # m = 1
+    gg = examples[m]
+    if(length(which(rownames(aa) == gg)) > 0){
+      p1 = FeaturePlot(aa, reduction = 'umap', features = gg)
+      p2 = SpatialFeaturePlot(aa, features = gg, image.alpha = 0.5)
+      
+      plot(wrap_plots(p2, p1))
+      
+    }
     
   }
   
-  DefaultAssay(st) <- "SCT"
-  VariableFeatures(st) <- varibleGenes
+  dev.off()
   
-  st <- RunPCA(st, verbose = FALSE)
-  ElbowPlot(st)
-  st <- FindNeighbors(st, dims = 1:20)
-  st <- FindClusters(st, verbose = FALSE)
+  # DefaultAssay(st) <- "SCT"
+  # VariableFeatures(st) <- varibleGenes
+  # 
+  # st <- RunPCA(st, verbose = FALSE)
+  # ElbowPlot(st)
+  # st <- FindNeighbors(st, dims = 1:20)
+  # st <- FindClusters(st, verbose = FALSE)
+  # 
+  # st <- RunUMAP(st, dims = 1:10, n.neighbors = 20, min.dist = 0.1)
+  # 
+  # DimPlot(st, reduction = "umap", group.by = c("ident", "condition"))
+ 
   
-  st <- RunUMAP(st, dims = 1:10, n.neighbors = 20, min.dist = 0.1)
+  # varibleGenes = unique(c(varibleGenes, VariableFeatures(aa)))
+  # cat(design$condition[n], ' : ',  ncol(aa), ' spot found \n')
   
-  DimPlot(st, reduction = "umap", group.by = c("ident", "condition"))
-  
-  SpatialFeaturePlot(st, features = 'Cd24a', image.alpha = 0.5)
-  
-  
-  varibleGenes = unique(c(varibleGenes, VariableFeatures(aa)))
-  cat(design$condition[n], ' : ',  ncol(aa), ' spot found \n')
-  
-  
-  
-  # merge slices from different time points and 
-  if(n == 1) {
-    st = aa
-  }else{
-    st = merge(st, aa)
-  }
-  
-  remove(aa)
+  # save(design, varibleGenes, st, file = paste0(RdataDir, 'seuratObject_design_variableGenes_mouse_adult.Rdata'))
+  save(design, aa, file = paste0(RdataDir, 'seuratObject_design_st_mouse_', design$condition[n], '.Rdata'))
+
+  # 
+  # remove(aa)
 }
 
-# save(design, varibleGenes, st, file = paste0(RdataDir, 'seuratObject_design_variableGenes_mouse_adult.Rdata'))
-save(design, varibleGenes, st, file = paste0(RdataDir, 'seuratObject_design_variableGenes_mouse_neonadal.Rdata'))
+#save(design, varibleGenes, st, file = paste0(RdataDir, 'seuratObject_design_variableGenes_mouse_adult.Rdata'))
+#save(design, varibleGenes, st, file = paste0(RdataDir, 'seuratObject_design_variableGenes_mouse_neonadal.Rdata'))
 
 ##########################################
 # cell and gene filtering
 ##########################################
 species = 'mouse_neonadal'
+# # merge slices from different time points and 
+# if(n == 1) {
+#   st = aa
+# }else{
+#   st = merge(st, aa)
+# }
 
 load(file = paste0(RdataDir, 'seuratObject_design_variableGenes_', species, '.Rdata'))
 
