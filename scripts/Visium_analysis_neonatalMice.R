@@ -33,10 +33,14 @@ design.adult = data.frame(seq(166907, 166904), c(paste0("adult.day", c(1, 4, 7, 
 colnames(design.adult) = colnames(design)
 
 design = data.frame(rbind(design, design.adult))
+rm(design.adult)
+design$species = NA
+design$species[1:4] = 'neonatal'
+design$species[5:8] = 'adult'
 
 for(n in 1:nrow(design))
 {
-  n = 3
+  n = 5
   # load output from spaceranger
   aa = Seurat::Load10X_Spatial(
     data.dir = paste0(dataDir, '/output_', design$sampleID[n], '/', design$sampleID[n],  '/outs'),
@@ -64,6 +68,7 @@ for(n in 1:nrow(design))
   
   Filtering.cells.genes = TRUE
   if(Filtering.cells.genes){
+    
     # remove some spots that don't need to be considered 
     if(n ==1 ){
       plot(cd$imagerow, cd$imagecol)
@@ -98,7 +103,18 @@ for(n in 1:nrow(design))
       
     }
     
+    if(n == 4){
+      plot(cd$imagerow, cd$imagecol)
+      abline(v = 14500, col = 'red')
+      abline(h = 15000, col = 'red')
+      
+      cropped = which(cd$imagerow <14500)
+      aa = aa[, cropped]
+      cat(ncol(aa), ' spots ', nrow(aa), 'genes left after spot removal\n')
+      
+    }
     
+    # Cell QC metrics: percentage of Mt, nb of counts, nb of genes 
     aa[['percent.mt']] = PercentageFeatureSet(aa, pattern = "^Mt", assay = 'Spatial')
     
     Idents(aa) = design$condition[n]
@@ -116,9 +132,12 @@ for(n in 1:nrow(design))
     plot3 <- SpatialFeaturePlot(aa, features = "percent.mt") + theme(legend.position = "bottom")
     plot(wrap_plots(plot1, plot2, plot3))
     
-    #plot1 <- VlnPlot(st, features = "nCount_Spatial", pt.size = 0.1) + NoLegend()
-    #plot2 <- SpatialFeaturePlot(aa, features = "nCount_Spatial") + theme(legend.position = "right")
-    #wrap_plots(plot1, plot2)
+    if(design$species[n] == 'neonatal'){ pct.mt.cutoff = 0.6; }
+    if(design$species[n] == 'adult') { pct.mt.cutoff = 1.0 }
+    
+    aa = aa[, which(aa$percent.mt < pct.mt.cutoff)]
+    
+    
   }
   
   ##########################################
@@ -138,6 +157,18 @@ for(n in 1:nrow(design))
   
   DimPlot(aa, reduction = "umap", group.by = c("ident"))
   
+  # check cell cycle scores and phase assignments
+  s.genes <- firstup(cc.genes.updated.2019$s.genes)
+  g2m.genes <- firstup(cc.genes.updated.2019$g2m.genes)
+  aa <- CellCycleScoring(aa, s.features = s.genes, g2m.features = g2m.genes, set.ident = FALSE)
+  
+  #head(aa[[]])
+  
+  p1 = SpatialDimPlot(aa, group.by = "Phase", label.size = 7)
+  p2 = DimPlot(aa, reduction = "umap", group.by = c("Phase"))
+  
+  plot(wrap_plots(p1, p2))
+  
   examples  = c('Mki67', 'Cdk1', 'Cdk4', 'Birc5',  
                 'Myh6', 'Tnnc1', 'Nppa', 'Col1a2', 'Vim', 'Emcn', 'Cd68', 'Csf1r')
   
@@ -155,28 +186,9 @@ for(n in 1:nrow(design))
   }
   
   dev.off()
+  saveRDS(aa, file = paste0(RdataDir, 'seuratObject_design_st_mouse_', design$condition[n], '.rds'))
   
-  # DefaultAssay(st) <- "SCT"
-  # VariableFeatures(st) <- varibleGenes
-  # 
-  # st <- RunPCA(st, verbose = FALSE)
-  # ElbowPlot(st)
-  # st <- FindNeighbors(st, dims = 1:20)
-  # st <- FindClusters(st, verbose = FALSE)
-  # 
-  # st <- RunUMAP(st, dims = 1:10, n.neighbors = 20, min.dist = 0.1)
-  # 
-  # DimPlot(st, reduction = "umap", group.by = c("ident", "condition"))
- 
   
-  # varibleGenes = unique(c(varibleGenes, VariableFeatures(aa)))
-  # cat(design$condition[n], ' : ',  ncol(aa), ' spot found \n')
-  
-  # save(design, varibleGenes, st, file = paste0(RdataDir, 'seuratObject_design_variableGenes_mouse_adult.Rdata'))
-  save(design, aa, file = paste0(RdataDir, 'seuratObject_design_st_mouse_', design$condition[n], '.Rdata'))
-
-  # 
-  # remove(aa)
 }
 
 #save(design, varibleGenes, st, file = paste0(RdataDir, 'seuratObject_design_variableGenes_mouse_adult.Rdata'))
