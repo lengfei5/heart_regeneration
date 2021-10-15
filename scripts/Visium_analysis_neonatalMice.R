@@ -40,7 +40,7 @@ design$species[5:8] = 'adult'
 
 for(n in 1:nrow(design))
 {
-  n = 5
+  n = 8
   # load output from spaceranger
   aa = Seurat::Load10X_Spatial(
     data.dir = paste0(dataDir, '/output_', design$sampleID[n], '/', design$sampleID[n],  '/outs'),
@@ -133,10 +133,11 @@ for(n in 1:nrow(design))
     plot(wrap_plots(plot1, plot2, plot3))
     
     if(design$species[n] == 'neonatal'){ pct.mt.cutoff = 0.6; }
-    if(design$species[n] == 'adult') { pct.mt.cutoff = 1.0 }
+    if(design$species[n] == 'adult') { pct.mt.cutoff = 1 }
     
     aa = aa[, which(aa$percent.mt < pct.mt.cutoff)]
     
+    cat(ncol(aa), ' spots left after spot filtering \n')
     
   }
   
@@ -151,9 +152,9 @@ for(n in 1:nrow(design))
   aa <- RunPCA(aa, verbose = FALSE, weight.by.var = TRUE)
   ElbowPlot(aa)
   
-  aa <- FindNeighbors(aa, dims = 1:20)
-  aa <- FindClusters(aa, verbose = FALSE, algorithm = 3, resolution = 1.0)
-  aa <- RunUMAP(aa, dims = 1:20, n.neighbors = 20, min.dist = 0.1)
+  aa <- FindNeighbors(aa, dims = 1:10)
+  aa <- FindClusters(aa, verbose = FALSE, algorithm = 3, resolution = 0.5)
+  aa <- RunUMAP(aa, dims = 1:10, n.neighbors = 30, min.dist = 0.1)
   
   DimPlot(aa, reduction = "umap", group.by = c("ident"))
   
