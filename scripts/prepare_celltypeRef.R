@@ -97,6 +97,7 @@ p1 = DimPlot(aa, reduction = 'umap', group.by = 'condition')
 p2 = DimPlot(aa, reduction = 'umap', group.by = 'sample')
 p1 + p2
 
+
 gg.examples =  c('Nppa', 'Nppb', 'Myh6', 'Tnnc1', 'Tnni3', 
                  'Tnnt2', 'Actn2', 'Gata4', 'Nkx2-5', 'Gja1', 
                  'Myl2', 'Tpm1', 'Ryr2', 'Atp2a2', 'Acta1')
@@ -104,8 +105,6 @@ gg.examples =  c('Nppa', 'Nppb', 'Myh6', 'Tnnc1', 'Tnni3',
 p3 = FeaturePlot(aa, reduction = 'umap', features = gg.examples)
 
 
-p2 + p3 
-p1 + p3
 
 p1 + p2 + ggsave(paste0(resDir, '/Umap_newClusters_vs_cellType.original_v2.pdf'), 
                  width = 12, height = 8)
