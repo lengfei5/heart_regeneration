@@ -94,7 +94,7 @@ p1 + p2
 
 
 p1 = DimPlot(aa, reduction = 'umap', group.by = 'condition')
-p2 = DimPlot(aa, reduction = 'umap', group.by = 'sample')
+p2 = DimPlot(aa, reduction = 'umap', group.by = 'sample', pt.size = 1.0)
 p1 + p2
 
 
@@ -120,7 +120,6 @@ FeaturePlot(aa, reduction = 'umap', features = c('S100a3', 'S100a9'))
 # remove the mitochrio marker genes
 jj = grep('^mt-', rownames(aa)) 
 aa = aa[-jj, ]
-
 
 aa.markers <- FindAllMarkers(aa, only.pos = TRUE, min.pct = 0.25, logfc.threshold = 0.25)
 aa.markers %>%
