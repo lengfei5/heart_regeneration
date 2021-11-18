@@ -57,7 +57,7 @@ counts = counts[which(ss>0), ]
 metadata = data.frame(metadata)
 rownames(metadata) = metadata$CellID
 
-save(metadata, counts, file = paste0(RdataDir, 'metadata_counts_week.0.2.Rdata'))
+save(metadata, counts, file = paste0(RdataDir, 'metadata_counts_week0.week2.Rdata'))
 
 ##########################################
 # make Seurat object with metadata and counts  
