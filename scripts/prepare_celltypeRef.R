@@ -125,7 +125,6 @@ FeaturePlot(aa, reduction = 'umap', features = c('Csf1r', 'Cd163'))
 FeaturePlot(aa, reduction = 'umap', features = c('S100a3', 'S100a9'))
 
 
-
 ##########################################
 # define the subclusters of CM (to do)
 ##########################################
@@ -152,10 +151,32 @@ if(Refine.clustering.annotaiton){
 
 ########################################################
 ########################################################
-# Section : 
-# 
+# Section : adult non-caridomyocyte single cell dataset 
+# the dataset is from Forte et al. 2020 
+# processed dataset from the collaborate Shoval
 ########################################################
 ########################################################
+dataDir = '/groups/tanaka/People/current/jiwang/projects/heart_regeneration/data/'
+
+aa = readRDS(file = paste0(dataDir, 'Forte_et_al_forEladJingkui.rds'))
+
+# add some more information to the metadata
+aa$timepoints = NA
+aa$timepoints[which(aa$orig.ident == 'MF17010')] = 'd0'
+aa$timepoints[which(aa$orig.ident == 'MF17013')] = 'd1'
+aa$timepoints[which(aa$orig.ident == 'MF17014')] = 'd3'
+aa$timepoints[which(aa$orig.ident == 'MF17015')] = 'd5'
+aa$timepoints[which(aa$orig.ident == 'MF17016')] = 'd7'
+aa$timepoints[which(aa$orig.ident == 'MF17017')] = 'd14'
+aa$timepoints[which(aa$orig.ident == 'MF17018')] = 'd28'
+
+meta = aa@meta.data
+
+p1 = DimPlot(aa, reduction = 'umap_0.05', group.by = 'my_annot')
+p2 = DimPlot(aa, reduction = "umap_0.05", group.by = c("timepoints"))
+
+p1 + p2 + ggsave(paste0(resDir, '/Forte2020_Umap_clusters._cellType.original.pdf'), 
+                 width = 16, height = 8)
 
 
 
