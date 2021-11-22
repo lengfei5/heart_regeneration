@@ -324,11 +324,13 @@ if(Normalization == 'SCT'){
   # this command creates an 'integrated' data assay
   ref.combined <- IntegrateData(anchorset = ref.anchors, features.to.integrate = features.common)
   
+  rm(ref.anchors)
   # specify that we will perform downstream analysis on the corrected data note that the
   # original unmodified data still resides in the 'RNA' assay
   DefaultAssay(ref.combined) <- "integrated"
   
   saveRDS(ref.combined, file = paste0(RdataDir, 'Seurat.obj_adultMiceHeart_Forte2020_Ren2020_refCombined_logNormalize_v1.rds'))
+  
   
   # Run the standard workflow for visualization and clustering
   ref.combined <- ScaleData(ref.combined, verbose = FALSE)
@@ -347,7 +349,20 @@ if(Normalization == 'SCT'){
   p2 <- DimPlot(ref.combined, reduction = "umap", group.by = "annot.ref", label = TRUE,
                 repel = TRUE)
   p1 + p2 + ggsave(paste0(resDir, '/Forte2020_Ren2020_IntegrationRPCA_', Normalization, '.pdf'), 
-                   width = 16, height = 8)
+                   width = 24, height = 10)
+  
+  
+  ##########################################
+  # clean the reference, i.e. remove the non-cardiomyocyte from Ren2020
+  # change the confusing annotation names from Shoval
+  ##########################################
+  kk = which(ref.combined$dataset == 'Forte2020'| (ref.combined$dataset == 'Ren2020' & ref.combined$annot.ref != 'CM'))
+  refs = ref.combined[,kk]
+  
+  saveRDS(refs, file = paste0(RdataDir, 'Seurat.obj_adultMiceHeart_Forte2020_Ren2020_refCombined_cleanAnnot_logNormalize_v1.rds'))
+  
   
   
 }
+
+
