@@ -9,6 +9,7 @@
 ##########################################################################
 # setup for data import and sequencing QCs
 rm(list = ls())
+
 version.analysis = '_R11934_20210827'
 
 resDir = paste0("../results/visium_mouse", version.analysis)
@@ -20,6 +21,9 @@ if(!dir.exists(RdataDir)) dir.create(RdataDir)
 dataDir = '../R11934_visium'
 
 source('functions_Visium.R')
+library(pryr) # monitor the memory usage
+require(ggplot2)
+mem_used()
 
 ########################################################
 ########################################################
@@ -115,58 +119,79 @@ VariableFeatures(st) <- varibleGenes
 
 st <- RunPCA(st, verbose = FALSE)
 ElbowPlot(st)
-st <- FindNeighbors(st, dims = 1:20)
-st <- FindClusters(st, verbose = FALSE)
 
-st <- RunUMAP(st, dims = 1:10, n.neighbors = 20, min.dist = 0.1)
+st <- FindNeighbors(st, dims = 1:10)
+st <- FindClusters(st, verbose = FALSE, resolution = 0.5)
 
-DimPlot(st, reduction = "umap", group.by = c("ident", "condition"))
+st <- RunUMAP(st, dims = 1:20, n.neighbors = 30, min.dist = 0.05)
 
-SpatialFeaturePlot(st, features = 'Cd24a', image.alpha = 0.5)
+p1 = DimPlot(st, reduction = "umap", group.by = c("ident", "condition")) 
+
+p1 + ggsave(filename = paste0(resDir, '/UMAP_all.timepoints_', species, '.pdf'), width = 16, height = 8)
+
+FeaturePlot(st, features = c("Myh6", 'Nppa'))
+
+SpatialFeaturePlot(st, features = 'Myh6', image.alpha = 0.5)
 
 
-# import marker genes
-library(openxlsx)
-#aa = read.xlsx('../data/Markers_updated_v2.xlsx', sheet = 1, colNames = TRUE)
-aa = read.csv('../data/Tzahor_geneList.csv', header = TRUE)
-
-aa = aa[-c(1), c(1:2)]
-#aa = aa[-c(1), -c(1:3)]
-
-markers = c()
-for(n in 1:ncol(aa))
-{
-  markers = c(markers, aa[!is.na(aa[,n]), n])
-}
-markers = markers[which(markers != '')]
-markers = firstup(tolower(unique(markers)))
-markers = gsub(' ', '', markers)
-
-markers[is.na(match(markers, rownames(st)))]
-
-markers = markers[!is.na(match(markers, rownames(st)))]
-
-#markers = unique(c(markers, rownames(st)[grep('Ly6g', rownames(st))]))
-
-#markers = c('Timp1', 'Timp2', 'Timp3', 'Timp4')
-
-pdfname = paste0(resDir, "/check_detected_celltypes_using_AdditionalMarkerGenes_", species, '_', colnames(aa)[1],   ".pdf")
-pdf(pdfname, width = 16, height = 8)
-par(cex = 1.0, las = 1, mgp = c(2,0.2,0), mar = c(3,2,2,0.2), tcl = -0.3)
-
-# p1 = DimPlot(st, reduction = "umap", group.by = c("ident", "condition"))
-# plot(p1)
-# p2 = SpatialDimPlot(st)
-# plot(p2)
-
-for(n in 1:length(markers))
-{
-  cat(markers[n], '\n')
-  p3 = SpatialFeaturePlot(st, features = markers[n], image.alpha = 0.5)
+QCs.with.marker.genes = FALSE
+if(QCs.with.marker.genes){
+  # import marker genes
+  library(openxlsx)
+  #aa = read.xlsx('../data/Markers_updated_v2.xlsx', sheet = 1, colNames = TRUE)
+  aa = read.csv('../data/Tzahor_geneList.csv', header = TRUE)
   
-  plot(p3)
+  aa = aa[-c(1), c(1:2)]
+  #aa = aa[-c(1), -c(1:3)]
+  
+  markers = c()
+  for(n in 1:ncol(aa))
+  {
+    markers = c(markers, aa[!is.na(aa[,n]), n])
+  }
+  markers = markers[which(markers != '')]
+  markers = firstup(tolower(unique(markers)))
+  markers = gsub(' ', '', markers)
+  
+  markers[is.na(match(markers, rownames(st)))]
+  
+  markers = markers[!is.na(match(markers, rownames(st)))]
+  
+  #markers = unique(c(markers, rownames(st)[grep('Ly6g', rownames(st))]))
+  
+  #markers = c('Timp1', 'Timp2', 'Timp3', 'Timp4')
+  
+  pdfname = paste0(resDir, "/check_detected_celltypes_using_AdditionalMarkerGenes_", species, '_', colnames(aa)[1],   ".pdf")
+  pdf(pdfname, width = 16, height = 8)
+  par(cex = 1.0, las = 1, mgp = c(2,0.2,0), mar = c(3,2,2,0.2), tcl = -0.3)
+  
+  # p1 = DimPlot(st, reduction = "umap", group.by = c("ident", "condition"))
+  # plot(p1)
+  # p2 = SpatialDimPlot(st)
+  # plot(p2)
+  
+  for(n in 1:length(markers))
+  {
+    cat(markers[n], '\n')
+    p3 = SpatialFeaturePlot(st, features = markers[n], image.alpha = 0.5)
+    
+    plot(p3)
+  }
+  
+  dev.off()
+  
 }
 
-dev.off()
+########################################################
+########################################################
+# Section : cell type deconvolution for each time point 
+# 
+########################################################
+########################################################
+library(RCTD)
+library(Matrix)
+
+std1 = subset(st, subset = condition == 'adult.day1')
+
 
 

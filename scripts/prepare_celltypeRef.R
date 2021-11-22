@@ -285,6 +285,7 @@ if(Normalization == 'SCT'){
   p2 <- DimPlot(ref.sct, reduction = "umap", group.by = "seurat_annotations", label = TRUE,
                 repel = TRUE)
   p1 + p2
+  
 }else{
   aa = readRDS(file = paste0(RdataDir, 'Forte2020_logNormalize_allgenes.rds'))
   
@@ -331,7 +332,6 @@ if(Normalization == 'SCT'){
   
   saveRDS(ref.combined, file = paste0(RdataDir, 'Seurat.obj_adultMiceHeart_Forte2020_Ren2020_refCombined_logNormalize_v1.rds'))
   
-  
   # Run the standard workflow for visualization and clustering
   ref.combined <- ScaleData(ref.combined, verbose = FALSE)
   ref.combined <- RunPCA(ref.combined, npcs = 30, verbose = FALSE)
@@ -361,6 +361,30 @@ if(Normalization == 'SCT'){
   
   saveRDS(refs, file = paste0(RdataDir, 'Seurat.obj_adultMiceHeart_Forte2020_Ren2020_refCombined_cleanAnnot_logNormalize_v1.rds'))
   
+  rm(ref.combined)
+  
+  
+  # test refs without integration
+  DefaultAssay(refs) <- "RNA"
+  refs = FindVariableFeatures(refs, selection.method = "vst", nfeatures = 3000)
+  
+  # Run the standard workflow for visualization and clustering
+  refs <- ScaleData(refs, verbose = FALSE)
+  refs <- RunPCA(refs, npcs = 30, verbose = FALSE)
+  
+  ElbowPlot(refs, ndims = 30)
+  
+  refs <- FindNeighbors(refs, reduction = "pca", dims = 1:20)
+  refs <- FindClusters(refs, resolution = 0.5)
+  
+  refs <- RunUMAP(refs, reduction = "pca", dims = 1:30, n.neighbors = 50, min.dist = 0.05) 
+  
+  # Visualization
+  p1 <- DimPlot(refs, reduction = "umap", group.by = "dataset")
+  p2 <- DimPlot(refs, reduction = "umap", group.by = "annot.ref", label = TRUE,
+                repel = TRUE)
+  p1 + p2 + ggsave(paste0(resDir, '/Forte2020_Ren2020_noCorrection_', Normalization, '.pdf'), 
+                   width = 24, height = 10)
   
   
 }
