@@ -191,7 +191,7 @@ if(QCs.with.marker.genes){
 library(RCTD)
 library(Matrix)
 
-std1 = subset(st, subset = condition == 'adult.day1')
-
+stxs = SplitObject(st, split.by = 'condition')
+stx = stxs[[2]]
 
 

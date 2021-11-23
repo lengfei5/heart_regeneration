@@ -2,6 +2,9 @@
 ##########################################################################
 # Project: Heart regeneration 
 # Script purpose: prepare the single cell/nucleus RNA-seq data for the cell type reference
+# for adult heart there are tww references: cardiomyocyte and non-cardiomycyte. 
+# because the ST-specific deconvolution method requires UMI counts as input, at the end the deconvolution has to be done 
+# separately with two reference and integration post-hoc 
 # Usage example: 
 # Author: Jingkui Wang (jingkui.wang@imp.ac.at)
 # Date of creation: Thu Nov 11 14:14:12 2021
@@ -110,11 +113,15 @@ saveRDS(aa, file = paste0(RdataDir, 'Seurat.obj_adultMiceHeart_week0.week2_Ren20
 ### KEEP the umap configuration for only week0: nfeatures = 2000, dims = 1:20, n.neighbors = 30 and min.dist = 0.05 (sctransform)
 ### umap configuraiton for week0 and week2: nfeatures = 3000, dims = 1:20, n.neighbors = 30/50, min.dist = 0.1 (sctransform)
 ### umap configuration for week0 and week2: nfeatures = 3000, dims = 1:20, n.neighbors = 20, min.dist = 0.05 (seurat.norm)
-aa = RunUMAP(aa, dims = 1:20, n.neighbors = 30, min.dist = 0.1)
-saveRDS(aa, file =  paste0(RdataDir, 'Seurat.obj_adultMiceHeart_week0.week2_Ren2020_SCT_umap.rds'))
+aa = readRDS(file = paste0(RdataDir, 'Seurat.obj_adultMiceHeart_week0.week2_Ren2020_seuratNormalization.rds'))
 
-#aa <- RunUMAP(aa, dims = 1:20, n.neighbors = 20, min.dist = 0.05)
-#saveRDS(aa, file =  paste0(RdataDir, 'Seurat.obj_adultMiceHeart_week0.week2_Ren2020_seuratNormalization_umap.rds'))
+if(Normalization == 'SCT'){
+  aa = RunUMAP(aa, dims = 1:20, n.neighbors = 30, min.dist = 0.1)
+  #saveRDS(aa, file =  paste0(RdataDir, 'Seurat.obj_adultMiceHeart_week0.week2_Ren2020_SCT_umap.rds'))
+}else{
+  aa <- RunUMAP(aa, dims = 1:20, n.neighbors = 20, min.dist = 0.05)
+  #saveRDS(aa, file =  paste0(RdataDir, 'Seurat.obj_adultMiceHeart_week0.week2_Ren2020_seuratNormalization_umap.rds'))
+}
 
 p1 = DimPlot(aa, reduction = 'umap', group.by = 'seurat_clusters')
 p2 = DimPlot(aa, reduction = "umap", group.by = c("CellType"))
@@ -149,27 +156,32 @@ p1 + p2 + ggsave(paste0(resDir, '/Umap_newClusters_vs_cellType.original_seuratNo
 FeaturePlot(aa, reduction = 'umap', features = c('Csf1r', 'Cd163'))
 FeaturePlot(aa, reduction = 'umap', features = c('S100a3', 'S100a9'))
 
-
 ##########################################
 # define the subclusters of CM (to do)
 ##########################################
 
 
 ##########################################
-# heatmap of marker genes  
+# identify marker genes and heatmap 
 ##########################################
 Refine.clustering.annotaiton = FALSE
 if(Refine.clustering.annotaiton){
   # remove the mitochonio marker genes
-  jj = grep('^mt-', rownames(aa)) 
-  aa = aa[-jj, ]
+  #jj = grep('^mt-', rownames(aa)) 
+  #aa = aa[-jj, ]
   
-  aa.markers <- FindAllMarkers(aa, only.pos = TRUE, min.pct = 0.25, logfc.threshold = 0.25)
+  # remove non-annotated cells
+  aa = aa[ ,!is.na(aa$CellType)]
+  Idents(aa) = aa$CellType
+  
+  aa.markers <- FindAllMarkers(aa, only.pos = TRUE, min.pct = 0.3, logfc.threshold = 0.5)
+  
   aa.markers %>%
     group_by(cluster) %>%
     top_n(n = 10, wt = avg_log2FC) -> top10
   DoHeatmap(aa, features = top10$gene) + NoLegend() + ggsave(paste0(resDir, '/heatmap_markerGenes_rmMt.pdf'), 
                                                              width = 12, height = 16)
+    
 }
 
 ########################################################
@@ -333,6 +345,8 @@ if(Normalization == 'SCT'){
   saveRDS(ref.combined, file = paste0(RdataDir, 'Seurat.obj_adultMiceHeart_Forte2020_Ren2020_refCombined_logNormalize_v1.rds'))
   
   # Run the standard workflow for visualization and clustering
+  ref.combined = readRDS(file =paste0(RdataDir, 'Seurat.obj_adultMiceHeart_Forte2020_Ren2020_refCombined_logNormalize_v1.rds'))
+  
   ref.combined <- ScaleData(ref.combined, verbose = FALSE)
   ref.combined <- RunPCA(ref.combined, npcs = 30, verbose = FALSE)
   
@@ -356,13 +370,13 @@ if(Normalization == 'SCT'){
   # clean the reference, i.e. remove the non-cardiomyocyte from Ren2020
   # change the confusing annotation names from Shoval
   ##########################################
-  kk = which(ref.combined$dataset == 'Forte2020'| (ref.combined$dataset == 'Ren2020' & ref.combined$annot.ref != 'CM'))
+  kk = which(ref.combined$dataset == 'Forte2020'| (ref.combined$dataset == 'Ren2020' & ref.combined$annot.ref == 'CM'))
   refs = ref.combined[,kk]
   
-  saveRDS(refs, file = paste0(RdataDir, 'Seurat.obj_adultMiceHeart_Forte2020_Ren2020_refCombined_cleanAnnot_logNormalize_v1.rds'))
+  saveRDS(refs, file = paste0(RdataDir, 
+                              'Seurat.obj_adultMiceHeart_Forte2020.nonCM_Ren2020CM_refCombined_cleanAnnot_logNormalize_v1.rds'))
   
   rm(ref.combined)
-  
   
   # test refs without integration
   DefaultAssay(refs) <- "RNA"
@@ -386,7 +400,16 @@ if(Normalization == 'SCT'){
   p1 + p2 + ggsave(paste0(resDir, '/Forte2020_Ren2020_noCorrection_', Normalization, '.pdf'), 
                    width = 24, height = 10)
   
+  ##########################################
+  # try to reversely calculated batch-corrected UMI counts using corrected gene expression matrix from Seurat 
+  ##########################################
+  refs = readRDS(file = paste0(RdataDir, 'Seurat.obj_adultMiceHeart_Forte2020_Ren2020_refCombined_cleanAnnot_logNormalize_v1.rds'))
+  
+  
+  
   
 }
+
+
 
 
