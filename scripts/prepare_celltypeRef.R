@@ -299,8 +299,8 @@ if(Normalization == 'SCT'){
   p1 + p2
   
 }else{
-  aa = readRDS(file = paste0(RdataDir, 'Forte2020_logNormalize_allgenes.rds'))
   
+  aa = readRDS(file = paste0(RdataDir, 'Forte2020_logNormalize_allgenes.rds'))
   cms = readRDS(file =  paste0(RdataDir, 'Seurat.obj_adultMiceHeart_week0.week2_Ren2020_seuratNormalization_umap.rds'))
   aa$dataset = 'Forte2020'
   cms$dataset = 'Ren2020'
@@ -373,38 +373,82 @@ if(Normalization == 'SCT'){
   kk = which(ref.combined$dataset == 'Forte2020'| (ref.combined$dataset == 'Ren2020' & ref.combined$annot.ref == 'CM'))
   refs = ref.combined[,kk]
   
+  rm(ref.combined)
+  
   saveRDS(refs, file = paste0(RdataDir, 
                               'Seurat.obj_adultMiceHeart_Forte2020.nonCM_Ren2020CM_refCombined_cleanAnnot_logNormalize_v1.rds'))
   
-  rm(ref.combined)
+  # clean a bit the annotation
+  refs$celltype = refs$annot.ref
+  refs$celltype[which(refs$celltype == '0 - Fibro-I')] = 'FB1'
+  refs$celltype[which(refs$celltype == '9 - Fibro-II')] = 'FB2'
+  refs$celltype[which(refs$celltype == '11 - Fibro-III')] = 'FB3'
+  refs$celltype[which(refs$celltype == '15 - Fibro-IV')] = 'FB4'
+  
+  refs$celltype[which(refs$celltype == '2 - EC-I')] = 'EC1'
+  refs$celltype[which(refs$celltype == '18 - EC-II')] = 'EC2'
+  refs$celltype[which(refs$celltype == '19 - EC-III')] = 'EC3'
+  refs$celltype[which(refs$celltype == '17 - Lymph-EC')] = 'Lymph.EC'
+  
+  refs$celltype[which(refs$celltype == '6 - B cell')] = 'B'
+  refs$celltype[which(refs$celltype == '3 - MyoF')] = 'myoFB'
+  refs$celltype[which(refs$celltype == '16 - SMC')] = 'sMC'
+  
+  refs$celltype[which(refs$celltype == '4 - GRN')] = 'GN'
+  refs$celltype[which(refs$celltype == '12 - NK/T')] = 'NK.T'
+  refs$celltype[which(refs$celltype == '13 - Monon/DC')] = 'MCT.DC'
+  refs$celltype[which(refs$celltype == '5 - Chil3 Mono')] = 'MCT.Chil3'
+  
+  refs$celltype[which(refs$celltype == '1 - Trem2 Macs')] = 'Mphage.Trem2'
+  refs$celltype[which(refs$celltype == '10 - Arg1 Macs')] = 'Mphage.Argl'
+  refs$celltype[which(refs$celltype == '7 - MHCII Macs')] = 'MHCII.Mphage'
+  refs$celltype[which(refs$celltype == '14 - Proliferating Macs')] = 'prolife.Mphage'
+  
+  saveRDS(refs, file = paste0(RdataDir, 
+                              'SeuratObj_adultMiceHeart_refCombine_Forte2020.nonCM_Ren2020CM_cleanAnnot_logNormalize_v1.rds'))
+  
   
   # test refs without integration
-  DefaultAssay(refs) <- "RNA"
-  refs = FindVariableFeatures(refs, selection.method = "vst", nfeatures = 3000)
-  
-  # Run the standard workflow for visualization and clustering
-  refs <- ScaleData(refs, verbose = FALSE)
-  refs <- RunPCA(refs, npcs = 30, verbose = FALSE)
-  
-  ElbowPlot(refs, ndims = 30)
-  
-  refs <- FindNeighbors(refs, reduction = "pca", dims = 1:20)
-  refs <- FindClusters(refs, resolution = 0.5)
-  
-  refs <- RunUMAP(refs, reduction = "pca", dims = 1:30, n.neighbors = 50, min.dist = 0.05) 
-  
-  # Visualization
-  p1 <- DimPlot(refs, reduction = "umap", group.by = "dataset")
-  p2 <- DimPlot(refs, reduction = "umap", group.by = "annot.ref", label = TRUE,
-                repel = TRUE)
-  p1 + p2 + ggsave(paste0(resDir, '/Forte2020_Ren2020_noCorrection_', Normalization, '.pdf'), 
-                   width = 24, height = 10)
+  Test_refs_withoutIntegration = FALSE
+  if(Test_refs_){
+    DefaultAssay(refs) <- "RNA"
+    refs = FindVariableFeatures(refs, selection.method = "vst", nfeatures = 3000)
+    
+    # Run the standard workflow for visualization and clustering
+    refs <- ScaleData(refs, verbose = FALSE)
+    refs <- RunPCA(refs, npcs = 30, verbose = FALSE)
+    
+    ElbowPlot(refs, ndims = 30)
+    
+    refs <- FindNeighbors(refs, reduction = "pca", dims = 1:20)
+    refs <- FindClusters(refs, resolution = 0.5)
+    
+    refs <- RunUMAP(refs, reduction = "pca", dims = 1:30, n.neighbors = 50, min.dist = 0.05) 
+    
+    # Visualization
+    p1 <- DimPlot(refs, reduction = "umap", group.by = "dataset")
+    p2 <- DimPlot(refs, reduction = "umap", group.by = "annot.ref", label = TRUE,
+                  repel = TRUE)
+    p1 + p2 + ggsave(paste0(resDir, '/Forte2020_Ren2020_noCorrection_', Normalization, '.pdf'), 
+                     width = 24, height = 10)
+    
+  }
   
   ##########################################
   # try to reversely calculated batch-corrected UMI counts using corrected gene expression matrix from Seurat 
   ##########################################
-  refs = readRDS(file = paste0(RdataDir, 'Seurat.obj_adultMiceHeart_Forte2020_Ren2020_refCombined_cleanAnnot_logNormalize_v1.rds'))
+  refs = readRDS(file = paste0(RdataDir, 
+                               'SeuratObj_adultMiceHeart_refCombine_Forte2020.nonCM_Ren2020CM_cleanAnnot_logNormalize_v1.rds'))
   
+  p1 <- DimPlot(refs, reduction = "umap", group.by = "dataset")
+  p2 <- DimPlot(refs, reduction = "umap", group.by = "celltype", label = TRUE,
+                repel = TRUE)
+  p1 + p2
+  
+  metadata = refs@meta.data   
+  Ec = refs@assays$integrated@data 
+  counts = refs@assays$RNA@counts
+  counts = counts[match(rownames(Ec), rownames(counts)), ]
   
   
   
