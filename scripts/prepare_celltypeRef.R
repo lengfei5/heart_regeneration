@@ -29,6 +29,8 @@ require(ggplot2)
 library(dplyr)
 library(patchwork)
 require(tictoc)
+library(pryr) # monitor the memory usage
+mem_used()
 
 Normalization = 'lognormal' # ('lognormal or SCT')
 
@@ -231,6 +233,7 @@ if(Normalization == 'SCT'){
   saveRDS(aa, file = paste0(RdataDir, 'Forte2020_SCTnorm_allgenes.rds'))
   
 }else{
+  
   aa <- NormalizeData(aa, normalization.method = "LogNormalize", scale.factor = 10000)
   aa <- FindVariableFeatures(aa, selection.method = "vst", nfeatures = 3000)
   
@@ -253,8 +256,11 @@ ElbowPlot(aa, ndims = 30)
 aa <- FindNeighbors(aa, dims = 1:30)
 aa <- FindClusters(aa, verbose = FALSE, algorithm = 3, resolution = 0.5)
 
-aa <- RunUMAP(aa, dims = 1:30, n.neighbors = 50, min.dist = 0.05) 
+aa <- RunUMAP(aa, dims = 1:30, n.neighbors = 50, min.dist = 0.05)
+
 p1 = DimPlot(aa, reduction = 'umap', group.by = 'my_annot') + ggtitle(paste0(Normalization, ' umap'))
+
+
 
 p0 = DimPlot(aa, reduction = 'umap_0.05', group.by = 'my_annot') + ggtitle('original umap')
 p0 + p1 +  ggsave(paste0(resDir, '/Forte2020_myumap_cellType.Shoval_', Normalization, '.pdf'), 
@@ -266,10 +272,18 @@ p1 + p2 + ggsave(paste0(resDir, '/Forte2020_Umap_myclusters_cellType.Shoval_', N
                  width = 16, height = 8)
 
 ##########################################
-# integrate Ren2020 and Forte2020 to have one reference using SCTransform and RPCA from Seurat
+# double check Shoval's cluster annotation
+##########################################
+Double.check.adult.non.cardiomyocyte.major.celltypes.subtypes(aa)
+
+
+########################################################
+########################################################
+# Section : # integrate Ren2020 and Forte2020 to have one reference using SCTransform and RPCA from Seurat
 # original code from https://satijalab.org/seurat/articles/integration_rpca.html
 # 
-##########################################
+########################################################
+########################################################
 if(Normalization == 'SCT'){
   cms = readRDS(file =  paste0(RdataDir, 'Seurat.obj_adultMiceHeart_week0.week2_Ren2020_SCT_umap.rds'))
   

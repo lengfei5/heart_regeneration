@@ -25,6 +25,7 @@ library(pryr) # monitor the memory usage
 require(ggplot2)
 mem_used()
 
+
 ########################################################
 ########################################################
 # Section : import the processed visium data by spaceranger
@@ -191,7 +192,6 @@ if(QCs.with.marker.genes){
 library(RCTD)
 library(Matrix)
 
-stxs = SplitObject(st, split.by = 'condition')
-stx = stxs[[2]]
+stx = st[, which(st$condition == 'adult.day4')]
 
 

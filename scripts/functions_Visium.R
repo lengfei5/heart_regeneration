@@ -12,6 +12,8 @@ require(SeuratObject)
 require(ggplot2)
 require(tibble)
 require(dplyr)
+require(tictoc)
+
 library(patchwork)
 
 firstup <- function(x) {
@@ -26,47 +28,178 @@ firstup <- function(x) {
 # 
 ########################################################
 ########################################################
+##########################################
+# prepare reference data and double check the main cell types and subtypes 
+##########################################
+
+
+Double.check.adult.non.cardiomyocyte.major.celltypes.subtypes = function(aa)
+{
+  # modify the cell annotations
+  aa$celltype = as.character(aa$my_annot)
+  
+  # major cell type FB
+  aa$celltype[which(aa$celltype == '0 - Fibro-I')] = 'FB1'
+  aa$celltype[which(aa$celltype == '9 - Fibro-II')] = 'FB2'
+  aa$celltype[which(aa$celltype == '11 - Fibro-III')] = 'FB3'
+  aa$celltype[which(aa$celltype == '15 - Fibro-IV')] = 'FB4'
+  aa$celltype[which(aa$celltype == '3 - MyoF')] = 'myoFB'
+  
+  # major cell type EC
+  aa$celltype[which(aa$celltype == '2 - EC-I')] = 'EC1'
+  aa$celltype[which(aa$celltype == '18 - EC-II')] = 'EC2'
+  aa$celltype[which(aa$celltype == '19 - EC-III')] = 'EC3'
+  aa$celltype[which(aa$celltype == '17 - Lymph-EC')] = 'Lymph.EC'
+  
+  # major cell type smooth muscle cells
+  aa$celltype[which(aa$celltype == '16 - SMC')] = 'SMC'
+  
+  # immune cells
+  aa$celltype[which(aa$celltype == '6 - B cell')] = 'B'
+  aa$celltype[which(aa$celltype == '4 - GRN')] = 'GN'
+  aa$celltype[which(aa$celltype == '12 - NK/T')] = 'NK.T'
+  aa$celltype[which(aa$celltype == '13 - Monon/DC')] = 'MCT.DC'
+  aa$celltype[which(aa$celltype == '5 - Chil3 Mono')] = 'MCT.Chil3'
+  
+  aa$celltype[which(aa$celltype == '1 - Trem2 Macs')] = 'Mphage.Trem2'
+  aa$celltype[which(aa$celltype == '10 - Arg1 Macs')] = 'Mphage.Argl'
+  aa$celltype[which(aa$celltype == '7 - MHCII Macs')] = 'MHCII.Mphage'
+  aa$celltype[which(aa$celltype == '14 - Proliferating Macs')] = 'prolife.Mphage'
+  
+  # merge major cell types
+  aa$subtype = aa$celltype
+  
+  aa$celltype[grep('FB', aa$subtype)]  = 'FB'
+  aa$celltype[grep('EC1|EC2|EC3|Lymph.EC', aa$subtype)]  = 'EC'
+  aa$celltype[grep('SMC', aa$subtype)] = 'SMC'
+  
+  aa$celltype[grep('GN|MCT|Mphage|NK', aa$subtype)]  = 'immune'
+  aa$celltype[which(aa$subtype == 'B')] = 'immune'
+  
+  #saveRDS(aa, file = paste0(RdataDir, 'Forte2020_logNormalize_allgenes_majorCellTypes_subtypes.rds'))
+  
+  load(file = paste0(RdataDir, 'Forte2020_logNormalize_allgenes_majorCellTypes_subtypes.rds'))
+  
+  p0 = DimPlot(aa, reduction = 'umap_0.05', group.by = 'celltype') + ggtitle('Shoval UMAP')
+  
+  p1 = DimPlot(aa, reduction = 'umap', group.by = 'celltype') + ggtitle(paste0(Normalization, ' - Elad umap'))
+  
+  p0 + p1 
+  ggsave(paste0(resDir, '/Ref_Forte2020_majorCelltypes_Shoval.umap_vs_Elad.umap.', Normalization, '.pdf'), 
+         width = 18, height = 8)
+  
+  
+  for(mcells in c('all', 'FB', 'EC', 'immune'))
+  {
+    # mcells = 'immune'
+    
+    if(mcells == 'all'){
+      ax = aa
+      
+      Idents(ax) = ax$celltype
+      
+    }else{
+      ax = subset(aa, cells = colnames(aa)[which(aa$celltype == mcells & aa$subtype != 'B' & aa$subtype != 'GN')] )
+      table(ax$celltype)
+      table(ax$subtype)
+      
+      ax <- FindVariableFeatures(ax, selection.method = "vst", nfeatures = 3000)
+      ax <- ScaleData(ax, features = rownames(ax))
+      
+      ax <- RunPCA(ax, verbose = FALSE, weight.by.var = TRUE)
+      ElbowPlot(ax, ndims = 30)
+      
+      # UMAP to visualize subtypes
+      ax <- RunUMAP(ax, dims = 1:20, n.neighbors = 30, min.dist = 0.05, n_threads = 6)
+      
+      DimPlot(ax, reduction = 'umap', group.by = 'subtype') + 
+      ggtitle(paste0(mcells, '-', ' cells UMAP (', Normalization, ' nfeature = 3000, ndim=30, neighbors=30, mdist=0.05)'))
+      
+      ggsave(paste0(resDir, '/Ref_Forte2020_UMAP_', mcells, '_excluding B and GN_subcelltypes.pdf'), 
+             width = 10, height = 8)
+      
+      ax <- FindNeighbors(ax, dims = 1:20)
+      
+      ax <- FindClusters(ax, verbose = FALSE, algorithm = 3, resolution = 0.4)
+      p1 = DimPlot(ax, reduction = 'umap', group.by = 'seurat_clusters')
+      p0 = DimPlot(ax, reduction = 'umap', group.by = 'subtype')
+      
+      p0 + p1
+      # marker genes and heatmaps
+      Idents(ax) = ax$subtype
+      
+      gg.examples = c('Col1a2', 'Vim', 'Fstl1', 'Ddr2', 'Acta2', 'Postn', 'Tcf21', 'Pdgfra', 'Col3a1', 'Col1a1', 
+                      'Gsn', 'Fbln2', 'Sparc', 'Mmp2', 'Msln', 'Rspo1', 'Lum', 'Col8a1')
+      
+      gg.examples = c('Tek', 'Pecam1', 'Emcn', 'Cdh5', 'Kdr', 'Vwf', 'Fabp4', 'Tie1', 'Flt1', 'Epas1', 'Ednrb', 'Gpihbp1', 'Npr3')
+      VlnPlot(ax, features = gg.examples)
+      ggsave(paste0(resDir, '/VlnPlot_markerGenes_', mcells, '_subtypes.pdf'), width = 20, height = 16)
+      
+      
+    }
+    
+    ax.markers <- FindAllMarkers(ax, only.pos = TRUE, min.pct = 0.1, logfc.threshold = 0.25)
+    # saveRDS(ax.markers, file = paste0(RdataDir, 'Forte2020_logNormalize_allgenes_majorCellTypes_markerGenes.rds'))
+    
+    ax.markers %>%
+      group_by(cluster) %>%
+      top_n(n = 10, wt = avg_log2FC) -> top10
+    
+    DoHeatmap(ax, features = top10$gene)
+    
+    ggsave(paste0(resDir, '/heatmap_markerGenes_', mcells, '_subtypes.pdf'), width = 12, height = 20)
+    
+  }
+
+}
+
+##########################################
+# run cell type deconvolution with RCTD
+##########################################
 Run.celltype.deconvolution.RCTD = function(stx = std1, slice = 'adult.day1', Normalization = 'lognormalize')
 {
-  # slice = 'adult.day4'; Normalization = 'lognormalize'
+  # slice = 'adult.day4'; Normalization = 'lognormalize';
+  refs = readRDS(file = paste0(RdataDir, 
+                               'SeuratObj_adultMiceHeart_refCombine_Forte2020.nonCM_Ren2020CM_cleanAnnot_logNormalize_v1.rds'))
   
   # import cardiomyocyte reference 
-  aa = readRDS(file = paste0(RdataDir, 'Seurat.obj_adultMiceHeart_week0.week2_Ren2020_seuratNormalization.rds'))
+  # aa = readRDS(file = paste0(RdataDir, 'Seurat.obj_adultMiceHeart_week0.week2_Ren2020_seuratNormalization.rds'))
+  # 
+  # if(Normalization == 'SCT'){
+  #   aa = RunUMAP(aa, dims = 1:20, n.neighbors = 30, min.dist = 0.1)
+  #   #saveRDS(aa, file =  paste0(RdataDir, 'Seurat.obj_adultMiceHeart_week0.week2_Ren2020_SCT_umap.rds'))
+  # }else{
+  #   aa <- RunUMAP(aa, dims = 1:20, n.neighbors = 20, min.dist = 0.05)
+  #   #saveRDS(aa, file =  paste0(RdataDir, 'Seurat.obj_adultMiceHeart_week0.week2_Ren2020_seuratNormalization_umap.rds'))
+  # }
+  # 
+  # aa = aa[ ,!is.na(aa$CellType)]
+  # Idents(aa) = aa$CellType
   
-  if(Normalization == 'SCT'){
-    aa = RunUMAP(aa, dims = 1:20, n.neighbors = 30, min.dist = 0.1)
-    #saveRDS(aa, file =  paste0(RdataDir, 'Seurat.obj_adultMiceHeart_week0.week2_Ren2020_SCT_umap.rds'))
-  }else{
-    aa <- RunUMAP(aa, dims = 1:20, n.neighbors = 20, min.dist = 0.05)
-    #saveRDS(aa, file =  paste0(RdataDir, 'Seurat.obj_adultMiceHeart_week0.week2_Ren2020_seuratNormalization_umap.rds'))
-  }
-  
-  aa = aa[ ,!is.na(aa$CellType)]
-  Idents(aa) = aa$CellType
-  
-  aa.markers <- FindAllMarkers(aa, only.pos = TRUE, min.pct = 0.2, logfc.threshold = 0.5)
-  
+  # aa.markers <- FindAllMarkers(aa, only.pos = TRUE, min.pct = 0.2, logfc.threshold = 0.5)
   # gene used for cell type signature
-  genes.used =  intersect(aa.markers$gene[!is.na(match(aa.markers$gene, rownames(aa)))], 
-                          aa.markers$gene[!is.na(match(aa.markers$gene, rownames(stx)))])
+  #genes.used =  intersect(aa.markers$gene[!is.na(match(aa.markers$gene, rownames(aa)))], 
+  #                        aa.markers$gene[!is.na(match(aa.markers$gene, rownames(stx)))])
   
   ##########################################
   # prepare reference for RTCD
   # original code from https://raw.githack.com/dmcable/RCTD/dev/vignettes/spatial-transcriptomics.html
   # mainly for coarse CM cells
   ##########################################
-  counts <- aa@assays$RNA@counts
-  counts = counts[!is.na(match(rownames(counts), genes.used)), ]
+  E.corrected <- refs@assays$integrated@data
+  E.corrected = expm1(E.corrected) # linear scale of corrected gene expression
+  
+  #counts = counts[!is.na(match(rownames(counts), genes.used)), ]
   #rownames(counts) <- counts[,1]; counts[,1] <- NULL # Move first column to rownames
-  meta_data <- aa@meta.data
-  cell_types <- meta_data$CellType
-  names(cell_types) <- meta_data$CellID # create cell_types named list
+  cell_types <- refs@meta.data$celltype
+  names(cell_types) <- colnames(refs) # create cell_types named list
   cell_types <- as.factor(cell_types) # convert to factor data type
-  nUMI <- meta_data$nCount_RNA 
-  names(nUMI) <- meta_data$CellID # create nUMI named list
+  
+  #nUMI <- meta_data$nCount_RNA 
+  #names(nUMI) <- meta_data$CellID # create nUMI named list
   
   ### Create the Reference object
-  reference <- Reference(counts, cell_types, nUMI)
+  reference <- Reference(E.corrected, cell_types, nUMI = NULL, require_int = FALSE)
     
   ## Examine reference object (optional)
   print(dim(reference@counts)) #observe Digital Gene Expression matrix
@@ -102,12 +235,16 @@ Run.celltype.deconvolution.RCTD = function(stx = std1, slice = 'adult.day1', Nor
   plot_puck_continuous(puck, barcodes, puck@nUMI, ylimit = c(0, round(quantile(puck@nUMI,0.9))), 
                        title ='plot of nUMI') 
   
-  myRCTD <- create.RCTD(puck, reference, max_cores = 8, gene_cutoff = 10^-10, fc_cutoff = 0.01, gene_cutoff_reg = 10^-10, 
+  myRCTD <- create.RCTD(puck, reference, max_cores = 16, gene_cutoff = 0.000125, fc_cutoff = 0.5, 
+                        gene_cutoff_reg = 2e-04,  fc_cutoff_reg = 0.75,
+                        UMI_min = 100, UMI_max = 2e+07, 
                         CELL_MIN_INSTANCE = 25)
   
-  myRCTD <- run.RCTD(myRCTD, doublet_mode = 'doublet')
   
-  saveRDS(myRCTD, file = paste0(RdataDir, 'RCTD_results_ref_Ren2020_', slice, '.rds'))
+  tic()
+  myRCTD <- run.RCTD(myRCTD, doublet_mode = 'doublet')
+  saveRDS(myRCTD, file = paste0(RdataDir, 'RCTD_results_refCombined_Forte2020.Ren2020_', slice, '.rds'))
+  toc()
   
   results <- myRCTD@results
   
