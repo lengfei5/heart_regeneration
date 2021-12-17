@@ -176,10 +176,6 @@ Double.check.adult.non.cardiomyocyte.major.celltypes.subtypes = function(aa)
   aa$celltype[grep('GN|MCT|Mphage|NK', aa$subtype)]  = 'immune'
   aa$celltype[which(aa$subtype == 'B')] = 'immune'
   
-  #saveRDS(aa, file = paste0(RdataDir, 'Forte2020_logNormalize_allgenes_majorCellTypes_subtypes.rds'))
-  
-  aa = readRDS(file = paste0(RdataDir, 'Forte2020_logNormalize_allgenes_majorCellTypes_subtypes.rds'))
-  
   p0 = DimPlot(aa, reduction = 'umap_0.05', group.by = 'celltype') + ggtitle('Shoval UMAP')
   
   p1 = DimPlot(aa, reduction = 'umap', group.by = 'celltype') + ggtitle(paste0(Normalization, ' - Elad umap'))
@@ -191,7 +187,7 @@ Double.check.adult.non.cardiomyocyte.major.celltypes.subtypes = function(aa)
   
   for(mcells in c('all', 'FB', 'EC', 'immune'))
   {
-    # mcells = 'immune'
+    # mcells = 'immune.others'
     
     if(mcells == 'all'){
       ax = aa
@@ -199,7 +195,8 @@ Double.check.adult.non.cardiomyocyte.major.celltypes.subtypes = function(aa)
       Idents(ax) = ax$celltype
       
     }else{
-      ax = subset(aa, cells = colnames(aa)[which(aa$celltype == mcells & aa$subtype != 'B' & aa$subtype != 'GN')] )
+      ax = subset(aa, cells = colnames(aa)[which(aa$celltype == mcells & aa$subtype != 'B' & aa$subtype != 'GN' &
+                                                   aa$subtype != 'NK.T')] )
       table(ax$celltype)
       table(ax$subtype)
       
@@ -210,12 +207,12 @@ Double.check.adult.non.cardiomyocyte.major.celltypes.subtypes = function(aa)
       ElbowPlot(ax, ndims = 30)
       
       # UMAP to visualize subtypes
-      ax <- RunUMAP(ax, dims = 1:20, n.neighbors = 30, min.dist = 0.05, n_threads = 6)
+      ax <- RunUMAP(ax, dims = 1:30, n.neighbors = 30, min.dist = 0.05, n_threads = 6)
       
       DimPlot(ax, reduction = 'umap', group.by = 'subtype') + 
       ggtitle(paste0(mcells, '-', ' cells UMAP (', Normalization, ' nfeature = 3000, ndim=30, neighbors=30, mdist=0.05)'))
       
-      ggsave(paste0(resDir, '/Ref_Forte2020_UMAP_', mcells, '_excluding B and GN_subcelltypes.pdf'), 
+      ggsave(paste0(resDir, '/Ref_Forte2020_UMAP_', mcells, '_excluding B GN NK.T_subcelltypes.pdf'), 
              width = 10, height = 8)
       
       ax <- FindNeighbors(ax, dims = 1:20)
@@ -250,7 +247,43 @@ Double.check.adult.non.cardiomyocyte.major.celltypes.subtypes = function(aa)
     ggsave(paste0(resDir, '/heatmap_markerGenes_', mcells, '_subtypes.pdf'), width = 12, height = 20)
     
   }
-
+  
+  ##########################################
+  # add distinct immune cells as major cell types  
+  ##########################################
+  jj = which(aa$subtype == 'B')
+  aa$celltype[jj] = aa$subtype[jj] 
+  
+  jj = which(aa$subtype == 'GN')
+  aa$celltype[jj] = aa$subtype[jj] 
+  
+  jj = which(aa$subtype == 'NK.T')
+  aa$celltype[jj] = aa$subtype[jj] 
+  
+  jj = which(aa$subtype == 'prolife.Mphage')
+  aa$celltype[jj] = aa$subtype[jj] 
+  
+  jj = which(aa$subtype == 'MHCII.Mphage')
+  aa$celltype[jj] = aa$subtype[jj] 
+  
+  jj = which(aa$subtype == 'MCT.DC')
+  aa$celltype[jj] = 'immune.others'
+  
+  jj = which(aa$celltype == 'immune')
+  aa$celltype[jj] = 'immune.others'
+  
+  p0 = DimPlot(aa, reduction = 'umap', group.by = 'celltype')
+  p1 = DimPlot(aa, reduction = 'umap', group.by = 'subtype')
+  
+  p0 + p1
+  ggsave(paste0(resDir, '/heatmap_markerGenes_', mcells, '_majoyCelltypes_subtypes.pdf'), width = 12, height = 20)
+  
+  rm(ax)
+  
+  xx = DietSeurat(aa, counts = TRUE, data = TRUE, scale.data = FALSE, assays = 'RNA', dimreducs = 'umap')
+  rm(aa)
+  save(xx, file = paste0(RdataDir, 'Forte2020_logNormalize_allgenes_majorCellTypes_subtypes.rds'))
+   
 }
 
 ##########################################

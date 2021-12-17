@@ -159,10 +159,9 @@ meta = aa@meta.data
 p1 = DimPlot(aa, reduction = 'umap_0.05', group.by = 'my_annot')
 p2 = DimPlot(aa, reduction = "umap_0.05", group.by = c("timepoints"))
 
-p1 + p2 + ggsave(paste0(resDir, '/Forte2020_Umap_clusters._cellType.original.pdf'), 
+p1 + p2 
+ggsave(paste0(resDir, '/Forte2020_Umap_clusters._cellType.original.pdf'), 
                  width = 16, height = 8)
-
-saveRDS(aa, file = paste0(RdataDir, 'Forte2020_processedSeurat.obj.from.Shoval.rds'))
 
 ##########################################
 # explore the normalization and intergration 
@@ -206,14 +205,15 @@ aa <- RunUMAP(aa, dims = 1:30, n.neighbors = 50, min.dist = 0.05)
 p1 = DimPlot(aa, reduction = 'umap', group.by = 'my_annot') + ggtitle(paste0(Normalization, ' umap'))
 
 
-
 p0 = DimPlot(aa, reduction = 'umap_0.05', group.by = 'my_annot') + ggtitle('original umap')
-p0 + p1 +  ggsave(paste0(resDir, '/Forte2020_myumap_cellType.Shoval_', Normalization, '.pdf'), 
+p0 + p1 
+ggsave(paste0(resDir, '/Forte2020_myumap_cellType.Shoval_', Normalization, '.pdf'), 
                width = 16, height = 8)
 
 p2 = DimPlot(aa, reduction = "umap", group.by = c("timepoints"))
 
-p1 + p2 + ggsave(paste0(resDir, '/Forte2020_Umap_myclusters_cellType.Shoval_', Normalization, '.pdf'), 
+p1 + p2 
+ggsave(paste0(resDir, '/Forte2020_Umap_myclusters_cellType.Shoval_', Normalization, '.pdf'), 
                  width = 16, height = 8)
 
 ##########################################
@@ -224,7 +224,7 @@ Double.check.adult.non.cardiomyocyte.major.celltypes.subtypes(aa)
 
 ########################################################
 ########################################################
-# Section : # integrate Ren2020 and Forte2020 to have one reference using SCTransform and RPCA from Seurat
+# Section III: # integrate Ren2020 and Forte2020 to have one reference using SCTransform and RPCA from Seurat
 # original code from https://satijalab.org/seurat/articles/integration_rpca.html
 # 
 ########################################################
@@ -461,7 +461,3 @@ if(Normalization == 'SCT'){
   
   
 }
-
-
-
-
