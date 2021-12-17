@@ -125,30 +125,12 @@ Double.check.adult.cardiomyocyte.major.celltypes.subtypes = function(aa)
   
   ggsave(paste0(resDir, '/heatmap_markerGenes_', mcells, '_subtypes.pdf'), width = 12, height = 26)
   
+  aa$subtype[match(colnames(ax), colnames(aa))] = ax$subtype
+  saveRDS(aa, file =  paste0(RdataDir, 'Seurat.obj_adultMiceHeart_week0.week2_Ren2020_seuratNormalization_umap_subtypes.rds'))
   
-  # ##########################################
-  # # identify marker genes and heatmap 
-  # ##########################################
-  # Refine.clustering.annotaiton = FALSE
-  # if(Refine.clustering.annotaiton){
-  #   # remove the mitochonio marker genes
-  #   #jj = grep('^mt-', rownames(aa)) 
-  #   #aa = aa[-jj, ]
-  #   
-  #   # remove non-annotated cells
-  #   aa = aa[ ,!is.na(aa$CellType)]
-  #   Idents(aa) = aa$CellType
-  #   
-  #   aa.markers <- FindAllMarkers(aa, only.pos = TRUE, min.pct = 0.3, logfc.threshold = 0.5)
-  #   
-  #   aa.markers %>%
-  #     group_by(cluster) %>%
-  #     top_n(n = 10, wt = avg_log2FC) -> top10
-  #   DoHeatmap(aa, features = top10$gene) + NoLegend() + ggsave(paste0(resDir, '/heatmap_markerGenes_rmMt.pdf'), 
-  #                                                              width = 12, height = 16)
-  #   
-  # }
-  # 
+  rm(aa)
+  rm(ax)
+  
 }
 
 Double.check.adult.non.cardiomyocyte.major.celltypes.subtypes = function(aa)
@@ -196,7 +178,7 @@ Double.check.adult.non.cardiomyocyte.major.celltypes.subtypes = function(aa)
   
   #saveRDS(aa, file = paste0(RdataDir, 'Forte2020_logNormalize_allgenes_majorCellTypes_subtypes.rds'))
   
-  load(file = paste0(RdataDir, 'Forte2020_logNormalize_allgenes_majorCellTypes_subtypes.rds'))
+  aa = readRDS(file = paste0(RdataDir, 'Forte2020_logNormalize_allgenes_majorCellTypes_subtypes.rds'))
   
   p0 = DimPlot(aa, reduction = 'umap_0.05', group.by = 'celltype') + ggtitle('Shoval UMAP')
   

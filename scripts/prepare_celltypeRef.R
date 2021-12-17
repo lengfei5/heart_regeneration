@@ -36,7 +36,7 @@ Normalization = 'lognormal' # ('lognormal or SCT')
 
 ########################################################
 ########################################################
-# Section : First process the adult cardiomyocyte from Ren et al., 2020
+# Section I : First process the adult cardiomyocyte from Ren et al., 2020
 # 
 ########################################################
 ########################################################
@@ -133,7 +133,7 @@ Double.check.adult.cardiomyocyte.major.celltypes.subtypes(aa)
 
 ########################################################
 ########################################################
-# Section : adult non-caridomyocyte single cell dataset 
+# Section II : adult non-caridomyocyte single cell dataset 
 # the dataset is from Forte et al. 2020 
 # processed dataset from the collaborate Shoval
 # in which the lognormal normalization was used and no batch correction or data integration were performed
