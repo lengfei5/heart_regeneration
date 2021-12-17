@@ -31,7 +31,125 @@ firstup <- function(x) {
 ##########################################
 # prepare reference data and double check the main cell types and subtypes 
 ##########################################
-
+Double.check.adult.cardiomyocyte.major.celltypes.subtypes = function(aa)
+{
+  p1 = DimPlot(aa, reduction = 'umap', group.by = 'seurat_clusters')
+  p2 = DimPlot(aa, reduction = "umap", group.by = c("CellType"))
+  p1 + p2 
+  
+  p3 = DimPlot(aa, reduction = 'umap', group.by = 'condition')
+  p4 = DimPlot(aa, reduction = 'umap', group.by = 'sample')
+  (p1 + p2)/(p3 + p4)
+  ggsave(paste0(resDir, '/Umap_Ren2020_week0.week2_newClusters_vs_cellType.original_conditions_samples_seuratNorm.pdf'), 
+           width = 12, height = 8)
+  
+  # double check the cardiomyocyte markers from Elad 
+  gg.examples =  c('Nppa', 'Nppb', 'Myh6', 'Tnnc1', 'Tnni3', 
+                   'Tnnt2', 'Actn2', 'Gata4', 'Nkx2-5', 'Gja1', 
+                   'Myl2', 'Tpm1', 'Ryr2', 'Atp2a2', 'Acta1')
+  
+  p5 = FeaturePlot(aa, reduction = 'umap', features = gg.examples)
+  
+  p2 / p5 + ggsave(paste0(resDir, '/Umap_cellType.original_FeatuerPlot_cardiomyocyoteMarkers_seuratNorm.pdf'), 
+                   width = 14, height = 20)
+  
+  p6 = VlnPlot(aa, features = gg.examples, group.by = 'CellType')
+  
+  p6 + ggsave(paste0(resDir, '/Umap_VlnPlot_cardiomyocyoteMarkers_seuratNorm.pdf'), 
+              width = 14, height = 10)
+  
+  p1 + p2 + ggsave(paste0(resDir, '/Umap_newClusters_vs_cellType.original_seuratNorm.pdf'), 
+                   width = 12, height = 8)
+  
+  #DimPlot(aa, reduction = "umap", group.by = c("SubCluster"))
+  
+  FeaturePlot(aa, reduction = 'umap', features = c('Csf1r', 'Cd163'))
+  FeaturePlot(aa, reduction = 'umap', features = c('S100a3', 'S100a9'))
+  
+  ##########################################
+  # double check the subtypes of CM 
+  ##########################################
+  aa$celltype = aa$CellType
+  aa$subtype = aa$SubCluster
+  
+  mcells = 'CM'
+  ax = subset(aa, cells = colnames(aa)[which(aa$CellType == mcells)])
+  table(ax$celltype)
+  table(ax$subtype)
+  
+  ax <- FindVariableFeatures(ax, selection.method = "vst", nfeatures = 5000)
+  ax <- ScaleData(ax, features = rownames(ax))
+  
+  ax <- RunPCA(ax, verbose = FALSE, weight.by.var = TRUE)
+  ElbowPlot(ax, ndims = 30)
+  
+  # UMAP to visualize subtypes
+  ax <- RunUMAP(ax, dims = 1:10, n.neighbors = 20, min.dist = 0.05, n_threads = 6)
+  
+  DimPlot(ax, reduction = 'umap', group.by = 'subtype') + 
+    ggtitle(paste0(mcells, '-', ' cells UMAP (', Normalization, ' nfeature = 5000, ndim=10, neighbors=20, mdist=0.05)'))
+  
+  ggsave(paste0(resDir, '/Ref_Ren2020_UMAP_', mcells, '_subcelltypes.pdf'), 
+         width = 10, height = 8)
+  
+  ax <- FindNeighbors(ax, dims = 1:10)
+  
+  ax <- FindClusters(ax, verbose = FALSE, algorithm = 3, resolution = 0.5)
+  p1 = DimPlot(ax, reduction = 'umap', group.by = 'seurat_clusters')
+  p0 = DimPlot(ax, reduction = 'umap', group.by = 'subtype')
+  
+  p0 + p1
+  
+  ax$subtype = paste0('CM', ax$seurat_clusters)
+  Idents(ax) = ax$subtype
+  
+  FeaturePlot(ax, features = c('Sln', 'Myl4', 'Myl7', 'Nppa', 'Myl1', # Atrial CM markers
+                               'Fabp3', 'Pln', 'Myl2', 'Myl3', 'Pin', 'Mb' # Ventricular CMs
+                               ))
+  
+ 
+  VlnPlot(ax, features = c('Sln', 'Myl4', 'Myl7', 'Nppa', 'Myl1', # Atrial CM markers
+                           'Fabp3', 'Pln', 'Myl2', 'Myl3', 'Pin', 'Mb' # Ventricular CMs
+  ))
+  
+  ggsave(paste0(resDir, '/VlnPLot_Atrial_Ventricular_markerGenes_', mcells, '_subtypes.pdf'), width = 12, height = 10)
+  
+  ax.markers <- FindAllMarkers(ax, only.pos = TRUE, min.pct = 0.2, logfc.threshold = 0.3)
+  # saveRDS(ax.markers, file = paste0(RdataDir, 'Forte2020_logNormalize_allgenes_majorCellTypes_markerGenes.rds'))
+  
+  ax.markers %>%
+    group_by(cluster) %>%
+    top_n(n = 20, wt = avg_log2FC) -> top10
+  
+  DoHeatmap(ax, features = top10$gene)
+  
+  ggsave(paste0(resDir, '/heatmap_markerGenes_', mcells, '_subtypes.pdf'), width = 12, height = 26)
+  
+  
+  # ##########################################
+  # # identify marker genes and heatmap 
+  # ##########################################
+  # Refine.clustering.annotaiton = FALSE
+  # if(Refine.clustering.annotaiton){
+  #   # remove the mitochonio marker genes
+  #   #jj = grep('^mt-', rownames(aa)) 
+  #   #aa = aa[-jj, ]
+  #   
+  #   # remove non-annotated cells
+  #   aa = aa[ ,!is.na(aa$CellType)]
+  #   Idents(aa) = aa$CellType
+  #   
+  #   aa.markers <- FindAllMarkers(aa, only.pos = TRUE, min.pct = 0.3, logfc.threshold = 0.5)
+  #   
+  #   aa.markers %>%
+  #     group_by(cluster) %>%
+  #     top_n(n = 10, wt = avg_log2FC) -> top10
+  #   DoHeatmap(aa, features = top10$gene) + NoLegend() + ggsave(paste0(resDir, '/heatmap_markerGenes_rmMt.pdf'), 
+  #                                                              width = 12, height = 16)
+  #   
+  # }
+  # 
+}
 
 Double.check.adult.non.cardiomyocyte.major.celltypes.subtypes = function(aa)
 {
