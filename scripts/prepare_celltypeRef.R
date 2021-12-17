@@ -229,38 +229,13 @@ Double.check.adult.non.cardiomyocyte.major.celltypes.subtypes(aa)
 # 
 ########################################################
 ########################################################
-if(Normalization == 'SCT'){
-  cms = readRDS(file =  paste0(RdataDir, 'Seurat.obj_adultMiceHeart_week0.week2_Ren2020_SCT_umap.rds'))
+Merge.adult.mice.cardiomyocyte.noncardiomyocyte = FALSE
+
+if(Merge.adult.mice.cardiomyocyte.noncardiomyocyte){
   
-  ref.list = list(aa, cms)
+  aa = readRDS(file = paste0(RdataDir, 'Forte2020_logNormalize_allgenes_majorCellTypes_subtypes.rds'))
+  cms = readRDS(file =  paste0(RdataDir, 'Seurat.obj_adultMiceHeart_week0.week2_Ren2020_seuratNormalization_umap_subtypes.rds'))
   
-  features <- SelectIntegrationFeatures(object.list = ref.list, nfeatures = 3000, assay = c('SCT', 'SCT'))
-  #features <- SelectIntegrationFeatures(object.list = ifnb.list, nfeatures = 3000)
-  ref.list <- PrepSCTIntegration(object.list = ref.list, anchor.features = features)
-  
-  ref.list <- lapply(X = ref.list, FUN = RunPCA, features = features)
-  
-  # this command creates an 'integrated' data assay
-  ref.anchors <- FindIntegrationAnchors(object.list = ref.list, normalization.method = "SCT",
-                                        anchor.features = features, dims = 1:30, reduction = "rpca", k.anchor = 20)
-  
-  ref.sct <- IntegrateData(anchorset = ref.anchors, normalization.method = "SCT", dims = 1:30)
-  
-  ref.sct <- RunPCA(ref.sct, verbose = FALSE)
-  ref.sct <- RunUMAP(ref.sct, reduction = "pca", dims = 1:30)
-  
-  DefaultAssay(ref.sct) <- "integrated"
-  
-  # Visualization
-  p1 <- DimPlot(ref.sct, reduction = "umap", group.by = "stim")
-  p2 <- DimPlot(ref.sct, reduction = "umap", group.by = "seurat_annotations", label = TRUE,
-                repel = TRUE)
-  p1 + p2
-  
-}else{
-  
-  aa = readRDS(file = paste0(RdataDir, 'Forte2020_logNormalize_allgenes.rds'))
-  cms = readRDS(file =  paste0(RdataDir, 'Seurat.obj_adultMiceHeart_week0.week2_Ren2020_seuratNormalization_umap.rds'))
   aa$dataset = 'Forte2020'
   cms$dataset = 'Ren2020'
   aa$annot.ref = aa$my_annot

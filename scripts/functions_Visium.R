@@ -282,7 +282,7 @@ Double.check.adult.non.cardiomyocyte.major.celltypes.subtypes = function(aa)
   
   xx = DietSeurat(aa, counts = TRUE, data = TRUE, scale.data = FALSE, assays = 'RNA', dimreducs = 'umap')
   rm(aa)
-  save(xx, file = paste0(RdataDir, 'Forte2020_logNormalize_allgenes_majorCellTypes_subtypes.rds'))
+  saveRDS(xx, file = paste0(RdataDir, 'Forte2020_logNormalize_allgenes_majorCellTypes_subtypes.rds'))
    
 }
 
