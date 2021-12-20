@@ -286,6 +286,112 @@ Double.check.adult.non.cardiomyocyte.major.celltypes.subtypes = function(aa)
    
 }
 
+
+##########################################
+# two test functions 
+# - test to combine the adult heart datasets without integration
+# - test to convert the batch corrected expression to counts (not good idea)
+##########################################
+Combine.adult.mice.heart.without.integration = function(refs)
+{
+  # test refs without integration
+  Test_refs_withoutIntegration = FALSE
+  if(Test_refs_){
+    DefaultAssay(refs) <- "RNA"
+    refs = FindVariableFeatures(refs, selection.method = "vst", nfeatures = 3000)
+    
+    # Run the standard workflow for visualization and clustering
+    refs <- ScaleData(refs, verbose = FALSE)
+    refs <- RunPCA(refs, npcs = 30, verbose = FALSE)
+    
+    ElbowPlot(refs, ndims = 30)
+    
+    refs <- FindNeighbors(refs, reduction = "pca", dims = 1:20)
+    refs <- FindClusters(refs, resolution = 0.5)
+    
+    refs <- RunUMAP(refs, reduction = "pca", dims = 1:30, n.neighbors = 50, min.dist = 0.05) 
+    
+    # Visualization
+    p1 <- DimPlot(refs, reduction = "umap", group.by = "dataset")
+    p2 <- DimPlot(refs, reduction = "umap", group.by = "annot.ref", label = TRUE,
+                  repel = TRUE)
+    p1 + p2 + ggsave(paste0(resDir, '/Forte2020_Ren2020_noCorrection_', Normalization, '.pdf'), 
+                     width = 24, height = 10)
+    
+  }
+  
+}
+
+##########################################
+# try to reversely calculated batch-corrected UMI counts using corrected gene expression matrix from Seurat 
+##########################################
+Convert.batch.corrected.expression.matrix.to.UMIcount = function(refs){
+  refs = readRDS(file = paste0(RdataDir, 
+                               'SeuratObj_adultMiceHeart_refCombine_Forte2020.nonCM_Ren2020CM_cleanAnnot_logNormalize_v1.rds'))
+  
+  #jj = which(metadata$dataset == 'Ren2020')
+  #aa = readRDS(file = paste0(RdataDir, 'Forte2020_logNormalize_allgenes.rds'))
+  #cms = readRDS(file =  paste0(RdataDir, 'Seurat.obj_adultMiceHeart_week0.week2_Ren2020_seuratNormalization_umap.rds'))
+  p1 <- DimPlot(refs, reduction = "umap", group.by = "dataset")
+  p2 <- DimPlot(refs, reduction = "umap", group.by = "celltype", label = TRUE,
+                repel = TRUE)
+  p1 + p2
+  
+  VlnPlot(refs, features = c("nCount_RNA"), group.by = 'dataset')
+  
+  metadata = refs@meta.data   
+  Ec = refs@assays$integrated@data
+  
+  counts = refs@assays$RNA@counts
+  counts = counts[match(rownames(Ec), rownames(counts)), ]
+  #E = refs@assays$RNA@data
+  
+  ss = colSums(counts)
+  ccts = expm1(Ec)/10000
+  ccts = t(t(ccts)*ss)
+  ccts = round(ccts)
+  
+  metadata$nCount_RNA = ss
+  
+  aa <- CreateSeuratObject(counts = ccts, project = "adult", min.cells = 50, min.features = 500)
+  aa = AddMetaData(aa, metadata, col.name = NULL) 
+  
+  aa <- NormalizeData(aa, normalization.method = "LogNormalize", scale.factor = 10000)
+  aa <- FindVariableFeatures(aa, selection.method = "vst", nfeatures = 3000)
+  
+  plot1 <- VariableFeaturePlot(aa)
+  
+  top10 <- head(VariableFeatures(aa), 10)
+  plot2 <- LabelPoints(plot = plot1, points = top10, repel = TRUE)
+  plot1 + plot2
+  
+  all.genes <- rownames(aa)
+  aa <- ScaleData(aa, features = all.genes)
+  
+  aa <- RunPCA(aa, verbose = FALSE, weight.by.var = TRUE)
+  ElbowPlot(aa, ndims = 30)
+  
+  aa <- FindNeighbors(aa, dims = 1:10)
+  aa <- FindClusters(aa, verbose = FALSE, algorithm = 3, resolution = 0.5)
+  
+  aa = RunUMAP(aa, reduction = "pca", dims = 1:30, n.neighbors = 30, min.dist = 0.05) 
+  
+  # Visualization
+  p1 <- DimPlot(aa, reduction = "umap", group.by = "dataset")
+  p2 <- DimPlot(aa, reduction = "umap", group.by = "celltype", label = TRUE,
+                repel = TRUE)
+  p1 + p2 + ggsave(paste0(resDir, '/refCombined_correctUMIcounts_Forte2020_Ren2020__', Normalization, '.pdf'), 
+                   width = 24, height = 10)
+  
+  refs = aa
+  #aa = readRDS(file = paste0(RdataDir, 'Seurat.obj_adultMiceHeart_week0.week2_Ren2020_seuratNormalization.rds'))
+  
+  saveRDS(refs, file = paste0(RdataDir, 
+                              'SeuratObj_adultMiceHeart_refCombine_Forte2020.nonCM_Ren2020CM_cleanAnnot_correctedUMIcounts_v1.rds'))
+
+}
+
+
 ##########################################
 # run cell type deconvolution with RCTD
 ##########################################
@@ -429,9 +535,6 @@ Run.celltype.deconvolution.RCTD = function(stx = std1, slice = 'adult.day1', Nor
   ##########################################
   # finer annotation for non-cardiomyocyte using reference Forte2020
   ##########################################
-  
-  
-  
   
 }
 
