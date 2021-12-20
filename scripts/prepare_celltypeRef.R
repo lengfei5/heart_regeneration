@@ -238,8 +238,8 @@ if(Merge.adult.mice.cardiomyocyte.noncardiomyocyte){
   
   aa$dataset = 'Forte2020'
   cms$dataset = 'Ren2020'
-  aa$annot.ref = aa$my_annot
-  cms$annot.ref = cms$CellType
+  #aa$annot.ref = aa$my_annot
+  #cms$annot.ref = cms$CellType
   features.common = intersect(rownames(aa), rownames(cms))
   
   refs.merged = merge(aa, y = cms, add.cell.ids = c("Forte2020", "Ren2020"), project = "adultHeart")
@@ -266,6 +266,7 @@ if(Merge.adult.mice.cardiomyocyte.noncardiomyocyte){
   
   ref.anchors <- FindIntegrationAnchors(object.list = ref.list, anchor.features = features, reduction = "rpca", 
                                         k.anchor = 5)
+  
   rm(ref.list)
   
   # this command creates an 'integrated' data assay
@@ -276,10 +277,12 @@ if(Merge.adult.mice.cardiomyocyte.noncardiomyocyte){
   # original unmodified data still resides in the 'RNA' assay
   DefaultAssay(ref.combined) <- "integrated"
   
-  saveRDS(ref.combined, file = paste0(RdataDir, 'Seurat.obj_adultMiceHeart_Forte2020_Ren2020_refCombined_logNormalize_v1.rds'))
+  xx = DietSeurat(ref.combined, counts = FALSE, data = TRUE, scale.data = FALSE, assays = 'integrated')
+  saveRDS(xx, file = paste0(RdataDir, 'Seurat.obj_adultMiceHeart_Forte2020_Ren2020_refCombined_logNormalize_v2.rds'))
+  
   
   # Run the standard workflow for visualization and clustering
-  ref.combined = readRDS(file =paste0(RdataDir, 'Seurat.obj_adultMiceHeart_Forte2020_Ren2020_refCombined_logNormalize_v1.rds'))
+  ref.combined = readRDS(file =paste0(RdataDir, 'Seurat.obj_adultMiceHeart_Forte2020_Ren2020_refCombined_logNormalize_v2.rds'))
   
   ref.combined <- ScaleData(ref.combined, verbose = FALSE)
   ref.combined <- RunPCA(ref.combined, npcs = 30, verbose = FALSE)
@@ -291,12 +294,15 @@ if(Merge.adult.mice.cardiomyocyte.noncardiomyocyte){
   
   ref.combined <- RunUMAP(ref.combined, reduction = "pca", dims = 1:30, n.neighbors = 50, min.dist = 0.05) 
   
+  kk = which(ref.combined$dataset == 'Ren2020' & ref.combined$celltype != 'CM')
+  ref.combined$celltype[kk] = paste0(ref.combined$celltype[kk], '_Ren2020')
   
   # Visualization
   p1 <- DimPlot(ref.combined, reduction = "umap", group.by = "dataset")
-  p2 <- DimPlot(ref.combined, reduction = "umap", group.by = "annot.ref", label = TRUE,
+  p2 <- DimPlot(ref.combined, reduction = "umap", group.by = "celltype", label = TRUE,
                 repel = TRUE)
-  p1 + p2 + ggsave(paste0(resDir, '/Forte2020_Ren2020_IntegrationRPCA_', Normalization, '.pdf'), 
+  p1 + p2 
+  ggsave(paste0(resDir, '/Forte2020_Ren2020_IntegrationRPCA_', Normalization, '.pdf'), 
                    width = 24, height = 10)
   
   
@@ -304,42 +310,43 @@ if(Merge.adult.mice.cardiomyocyte.noncardiomyocyte){
   # clean the reference, i.e. remove the non-cardiomyocyte from Ren2020
   # change the confusing annotation names from Shoval
   ##########################################
-  kk = which(ref.combined$dataset == 'Forte2020'| (ref.combined$dataset == 'Ren2020' & ref.combined$annot.ref == 'CM'))
+  kk = which(ref.combined$dataset == 'Forte2020'| (ref.combined$dataset == 'Ren2020' & ref.combined$celltype == 'CM'))
   refs = ref.combined[,kk]
   
   rm(ref.combined)
   
   saveRDS(refs, file = paste0(RdataDir, 
-                              'Seurat.obj_adultMiceHeart_Forte2020.nonCM_Ren2020CM_refCombined_cleanAnnot_logNormalize_v1.rds'))
-  
-  # clean a bit the annotation
-  refs$celltype = refs$annot.ref
-  refs$celltype[which(refs$celltype == '0 - Fibro-I')] = 'FB1'
-  refs$celltype[which(refs$celltype == '9 - Fibro-II')] = 'FB2'
-  refs$celltype[which(refs$celltype == '11 - Fibro-III')] = 'FB3'
-  refs$celltype[which(refs$celltype == '15 - Fibro-IV')] = 'FB4'
-  
-  refs$celltype[which(refs$celltype == '2 - EC-I')] = 'EC1'
-  refs$celltype[which(refs$celltype == '18 - EC-II')] = 'EC2'
-  refs$celltype[which(refs$celltype == '19 - EC-III')] = 'EC3'
-  refs$celltype[which(refs$celltype == '17 - Lymph-EC')] = 'Lymph.EC'
-  
-  refs$celltype[which(refs$celltype == '6 - B cell')] = 'B'
-  refs$celltype[which(refs$celltype == '3 - MyoF')] = 'myoFB'
-  refs$celltype[which(refs$celltype == '16 - SMC')] = 'sMC'
-  
-  refs$celltype[which(refs$celltype == '4 - GRN')] = 'GN'
-  refs$celltype[which(refs$celltype == '12 - NK/T')] = 'NK.T'
-  refs$celltype[which(refs$celltype == '13 - Monon/DC')] = 'MCT.DC'
-  refs$celltype[which(refs$celltype == '5 - Chil3 Mono')] = 'MCT.Chil3'
-  
-  refs$celltype[which(refs$celltype == '1 - Trem2 Macs')] = 'Mphage.Trem2'
-  refs$celltype[which(refs$celltype == '10 - Arg1 Macs')] = 'Mphage.Argl'
-  refs$celltype[which(refs$celltype == '7 - MHCII Macs')] = 'MHCII.Mphage'
-  refs$celltype[which(refs$celltype == '14 - Proliferating Macs')] = 'prolife.Mphage'
-  
+                              'Seurat.obj_adultMiceHeart_Forte2020.nonCM_Ren2020CM_refCombined_cleanAnnot_logNormalize_v2.rds'))
   saveRDS(refs, file = paste0(RdataDir, 
-                              'SeuratObj_adultMiceHeart_refCombine_Forte2020.nonCM_Ren2020CM_cleanAnnot_logNormalize_v1.rds'))
+                              'SeuratObj_adultMiceHeart_refCombine_Forte2020.nonCM_Ren2020CM_cleanAnnot_logNormalize_v2.rds'))
+  
+  
+  # # clean a bit the annotation
+  # refs$celltype = refs$annot.ref
+  # refs$celltype[which(refs$celltype == '0 - Fibro-I')] = 'FB1'
+  # refs$celltype[which(refs$celltype == '9 - Fibro-II')] = 'FB2'
+  # refs$celltype[which(refs$celltype == '11 - Fibro-III')] = 'FB3'
+  # refs$celltype[which(refs$celltype == '15 - Fibro-IV')] = 'FB4'
+  # 
+  # refs$celltype[which(refs$celltype == '2 - EC-I')] = 'EC1'
+  # refs$celltype[which(refs$celltype == '18 - EC-II')] = 'EC2'
+  # refs$celltype[which(refs$celltype == '19 - EC-III')] = 'EC3'
+  # refs$celltype[which(refs$celltype == '17 - Lymph-EC')] = 'Lymph.EC'
+  # 
+  # refs$celltype[which(refs$celltype == '6 - B cell')] = 'B'
+  # refs$celltype[which(refs$celltype == '3 - MyoF')] = 'myoFB'
+  # refs$celltype[which(refs$celltype == '16 - SMC')] = 'sMC'
+  # 
+  # refs$celltype[which(refs$celltype == '4 - GRN')] = 'GN'
+  # refs$celltype[which(refs$celltype == '12 - NK/T')] = 'NK.T'
+  # refs$celltype[which(refs$celltype == '13 - Monon/DC')] = 'MCT.DC'
+  # refs$celltype[which(refs$celltype == '5 - Chil3 Mono')] = 'MCT.Chil3'
+  # 
+  # refs$celltype[which(refs$celltype == '1 - Trem2 Macs')] = 'Mphage.Trem2'
+  # refs$celltype[which(refs$celltype == '10 - Arg1 Macs')] = 'Mphage.Argl'
+  # refs$celltype[which(refs$celltype == '7 - MHCII Macs')] = 'MHCII.Mphage'
+  # refs$celltype[which(refs$celltype == '14 - Proliferating Macs')] = 'prolife.Mphage'
+  # 
   
   
   # test refs without integration
