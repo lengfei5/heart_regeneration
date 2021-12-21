@@ -392,10 +392,16 @@ Convert.batch.corrected.expression.matrix.to.UMIcount = function(refs){
 }
 
 ##########################################
-# run cell type deconvolution with RCTD for all slices
+# Run cell type deconvolution with RCTD for all slices
+# inputs are seurat object st and prepared refs
+# The deconvolution will be done for each condition of st with a for loop
+# For each condition, major cell type is first considered and then subtype in references further considered
+# 
 ##########################################
-Run.celltype.deconvolution.RCTD = function(st, refs, Normalization = 'lognormalize')
+Run.celltype.deconvolution.RCTD = function(st, refs, Normalization = 'lognormalize', plot.RCTD = TRUE, run.RCTD.subtype = FALSE)
 {
+  require(RCTD)
+  require(Matrix)
   # slice = 'adult.day4'; Normalization = 'lognormalize';
   #refs = readRDS(file = paste0(RdataDir, 
   #                             'SeuratObj_adultMiceHeart_refCombine_Forte2020.nonCM_Ren2020CM_cleanAnnot_logNormalize_v1.rds'))
@@ -418,123 +424,145 @@ Run.celltype.deconvolution.RCTD = function(st, refs, Normalization = 'lognormali
   # gene used for cell type signature
   #genes.used =  intersect(aa.markers$gene[!is.na(match(aa.markers$gene, rownames(aa)))], 
   #                        aa.markers$gene[!is.na(match(aa.markers$gene, rownames(stx)))])
-  stx = st[, which(st$condition == 'adult.day4')]
   
   ##########################################
-  # prepare reference for RTCD
+  # prepare references for RTCD
   # original code from https://raw.githack.com/dmcable/RCTD/dev/vignettes/spatial-transcriptomics.html
-  # mainly for coarse CM cells
+  # first for major cell types 
+  # secondly for subtypes
   ##########################################
   E.corrected <- refs@assays$integrated@data
   E.corrected = expm1(E.corrected) # linear scale of corrected gene expression
   
-  #counts = counts[!is.na(match(rownames(counts), genes.used)), ]
-  #rownames(counts) <- counts[,1]; counts[,1] <- NULL # Move first column to rownames
+  ### Create the Reference object for major cell types
   cell_types <- refs@meta.data$celltype
   names(cell_types) <- colnames(refs) # create cell_types named list
   cell_types <- as.factor(cell_types) # convert to factor data type
-  
-  #nUMI <- meta_data$nCount_RNA 
-  #names(nUMI) <- meta_data$CellID # create nUMI named list
-  
-  ### Create the Reference object
   reference <- Reference(E.corrected, cell_types, nUMI = NULL, require_int = FALSE)
-    
+  
+  ### create reference objects for subtypes
+  subtypes <- refs@meta.data$subtype
+  names(subtypes) <- colnames(refs) # create cell_types named list
+  subtypes <- as.factor(subtypes) # convert to factor data type
+  reference_subtype <- Reference(E.corrected, subtypes, nUMI = NULL, require_int = FALSE)
+  
+  rm(E.corrected)
+  
   ## Examine reference object (optional)
   print(dim(reference@counts)) #observe Digital Gene Expression matrix
   #> [1] 384 475
   table(reference@cell_types) #number of occurences for each cell type
-  
-  ##########################################
-  # prepare ST data for RTCD
-  # original code from https://raw.githack.com/dmcable/RCTD/dev/vignettes/spatial-transcriptomics.html
-  ##########################################
-  counts <- stx@assays$Spatial@counts
-  #counts = counts[!is.na(match(rownames(counts), genes.used)), ]
-  coords <- eval(parse(text = paste0('stx@images$',  slice, '@coordinates')))
-  coords = coords[, c(4, 5)]
-  #rownames(counts) <- counts[,1]; counts[,1] <- NULL # Move first column to rownames
-  #rownames(coords) <- coords$barcodes; 
-  #coords$barcodes <- NULL # Move barcodes to rownames
-  nUMI <- colSums(counts) # In this case, total counts per pixel is nUMI
-  
-  ### Create SpatialRNA object
-  puck <- SpatialRNA(coords, counts, nUMI)
-  
-  ## Examine SpatialRNA object (optional)
-  print(dim(puck@counts)) # observe Digital Gene Expression matrix
-  hist(log(puck@nUMI,2)) # histogram of log_2 nUMI
-  
-  print(head(puck@coords)) # start of coordinate data.frame
-  barcodes <- colnames(puck@counts) # pixels to be used (a list of barcode names). 
-  
-  # This list can be restricted if you want to crop the puck e.g. 
-  # puck <- restrict_puck(puck, barcodes) provides a basic plot of the nUMI of each pixel
-  # on the plot:
-  plot_puck_continuous(puck, barcodes, puck@nUMI, ylimit = c(0, round(quantile(puck@nUMI,0.9))), 
-                       title ='plot of nUMI') 
-  
-  myRCTD <- create.RCTD(puck, reference, max_cores = 16, gene_cutoff = 0.000125, fc_cutoff = 0.5, 
-                        gene_cutoff_reg = 2e-04,  fc_cutoff_reg = 0.75,
-                        UMI_min = 100, UMI_max = 2e+07, 
-                        CELL_MIN_INSTANCE = 25)
-  
-  
-  tic()
-  myRCTD <- run.RCTD(myRCTD, doublet_mode = 'doublet')
-  saveRDS(myRCTD, file = paste0(RdataDir, 'RCTD_results_refCombined_Forte2020.Ren2020_', slice, '.rds'))
-  toc()
-  
-  results <- myRCTD@results
-  
-  # normalize the cell type proportions to sum to 1.
-  norm_weights = sweep(results$weights, 1, rowSums(results$weights), '/') 
-  cell_type_names <- myRCTD@cell_type_info$info[[2]] #list of cell type names
-  
-  spatialRNA <- myRCTD@spatialRNA
-  resultsdir <- resDir
-  
-  # make the plots 
-  # Plots the confident weights for each cell type as in full_mode (saved as 
-  # 'results/cell_type_weights_unthreshold.pdf')
-  plot_weights(cell_type_names, spatialRNA, resultsdir, norm_weights)
-  
-  # Plots all weights for each cell type as in full_mode. (saved as 
-  # 'results/cell_type_weights.pdf')
-  plot_weights_unthreshold(cell_type_names, spatialRNA, resultsdir, norm_weights) 
-  # Plots the weights for each cell type as in doublet_mode. (saved as 
-  # 'results/cell_type_weights_doublets.pdf')
-  
-  plot_weights_doublet(cell_type_names, spatialRNA, resultsdir, results$weights_doublet, 
-                       results$results_df) 
-  # Plots the number of confident pixels of each cell type in 'full_mode'. (saved as 
-  # 'results/cell_type_occur.pdf')
-  plot_cond_occur(cell_type_names, resultsdir, norm_weights, spatialRNA)
-  
-  # makes a map of all cell types, (saved as 
-  # 'results/all_cell_types.pdf')
-  plot_all_cell_types(results$results_df, spatialRNA@coords, cell_type_names, resultsdir) 
-  
-  ##########################################
-  # save and assign the cell type 
-  ##########################################
-  cts = results$results_df
-  cts$cellType = NA
-  cts$cellType[which(cts$spot_class == 'singlet')] = as.character(cts$first_type[which(cts$spot_class == 'singlet')])
-  cts$cellType[which(cts$spot_class == 'doublet_certain')] = 
-    paste0(cts$first_type[which(cts$spot_class == 'doublet_certain')], 
-           '_', cts$second_type[which(cts$spot_class == 'doublet_certain')])
-  
-  stx$celltype = cts$cellType[match(colnames(stx), rownames(cts))]
-  
-  SpatialDimPlot(stx, group.by = 'celltype', images = slice, stroke = 0, interactive = FALSE)
-  
-  # remove the CM annotated spots from Visium and prepare for the second-round RCTD
+  table(reference_subtype@cell_types)
   
   
   ##########################################
-  # finer annotation for non-cardiomyocyte using reference Forte2020
+  # loop over all conditions of st
   ##########################################
+  cat('visium conditions :\n')
+  print(table(st$condition))
+  cc = names(table(st$condition))
+  
+  for(n in 1:length(cc))
+  {
+    # n = 4
+    slice = cc[n]
+    stx = st[, which(st$condition == slice)]
+    
+    resultsdir <- paste0(resDir, '/RCTD/', slice)
+    system(paste0('mkdir -p ', resultsdir))
+    
+    ##########################################
+    # prepare ST data for RTCD
+    # original code from https://raw.githack.com/dmcable/RCTD/dev/vignettes/spatial-transcriptomics.html
+    ##########################################
+    counts <- stx@assays$Spatial@counts
+    #counts = counts[!is.na(match(rownames(counts), genes.used)), ]
+    coords <- eval(parse(text = paste0('stx@images$',  slice, '@coordinates')))
+    coords = coords[, c(4, 5)]
+    
+    nUMI <- colSums(counts) # In this case, total counts per pixel is nUMI
+    
+    ### Create SpatialRNA object
+    puck <- SpatialRNA(coords, counts, nUMI)
+    
+    ## Examine SpatialRNA object (optional)
+    print(dim(puck@counts)) # observe Digital Gene Expression matrix
+    hist(log(puck@nUMI,2)) # histogram of log_2 nUMI
+    
+    print(head(puck@coords)) # start of coordinate data.frame
+    barcodes <- colnames(puck@counts) # pixels to be used (a list of barcode names). 
+    
+    # This list can be restricted if you want to crop the puck e.g. 
+    # puck <- restrict_puck(puck, barcodes) provides a basic plot of the nUMI of each pixel
+    # on the plot:
+    plot_puck_continuous(puck, barcodes, puck@nUMI, ylimit = c(0, round(quantile(puck@nUMI,0.9))), 
+                         title ='plot of nUMI') 
+    ggsave(paste0(resultsdir, '/RCTD_nUMI_plot_', slice, '.pdf'), width = 12, height = 10)
+    
+    myRCTD <- create.RCTD(puck, reference, max_cores = 16, gene_cutoff = 0.000125, fc_cutoff = 0.5, 
+                          gene_cutoff_reg = 2e-04,  fc_cutoff_reg = 0.75,
+                          UMI_min = 100, UMI_max = 2e+07, 
+                          CELL_MIN_INSTANCE = 25)
+    
+    tic()
+    myRCTD <- run.RCTD(myRCTD, doublet_mode = 'doublet')
+    
+    saveRDS(myRCTD, file = paste0(RdataDir, 'RCTD_results_refCombined_Forte2020.Ren2020_', slice, '.rds'))
+    
+    toc()
+    
+    results <- myRCTD@results
+    
+    # normalize the cell type proportions to sum to 1.
+    norm_weights = sweep(results$weights, 1, rowSums(results$weights), '/') 
+    cell_type_names <- myRCTD@cell_type_info$info[[2]] #list of cell type names
+    
+    spatialRNA <- myRCTD@spatialRNA
+    
+    # make the plots 
+    if(plot.RCTD){
+      # Plots the confident weights for each cell type as in full_mode (saved as 'results/cell_type_weights_unthreshold.pdf')
+      plot_weights(cell_type_names, spatialRNA, resultsdir, norm_weights)
+      
+      # Plots all weights for each cell type as in full_mode. (saved as 'results/cell_type_weights.pdf')
+      plot_weights_unthreshold(cell_type_names, spatialRNA, resultsdir, norm_weights) 
+      # Plots the weights for each cell type as in doublet_mode. (saved as 'results/cell_type_weights_doublets.pdf')
+      
+      plot_weights_doublet(cell_type_names, spatialRNA, resultsdir, results$weights_doublet, results$results_df) 
+      # Plots the number of confident pixels of each cell type in 'full_mode'. (saved as 'results/cell_type_occur.pdf')
+      plot_cond_occur(cell_type_names, resultsdir, norm_weights, spatialRNA)
+      
+      # makes a map of all cell types, (saved as 
+      # 'results/all_cell_types.pdf')
+      plot_all_cell_types(results$results_df, spatialRNA@coords, cell_type_names, resultsdir)
+      
+      
+    }
+    
+    ##########################################
+    # save and assign the cell type, and visualization
+    ##########################################
+    cts = results$results_df
+    cts$cellType = NA
+    cts$cellType[which(cts$spot_class == 'singlet')] = as.character(cts$first_type[which(cts$spot_class == 'singlet')])
+    cts$cellType[which(cts$spot_class == 'doublet_certain')] = 
+      paste0(cts$first_type[which(cts$spot_class == 'doublet_certain')], 
+             '_', cts$second_type[which(cts$spot_class == 'doublet_certain')])
+    
+    stx$celltype = cts$cellType[match(colnames(stx), rownames(cts))]
+    
+    
+    SpatialDimPlot(stx, group.by = 'celltype', images = slice, stroke = 0, interactive = FALSE)
+    
+    ##########################################
+    # finer annotation by running RCTD with subtypes 
+    ##########################################
+    if(run.RCTD.subtype){
+      cat('run RCTD with subtypes \n')
+        
+    }
+    
+  }
   
 }
 
