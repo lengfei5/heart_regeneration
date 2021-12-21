@@ -398,7 +398,8 @@ Convert.batch.corrected.expression.matrix.to.UMIcount = function(refs){
 # For each condition, major cell type is first considered and then subtype in references further considered
 # 
 ##########################################
-Run.celltype.deconvolution.RCTD = function(st, refs, Normalization = 'lognormalize', plot.RCTD = TRUE, run.RCTD.subtype = FALSE)
+Run.celltype.deconvolution.RCTD = function(st, refs, Normalization = 'lognormalize', plot.RCTD = TRUE, PLOT.scatterpie = TRUE,
+                                           run.RCTD.subtype = FALSE)
 {
   require(RCTD)
   require(Matrix)
@@ -539,7 +540,132 @@ Run.celltype.deconvolution.RCTD = function(st, refs, Normalization = 'lognormali
     }
     
     ##########################################
-    # save and assign the cell type, and visualization using scatterpie plot 
+    # visualization using scatterpie plot 
+    # (original code from 
+    # https://github.com/MarcElosua/SPOTlight_deconvolution_analysis/blob/master/analysis/pancreas_PDAC/3b-PDAC_piecharts_immune.Rmd)
+    ##########################################
+    if(PLOT.scatterpie){
+      require(scatterpie)
+      require(cowplot)
+      
+      library(RColorBrewer)
+      n <- 60
+      qual_col_pals = brewer.pal.info[brewer.pal.info$category == 'qual',]
+      col_vector  <-  unlist(mapply(brewer.pal, qual_col_pals$maxcolors, rownames(qual_col_pals)))
+      
+      # set color vec
+      colourCount <- length(unique(cell_type_names))
+      getPalette <- colorRampPalette(brewer.pal(8, "Dark2"))
+      
+      cell_types_plt <- sort(unique(cell_type_names))
+      col_ct <- col_vector[seq_len(length(cell_types_plt))]
+      plt_df <- data.frame(plt_name = unique(cell_type_names),
+                           ct_name = gsub(pattern = "[[:punct:]]|[[:blank:]]", ".",
+                                          x = unique(cell_type_names),
+                                          perl = TRUE),
+                           col_ct = col_ct)
+      
+      ## Preprocess data
+      seurat_coord = SpatialDimPlot(stx, images = slice, stroke = 0)
+      spatial_coord <-  seurat_coord$data %>%
+        tibble::rownames_to_column("ID")
+      
+      colnames(spatial_coord)[2:3] = c('x', 'y')
+      spatial_coord = data.frame(spatial_coord, norm_weights[match(spatial_coord$ID, rownames(norm_weights)), ])
+      
+      ggplot() + geom_scatterpie(aes(x=x, y=y), data=spatial_coord,
+                                 cols=cell_type_names, 
+                                 color = NA,
+                                 alpha = 1, 
+                                 pie_scale = 0.5) + 
+        #ggplot2::scale_y_reverse() +
+        ggplot2::scale_x_reverse() + 
+        cowplot::theme_half_open(11, rel_small = 1) +
+        ggplot2::theme_void() + 
+        ggplot2::coord_fixed(ratio = 1) +
+        #ggplot2::scale_fill_manual(values = plt_df[plt_df$plt_name %in% ct_all, "col_ct"]) +
+        ggplot2::labs(title = "Spatial scatterpie") +
+        ggplot2::theme(
+          # plot.background = element_rect(fill = "#FFFFFF"),
+          # panel.background = element_blank(),
+          # plot.margin = margin(20, 20, 20, 20),
+          plot.title = ggplot2::element_text(hjust = 0.5, size = 20)) +
+        ggplot2::guides(fill = guide_legend(ncol = 1))
+      
+      ggsave(paste0(resultsdir, '/RCTD_scatterpie_', slice, '.pdf'), width = 22, height = 16)
+      
+      # # Set right plot names
+      # tmp_df <- data.frame(plt_name = colnames(spatial_coord)[colnames(spatial_coord) %in% plt_df$plt_name]) %>% 
+      #   left_join(plt_df)
+      # 
+      # ind <- which(names(spatial_coord) %in% tmp_df$plt_name)
+      # names(spatial_coord)[ind] <- as.character(tmp_df$plt_name)
+      
+      # # Get list of all present cell types
+      # ct_all <- names(spatial_coord)[names(spatial_coord) %in% as.character(tmp_df$plt_name)]
+      # ind_rm <- which(colSums(spatial_coord[, ct_all] > 0) == 0)
+      # if (length(ind_rm) > 0) {
+      #   ct_all <- ct_all[-ind_rm]
+      # }
+      # 
+      # new_names <- data.frame(ct_name = colnames(decon_mtrx_subs)) %>%
+      #   dplyr::left_join(plt_df, by = "ct_name") %>%
+      #   dplyr::pull(plt_name)
+      # 
+      # colnames(decon_mtrx_subs) <- new_names
+      # 
+      # st_se@meta.data <- cbind(st_se@meta.data, decon_mtrx_subs)
+      # 
+      # 
+      # # Set right plot names
+      # tmp_df <- data.frame(plt_name = colnames(spatial_coord)[colnames(spatial_coord) %in% plt_df$plt_name]) %>% 
+      #   left_join(plt_df)
+      # 
+      # ind <- which(names(spatial_coord) %in% tmp_df$plt_name)
+      # # names(spatial_coord)[ind] <- as.character(tmp_df$plt_name)
+      # 
+      # # Get list of all present cell types
+      # ct_all <- names(spatial_coord)[names(spatial_coord) %in% as.character(tmp_df$plt_name)]
+      # ind_rm <- which(colSums(spatial_coord[, ct_all] > 0) == 0)
+      # if (length(ind_rm) > 0) {
+      #   ct_all <- ct_all[-ind_rm]
+      # }
+      # 
+      # 
+      # # Plot the scatterplot
+      # scatterpie_plt <- ggplot2::ggplot() +
+      #   scatterpie::geom_scatterpie(data = spatial_coord[c(1:200),],
+      #                               aes(x = x,
+      #                                   y = y),
+      #                               cols = ct_all,
+      #                               color = NA,
+      #                               alpha = 1, 
+      #                               pie_scale = 0.9) +
+      #   #ggplot2::scale_y_reverse() +
+      #   cowplot::theme_half_open(11, rel_small = 1) +
+      #   ggplot2::theme_void() + 
+      #   ggplot2::coord_fixed(ratio = 1) +
+      #   # ggplot2::scale_fill_manual(values = tmp_df[tmp_df$plt_name %in% ct_all, "col_ct"]) +
+      #   ggplot2::scale_fill_manual(values = plt_df[plt_df$plt_name %in% ct_all, "col_ct"]) +
+      #   ggplot2::labs(title = sprintf("%s Spatial scatterpie", geo)) +
+      #   ggplot2::theme(
+      #     # plot.background = element_rect(fill = "#FFFFFF"),
+      #     # panel.background = element_blank(),
+      #     # plot.margin = margin(20, 20, 20, 20),
+      #     plot.title = ggplot2::element_text(hjust = 0.5, size = 20)) +
+      #   ggplot2::guides(fill = guide_legend(ncol = 1))
+      # 
+      # cowplot::save_plot(plot = scatterpie_plt,
+      #                    filename = sprintf("%s/%s/scatterpie__immune_%s.pdf",
+      #                                       an_pdac, plt_dir, geo),
+      #                    base_width = 12,
+      #                    base_height = 9)
+      # 
+      
+    }
+    
+    ##########################################
+    # save and assign the cell type
     ##########################################
     cts = results$results_df
     cts$cellType = NA
@@ -551,80 +677,8 @@ Run.celltype.deconvolution.RCTD = function(st, refs, Normalization = 'lognormali
     stx$celltype = cts$cellType[match(colnames(stx), rownames(cts))]
     
     
-    SpatialDimPlot(stx, group.by = 'celltype', images = slice, stroke = 0, interactive = FALSE)
+    xx = SpatialDimPlot(stx, group.by = 'celltype', images = slice, stroke = 0, interactive = FALSE)
     
-    ### test scatterpie plot 
-    ### (original code from 
-    ### https://github.com/MarcElosua/SPOTlight_deconvolution_analysis/blob/master/analysis/pancreas_PDAC/3b-PDAC_piecharts_immune.Rmd)
-    
-    scatterpie_arrange_plt <- lapply(c("GSM3036911", "GSM4100723"), function(geo) {
-      st_se <- st_list[[geo]]
-      decon_mtrx <- immune_decon_mtrx_ls[[geo]][[2]]
-      decon_mtrx_subs <- decon_mtrx[, colnames(decon_mtrx) !=  "res_ss"]
-      
-      colnames(decon_mtrx_subs) <- gsub(pattern = "[[:punct:]]|[[:blank:]]",
-                                        replacement = ".",
-                                        x = colnames(decon_mtrx_subs),
-                                        perl = TRUE)
-      # Change names to original ones
-      new_names <- data.frame(ct_name = colnames(decon_mtrx_subs)) %>%
-        dplyr::left_join(plt_df, by = "ct_name") %>%
-        dplyr::pull(plt_name)
-      
-      colnames(decon_mtrx_subs) <- new_names
-      
-      st_se@meta.data <- cbind(st_se@meta.data, decon_mtrx_subs)
-      
-      ## Preprocess data
-      spatial_coord <- st_se@meta.data %>%
-        tibble::rownames_to_column("ID")
-      
-      # Set right plot names
-      tmp_df <- data.frame(plt_name = colnames(spatial_coord)[colnames(spatial_coord) %in% plt_df$plt_name]) %>% 
-        left_join(plt_df)
-      
-      ind <- which(names(spatial_coord) %in% tmp_df$plt_name)
-      # names(spatial_coord)[ind] <- as.character(tmp_df$plt_name)
-      
-      # Get list of all present cell types
-      ct_all <- names(spatial_coord)[names(spatial_coord) %in% as.character(tmp_df$plt_name)]
-      ind_rm <- which(colSums(spatial_coord[, ct_all] > 0) == 0)
-      if (length(ind_rm) > 0) {
-        ct_all <- ct_all[-ind_rm]
-      }
-      
-      # Plot the scatterplot
-      scatterpie_plt <- ggplot2::ggplot() +
-        scatterpie::geom_scatterpie(data = spatial_coord,
-                                    aes(x = x,
-                                        y = y),
-                                    cols = ct_all,
-                                    color = NA,
-                                    alpha = 1, 
-                                    pie_scale = 0.9) +
-        ggplot2::scale_y_reverse() +
-        cowplot::theme_half_open(11, rel_small = 1) +
-        ggplot2::theme_void() + 
-        ggplot2::coord_fixed(ratio = 1) +
-        # ggplot2::scale_fill_manual(values = tmp_df[tmp_df$plt_name %in% ct_all, "col_ct"]) +
-        ggplot2::scale_fill_manual(values = plt_df[plt_df$plt_name %in% ct_all, "col_ct"]) +
-        ggplot2::labs(title = sprintf("%s Spatial scatterpie", geo)) +
-        ggplot2::theme(
-          # plot.background = element_rect(fill = "#FFFFFF"),
-          # panel.background = element_blank(),
-          # plot.margin = margin(20, 20, 20, 20),
-          plot.title = ggplot2::element_text(hjust = 0.5, size = 20)) +
-        ggplot2::guides(fill = guide_legend(ncol = 1))
-      
-      cowplot::save_plot(plot = scatterpie_plt,
-                         filename = sprintf("%s/%s/scatterpie__immune_%s.pdf",
-                                            an_pdac, plt_dir, geo),
-                         base_width = 12,
-                         base_height = 9)
-      return(scatterpie_plt)
-    })
-    
-   
     
     ##########################################
     # finer annotation by running RCTD with subtypes 
