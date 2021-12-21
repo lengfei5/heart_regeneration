@@ -536,11 +536,10 @@ Run.celltype.deconvolution.RCTD = function(st, refs, Normalization = 'lognormali
       # 'results/all_cell_types.pdf')
       plot_all_cell_types(results$results_df, spatialRNA@coords, cell_type_names, resultsdir)
       
-      
     }
     
     ##########################################
-    # save and assign the cell type, and visualization
+    # save and assign the cell type, and visualization using scatterpie plot 
     ##########################################
     cts = results$results_df
     cts$cellType = NA
@@ -554,12 +553,86 @@ Run.celltype.deconvolution.RCTD = function(st, refs, Normalization = 'lognormali
     
     SpatialDimPlot(stx, group.by = 'celltype', images = slice, stroke = 0, interactive = FALSE)
     
+    ### test scatterpie plot 
+    ### (original code from 
+    ### https://github.com/MarcElosua/SPOTlight_deconvolution_analysis/blob/master/analysis/pancreas_PDAC/3b-PDAC_piecharts_immune.Rmd)
+    
+    scatterpie_arrange_plt <- lapply(c("GSM3036911", "GSM4100723"), function(geo) {
+      st_se <- st_list[[geo]]
+      decon_mtrx <- immune_decon_mtrx_ls[[geo]][[2]]
+      decon_mtrx_subs <- decon_mtrx[, colnames(decon_mtrx) !=  "res_ss"]
+      
+      colnames(decon_mtrx_subs) <- gsub(pattern = "[[:punct:]]|[[:blank:]]",
+                                        replacement = ".",
+                                        x = colnames(decon_mtrx_subs),
+                                        perl = TRUE)
+      # Change names to original ones
+      new_names <- data.frame(ct_name = colnames(decon_mtrx_subs)) %>%
+        dplyr::left_join(plt_df, by = "ct_name") %>%
+        dplyr::pull(plt_name)
+      
+      colnames(decon_mtrx_subs) <- new_names
+      
+      st_se@meta.data <- cbind(st_se@meta.data, decon_mtrx_subs)
+      
+      ## Preprocess data
+      spatial_coord <- st_se@meta.data %>%
+        tibble::rownames_to_column("ID")
+      
+      # Set right plot names
+      tmp_df <- data.frame(plt_name = colnames(spatial_coord)[colnames(spatial_coord) %in% plt_df$plt_name]) %>% 
+        left_join(plt_df)
+      
+      ind <- which(names(spatial_coord) %in% tmp_df$plt_name)
+      # names(spatial_coord)[ind] <- as.character(tmp_df$plt_name)
+      
+      # Get list of all present cell types
+      ct_all <- names(spatial_coord)[names(spatial_coord) %in% as.character(tmp_df$plt_name)]
+      ind_rm <- which(colSums(spatial_coord[, ct_all] > 0) == 0)
+      if (length(ind_rm) > 0) {
+        ct_all <- ct_all[-ind_rm]
+      }
+      
+      # Plot the scatterplot
+      scatterpie_plt <- ggplot2::ggplot() +
+        scatterpie::geom_scatterpie(data = spatial_coord,
+                                    aes(x = x,
+                                        y = y),
+                                    cols = ct_all,
+                                    color = NA,
+                                    alpha = 1, 
+                                    pie_scale = 0.9) +
+        ggplot2::scale_y_reverse() +
+        cowplot::theme_half_open(11, rel_small = 1) +
+        ggplot2::theme_void() + 
+        ggplot2::coord_fixed(ratio = 1) +
+        # ggplot2::scale_fill_manual(values = tmp_df[tmp_df$plt_name %in% ct_all, "col_ct"]) +
+        ggplot2::scale_fill_manual(values = plt_df[plt_df$plt_name %in% ct_all, "col_ct"]) +
+        ggplot2::labs(title = sprintf("%s Spatial scatterpie", geo)) +
+        ggplot2::theme(
+          # plot.background = element_rect(fill = "#FFFFFF"),
+          # panel.background = element_blank(),
+          # plot.margin = margin(20, 20, 20, 20),
+          plot.title = ggplot2::element_text(hjust = 0.5, size = 20)) +
+        ggplot2::guides(fill = guide_legend(ncol = 1))
+      
+      cowplot::save_plot(plot = scatterpie_plt,
+                         filename = sprintf("%s/%s/scatterpie__immune_%s.pdf",
+                                            an_pdac, plt_dir, geo),
+                         base_width = 12,
+                         base_height = 9)
+      return(scatterpie_plt)
+    })
+    
+   
+    
     ##########################################
     # finer annotation by running RCTD with subtypes 
     ##########################################
     if(run.RCTD.subtype){
       cat('run RCTD with subtypes \n')
-        
+      cat('to construct ...\n')
+      
     }
     
   }
