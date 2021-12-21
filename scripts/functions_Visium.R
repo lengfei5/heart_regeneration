@@ -388,9 +388,8 @@ Convert.batch.corrected.expression.matrix.to.UMIcount = function(refs){
   
   saveRDS(refs, file = paste0(RdataDir, 
                               'SeuratObj_adultMiceHeart_refCombine_Forte2020.nonCM_Ren2020CM_cleanAnnot_correctedUMIcounts_v1.rds'))
-
+  
 }
-
 
 ##########################################
 # run cell type deconvolution with RCTD
