@@ -86,7 +86,7 @@ for(n in 1:nrow(design))
 }
 
 # save(design, varibleGenes, st, file = paste0(RdataDir, 'seuratObject_design_variableGenes_mouse_adult.Rdata'))
-save(design, varibleGenes, st, file = paste0(RdataDir, 'seuratObject_design_variableGenes_mouse_neonadal.Rdata'))
+#save(design, varibleGenes, st, file = paste0(RdataDir, 'seuratObject_design_variableGenes_mouse_neonadal.Rdata'))
 
 ##########################################
 # cell and gene filtering
@@ -121,19 +121,20 @@ VariableFeatures(st) <- varibleGenes
 st <- RunPCA(st, verbose = FALSE)
 ElbowPlot(st)
 
-st <- FindNeighbors(st, dims = 1:10)
+st <- FindNeighbors(st, dims = 1:20)
 st <- FindClusters(st, verbose = FALSE, resolution = 0.5)
 
 st <- RunUMAP(st, dims = 1:20, n.neighbors = 30, min.dist = 0.05)
 
-p1 = DimPlot(st, reduction = "umap", group.by = c("ident", "condition")) 
+DimPlot(st, reduction = "umap", group.by = c("ident", "condition")) 
 
-p1 + ggsave(filename = paste0(resDir, '/UMAP_all.timepoints_', species, '.pdf'), width = 16, height = 8)
+ggsave(filename = paste0(resDir, '/UMAP_all.timepoints_', species, '.pdf'), width = 16, height = 8)
 
 FeaturePlot(st, features = c("Myh6", 'Nppa'))
 
 SpatialFeaturePlot(st, features = 'Myh6', image.alpha = 0.5)
 
+save(design, varibleGenes, st, file = paste0(RdataDir, 'seuratObject_design_variableGenes_adultMice_umap.clustered.Rdata'))
 
 QCs.with.marker.genes = FALSE
 if(QCs.with.marker.genes){
@@ -143,7 +144,6 @@ if(QCs.with.marker.genes){
   aa = read.csv('../data/Tzahor_geneList.csv', header = TRUE)
   
   aa = aa[-c(1), c(1:2)]
-  #aa = aa[-c(1), -c(1:3)]
   
   markers = c()
   for(n in 1:ncol(aa))
@@ -158,18 +158,9 @@ if(QCs.with.marker.genes){
   
   markers = markers[!is.na(match(markers, rownames(st)))]
   
-  #markers = unique(c(markers, rownames(st)[grep('Ly6g', rownames(st))]))
-  
-  #markers = c('Timp1', 'Timp2', 'Timp3', 'Timp4')
-  
   pdfname = paste0(resDir, "/check_detected_celltypes_using_AdditionalMarkerGenes_", species, '_', colnames(aa)[1],   ".pdf")
   pdf(pdfname, width = 16, height = 8)
   par(cex = 1.0, las = 1, mgp = c(2,0.2,0), mar = c(3,2,2,0.2), tcl = -0.3)
-  
-  # p1 = DimPlot(st, reduction = "umap", group.by = c("ident", "condition"))
-  # plot(p1)
-  # p2 = SpatialDimPlot(st)
-  # plot(p2)
   
   for(n in 1:length(markers))
   {
@@ -189,8 +180,10 @@ if(QCs.with.marker.genes){
 # 
 ########################################################
 ########################################################
-library(RCTD)
-library(Matrix)
+source('functions_Visium.R')
+refs = readRDS(file = paste0('../results/Rdata/', 
+              'SeuratObj_adultMiceHeart_refCombine_Forte2020.nonCM_Ren2020CM_cleanAnnot_logNormalize_v2.rds'))
+
 
 stx = st[, which(st$condition == 'adult.day4')]
 
