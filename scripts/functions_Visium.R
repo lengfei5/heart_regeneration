@@ -392,13 +392,13 @@ Convert.batch.corrected.expression.matrix.to.UMIcount = function(refs){
 }
 
 ##########################################
-# run cell type deconvolution with RCTD
+# run cell type deconvolution with RCTD for all slices
 ##########################################
-Run.celltype.deconvolution.RCTD = function(stx = std1, slice = 'adult.day1', Normalization = 'lognormalize')
+Run.celltype.deconvolution.RCTD = function(st, refs, Normalization = 'lognormalize')
 {
   # slice = 'adult.day4'; Normalization = 'lognormalize';
-  refs = readRDS(file = paste0(RdataDir, 
-                               'SeuratObj_adultMiceHeart_refCombine_Forte2020.nonCM_Ren2020CM_cleanAnnot_logNormalize_v1.rds'))
+  #refs = readRDS(file = paste0(RdataDir, 
+  #                             'SeuratObj_adultMiceHeart_refCombine_Forte2020.nonCM_Ren2020CM_cleanAnnot_logNormalize_v1.rds'))
   
   # import cardiomyocyte reference 
   # aa = readRDS(file = paste0(RdataDir, 'Seurat.obj_adultMiceHeart_week0.week2_Ren2020_seuratNormalization.rds'))
@@ -418,6 +418,7 @@ Run.celltype.deconvolution.RCTD = function(stx = std1, slice = 'adult.day1', Nor
   # gene used for cell type signature
   #genes.used =  intersect(aa.markers$gene[!is.na(match(aa.markers$gene, rownames(aa)))], 
   #                        aa.markers$gene[!is.na(match(aa.markers$gene, rownames(stx)))])
+  stx = st[, which(st$condition == 'adult.day4')]
   
   ##########################################
   # prepare reference for RTCD

@@ -181,10 +181,11 @@ if(QCs.with.marker.genes){
 ########################################################
 ########################################################
 source('functions_Visium.R')
+
 refs = readRDS(file = paste0('../results/Rdata/', 
               'SeuratObj_adultMiceHeart_refCombine_Forte2020.nonCM_Ren2020CM_cleanAnnot_logNormalize_v2.rds'))
 
+st = Run.celltype.deconvolution.RCTD(st, refs)
 
-stx = st[, which(st$condition == 'adult.day4')]
 
 
