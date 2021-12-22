@@ -180,6 +180,7 @@ if(QCs.with.marker.genes){
 # 
 ########################################################
 ########################################################
+load(file = paste0(RdataDir, 'seuratObject_design_variableGenes_adultMice_umap.clustered.Rdata'))
 source('functions_Visium.R')
 
 refs = readRDS(file = paste0('../results/Rdata/', 

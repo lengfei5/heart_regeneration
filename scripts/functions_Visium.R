@@ -398,7 +398,10 @@ Convert.batch.corrected.expression.matrix.to.UMIcount = function(refs){
 # For each condition, major cell type is first considered and then subtype in references further considered
 # 
 ##########################################
-Run.celltype.deconvolution.RCTD = function(st, refs, Normalization = 'lognormalize', plot.RCTD = TRUE, PLOT.scatterpie = TRUE,
+Run.celltype.deconvolution.RCTD = function(st, refs, Normalization = 'lognormalize', 
+                                           save.RCTD.in.seuratObj = FALSE, 
+                                           plot.RCTD.summary = TRUE, 
+                                           PLOT.scatterpie = TRUE,
                                            run.RCTD.subtype = FALSE)
 {
   require(RCTD)
@@ -441,20 +444,22 @@ Run.celltype.deconvolution.RCTD = function(st, refs, Normalization = 'lognormali
   cell_types <- as.factor(cell_types) # convert to factor data type
   reference <- Reference(E.corrected, cell_types, nUMI = NULL, require_int = FALSE)
   
-  ### create reference objects for subtypes
-  subtypes <- refs@meta.data$subtype
-  names(subtypes) <- colnames(refs) # create cell_types named list
-  subtypes <- as.factor(subtypes) # convert to factor data type
-  reference_subtype <- Reference(E.corrected, subtypes, nUMI = NULL, require_int = FALSE)
-  
-  rm(E.corrected)
-  
   ## Examine reference object (optional)
   print(dim(reference@counts)) #observe Digital Gene Expression matrix
   #> [1] 384 475
   table(reference@cell_types) #number of occurences for each cell type
-  table(reference_subtype@cell_types)
   
+  ### create reference objects for subtypes
+  if(run.RCTD.subtype){
+    subtypes <- refs@meta.data$subtype
+    names(subtypes) <- colnames(refs) # create cell_types named list
+    subtypes <- as.factor(subtypes) # convert to factor data type
+    reference_subtype <- Reference(E.corrected, subtypes, nUMI = NULL, require_int = FALSE)
+    table(reference_subtype@cell_types)
+    
+  }
+  
+  rm(E.corrected)
   
   ##########################################
   # loop over all conditions of st
@@ -464,8 +469,9 @@ Run.celltype.deconvolution.RCTD = function(st, refs, Normalization = 'lognormali
   cc = names(table(st$condition))
   
   for(n in 1:length(cc))
+  #for(n in 1:2)
   {
-    # n = 4
+    # n = 2
     slice = cc[n]
     stx = st[, which(st$condition == slice)]
     
@@ -512,6 +518,8 @@ Run.celltype.deconvolution.RCTD = function(st, refs, Normalization = 'lognormali
     
     toc()
     
+    # myRCTD = readRDS(file = paste0(RdataDir, 'RCTD_results_refCombined_Forte2020.Ren2020_', slice, '.rds'))
+    
     results <- myRCTD@results
     
     # normalize the cell type proportions to sum to 1.
@@ -521,7 +529,7 @@ Run.celltype.deconvolution.RCTD = function(st, refs, Normalization = 'lognormali
     spatialRNA <- myRCTD@spatialRNA
     
     # make the plots 
-    if(plot.RCTD){
+    if(plot.RCTD.summary){
       # Plots the confident weights for each cell type as in full_mode (saved as 'results/cell_type_weights_unthreshold.pdf')
       plot_weights(cell_type_names, spatialRNA, resultsdir, norm_weights)
       
@@ -547,43 +555,47 @@ Run.celltype.deconvolution.RCTD = function(st, refs, Normalization = 'lognormali
     if(PLOT.scatterpie){
       require(scatterpie)
       require(cowplot)
-      
       library(RColorBrewer)
-      n <- 60
-      qual_col_pals = brewer.pal.info[brewer.pal.info$category == 'qual',]
-      col_vector  <-  unlist(mapply(brewer.pal, qual_col_pals$maxcolors, rownames(qual_col_pals)))
       
-      # set color vec
-      colourCount <- length(unique(cell_type_names))
+      # set the color vectors for all cell types
+      # n <- 60
+      # qual_col_pals = brewer.pal.info[brewer.pal.info$category == 'qual',]
+      # col_vector  <-  unlist(mapply(brewer.pal, qual_col_pals$maxcolors, rownames(qual_col_pals)))
+      # 
+      # set color vector
       getPalette <- colorRampPalette(brewer.pal(8, "Dark2"))
-      
+      # use a panel of colors from https://gotellilab.github.io/GotelliLabMeetingHacks/NickGotelli/ColorPalettes.html
+      tol10qualitative=c("#332288", "#88CCEE", "#44AA99", "#117733", "#999933", "#DDCC77",
+                         "#661100", "#CC6677", "#882255", "#AA4499")
       cell_types_plt <- sort(unique(cell_type_names))
-      col_ct <- col_vector[seq_len(length(cell_types_plt))]
-      plt_df <- data.frame(plt_name = unique(cell_type_names),
-                           ct_name = gsub(pattern = "[[:punct:]]|[[:blank:]]", ".",
-                                          x = unique(cell_type_names),
-                                          perl = TRUE),
-                           col_ct = col_ct)
+      #col_vector = getPalette(length(cell_types_plt))
+      col_vector = tol10qualitative
       
-      ## Preprocess data
-      seurat_coord = SpatialDimPlot(stx, images = slice, stroke = 0)
-      spatial_coord <-  seurat_coord$data %>%
+      col_ct <- col_vector[seq_len(length(cell_types_plt))]
+      names(col_ct) = cell_types_plt
+      
+      #plot(1:length(col_ct), 1:length(col_ct), col = getPalette(length(col_ct)))
+      
+      ## Preprocess coordinates 
+      spatial_coord <-  spatialRNA@coords %>%
         tibble::rownames_to_column("ID")
       
-      colnames(spatial_coord)[2:3] = c('x', 'y')
+      #colnames(spatial_coord)[2:3] = c('x', 'y')
       spatial_coord = data.frame(spatial_coord, norm_weights[match(spatial_coord$ID, rownames(norm_weights)), ])
       
       ggplot() + geom_scatterpie(aes(x=x, y=y), data=spatial_coord,
                                  cols=cell_type_names, 
                                  color = NA,
                                  alpha = 1, 
-                                 pie_scale = 0.5) + 
+                                 pie_scale = 0.4) +
+        ggplot2::scale_fill_manual(values = col_ct) + # try to change the color of cell types
+        #ggplot2::coord_fixed(ratio = 1) +
+        coord_flip() + 
         #ggplot2::scale_y_reverse() +
-        ggplot2::scale_x_reverse() + 
+        ggplot2::scale_x_reverse() + # flip first and reverse x to match seurat Spatial plots
         cowplot::theme_half_open(11, rel_small = 1) +
         ggplot2::theme_void() + 
-        ggplot2::coord_fixed(ratio = 1) +
-        #ggplot2::scale_fill_manual(values = plt_df[plt_df$plt_name %in% ct_all, "col_ct"]) +
+        
         ggplot2::labs(title = "Spatial scatterpie") +
         ggplot2::theme(
           # plot.background = element_rect(fill = "#FFFFFF"),
@@ -594,91 +606,25 @@ Run.celltype.deconvolution.RCTD = function(st, refs, Normalization = 'lognormali
       
       ggsave(paste0(resultsdir, '/RCTD_scatterpie_', slice, '.pdf'), width = 22, height = 16)
       
-      # # Set right plot names
-      # tmp_df <- data.frame(plt_name = colnames(spatial_coord)[colnames(spatial_coord) %in% plt_df$plt_name]) %>% 
-      #   left_join(plt_df)
-      # 
-      # ind <- which(names(spatial_coord) %in% tmp_df$plt_name)
-      # names(spatial_coord)[ind] <- as.character(tmp_df$plt_name)
-      
-      # # Get list of all present cell types
-      # ct_all <- names(spatial_coord)[names(spatial_coord) %in% as.character(tmp_df$plt_name)]
-      # ind_rm <- which(colSums(spatial_coord[, ct_all] > 0) == 0)
-      # if (length(ind_rm) > 0) {
-      #   ct_all <- ct_all[-ind_rm]
-      # }
-      # 
-      # new_names <- data.frame(ct_name = colnames(decon_mtrx_subs)) %>%
-      #   dplyr::left_join(plt_df, by = "ct_name") %>%
-      #   dplyr::pull(plt_name)
-      # 
-      # colnames(decon_mtrx_subs) <- new_names
-      # 
-      # st_se@meta.data <- cbind(st_se@meta.data, decon_mtrx_subs)
-      # 
-      # 
-      # # Set right plot names
-      # tmp_df <- data.frame(plt_name = colnames(spatial_coord)[colnames(spatial_coord) %in% plt_df$plt_name]) %>% 
-      #   left_join(plt_df)
-      # 
-      # ind <- which(names(spatial_coord) %in% tmp_df$plt_name)
-      # # names(spatial_coord)[ind] <- as.character(tmp_df$plt_name)
-      # 
-      # # Get list of all present cell types
-      # ct_all <- names(spatial_coord)[names(spatial_coord) %in% as.character(tmp_df$plt_name)]
-      # ind_rm <- which(colSums(spatial_coord[, ct_all] > 0) == 0)
-      # if (length(ind_rm) > 0) {
-      #   ct_all <- ct_all[-ind_rm]
-      # }
-      # 
-      # 
-      # # Plot the scatterplot
-      # scatterpie_plt <- ggplot2::ggplot() +
-      #   scatterpie::geom_scatterpie(data = spatial_coord[c(1:200),],
-      #                               aes(x = x,
-      #                                   y = y),
-      #                               cols = ct_all,
-      #                               color = NA,
-      #                               alpha = 1, 
-      #                               pie_scale = 0.9) +
-      #   #ggplot2::scale_y_reverse() +
-      #   cowplot::theme_half_open(11, rel_small = 1) +
-      #   ggplot2::theme_void() + 
-      #   ggplot2::coord_fixed(ratio = 1) +
-      #   # ggplot2::scale_fill_manual(values = tmp_df[tmp_df$plt_name %in% ct_all, "col_ct"]) +
-      #   ggplot2::scale_fill_manual(values = plt_df[plt_df$plt_name %in% ct_all, "col_ct"]) +
-      #   ggplot2::labs(title = sprintf("%s Spatial scatterpie", geo)) +
-      #   ggplot2::theme(
-      #     # plot.background = element_rect(fill = "#FFFFFF"),
-      #     # panel.background = element_blank(),
-      #     # plot.margin = margin(20, 20, 20, 20),
-      #     plot.title = ggplot2::element_text(hjust = 0.5, size = 20)) +
-      #   ggplot2::guides(fill = guide_legend(ncol = 1))
-      # 
-      # cowplot::save_plot(plot = scatterpie_plt,
-      #                    filename = sprintf("%s/%s/scatterpie__immune_%s.pdf",
-      #                                       an_pdac, plt_dir, geo),
-      #                    base_width = 12,
-      #                    base_height = 9)
-      # 
-      
     }
     
     ##########################################
-    # save and assign the cell type
+    # save and assign the cell type into Seurat object
+    # default FALSE
     ##########################################
-    cts = results$results_df
-    cts$cellType = NA
-    cts$cellType[which(cts$spot_class == 'singlet')] = as.character(cts$first_type[which(cts$spot_class == 'singlet')])
-    cts$cellType[which(cts$spot_class == 'doublet_certain')] = 
-      paste0(cts$first_type[which(cts$spot_class == 'doublet_certain')], 
-             '_', cts$second_type[which(cts$spot_class == 'doublet_certain')])
-    
-    stx$celltype = cts$cellType[match(colnames(stx), rownames(cts))]
-    
-    
-    xx = SpatialDimPlot(stx, group.by = 'celltype', images = slice, stroke = 0, interactive = FALSE)
-    
+    if(save.RCTD.in.seuratObj){
+      cts = results$results_df
+      cts$cellType = NA
+      cts$cellType[which(cts$spot_class == 'singlet')] = as.character(cts$first_type[which(cts$spot_class == 'singlet')])
+      cts$cellType[which(cts$spot_class == 'doublet_certain')] = 
+        paste0(cts$first_type[which(cts$spot_class == 'doublet_certain')], 
+               '_', cts$second_type[which(cts$spot_class == 'doublet_certain')])
+      
+      stx$celltype = cts$cellType[match(colnames(stx), rownames(cts))]
+      
+      xx = SpatialDimPlot(stx, group.by = 'celltype', images = slice, stroke = 0, interactive = FALSE)
+      
+    }
     
     ##########################################
     # finer annotation by running RCTD with subtypes 
