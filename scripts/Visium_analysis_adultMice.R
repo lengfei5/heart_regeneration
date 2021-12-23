@@ -28,8 +28,8 @@ mem_used()
 
 ########################################################
 ########################################################
-# Section : import the processed visium data by spaceranger
-# first start with neonatal mice samples
+# Section I: import the processed visium data by spaceranger
+# first processing and QCs 
 ########################################################
 ########################################################
 #design = data.frame(seq(166904, 166911), c(paste0("adult.day", c(14, 7, 4, 1)), 
@@ -176,7 +176,7 @@ if(QCs.with.marker.genes){
 
 ########################################################
 ########################################################
-# Section : cell type deconvolution for each time point 
+# Section II : cell type deconvolution for each time point 
 # 
 ########################################################
 ########################################################
@@ -187,6 +187,8 @@ refs = readRDS(file = paste0('../results/Rdata/',
               'SeuratObj_adultMiceHeart_refCombine_Forte2020.nonCM_Ren2020CM_cleanAnnot_logNormalize_v2.rds'))
 
 st = Run.celltype.deconvolution.RCTD(st, refs)
+
+
 
 
 
