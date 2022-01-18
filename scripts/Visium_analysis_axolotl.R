@@ -29,12 +29,12 @@ mem_used()
 
 ########################################################
 ########################################################
-# Section I: import the processed visium data by spaceranger
+# Section I: import the processed visium data by nf from Tomas and 
 # first processing and QCs 
 ########################################################
 ########################################################
 design = data.frame(sampleID = seq(183623, 183626), 
-                    condition = c(paste0('ax_day', c(1, 4, 7, 14))), stringsAsFactors = FALSE)
+                    condition = c(paste0('Amex_d1', c(1, 4, 7, 14))), stringsAsFactors = FALSE)
 
 varibleGenes = c()
 
@@ -42,15 +42,10 @@ for(n in 1:nrow(design))
 {
   # n = 1
   
-  # load output from spaceranger
-  aa = Seurat::Load10X_Spatial(
-    data.dir = paste0(dataDir, '/output_', design$sampleID[n], '/', design$sampleID[n],  '/outs'),
-    filename = "filtered_feature_bc_matrix.h5",
-    assay = "Spatial",
-    slice =  design$condition[n],
-    filter.matrix = TRUE,
-    to.upper = FALSE
-  )
+  # load nf output and process
+  source('functions_Visium.R')
+  aa = make_SeuratObj_visium(topdir = paste0(dataDir, '/', design$condition[n], '_', design$sampleID[n]), 
+                             saveDir = paste0(resDir, '/', design$condition[n], '_', design$sampleID[n]))
   
   aa$condition = design$condition[n]
   #aa <- SCTransform(aa, assay = "Spatial",  method = "glmGamPoi", verbose = FALSE)
