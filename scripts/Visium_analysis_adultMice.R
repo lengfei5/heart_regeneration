@@ -12,7 +12,7 @@ rm(list = ls())
 
 version.analysis = '_R11934_20210827'
 
-resDir = paste0("../results/visium_mouse", version.analysis)
+resDir = paste0("../results/visium_adultMice", version.analysis)
 RdataDir = paste0('../results/Rdata/')
 
 if(!dir.exists(resDir)) dir.create(resDir)
@@ -188,6 +188,18 @@ refs = readRDS(file = paste0('../results/Rdata/',
 
 st = Run.celltype.deconvolution.RCTD(st, refs)
 
+
+########################################################
+########################################################
+# Section III: spatialDE analysis 
+# 
+########################################################
+########################################################
+load(file = paste0(RdataDir, 'seuratObject_design_variableGenes_adultMice_umap.clustered.Rdata'))
+
+source('functions_Visium.R')
+
+st = Find.SpatialDE(st)
 
 
 

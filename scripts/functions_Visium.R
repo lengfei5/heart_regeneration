@@ -13,7 +13,6 @@ require(ggplot2)
 require(tibble)
 require(dplyr)
 require(tictoc)
-
 library(patchwork)
 
 firstup <- function(x) {
@@ -638,5 +637,99 @@ Run.celltype.deconvolution.RCTD = function(st, refs, Normalization = 'lognormali
   }
   
 }
+
+
+########################################################
+########################################################
+# Section : functions for SpatialDE analysis
+# test SPARK first (original code from https://xzhoulab.github.io/SPARK/02_SPARK_Example/)
+########################################################
+########################################################
+Find.SpatialDE = function(st, use.sparkX = TRUE)
+{
+  library('SPARK')
+  require(parallel)
+  
+  cat('visium conditions :\n')
+  print(table(st$condition))
+  cc = names(table(st$condition))
+  
+  for(n in 1:length(cc))
+  {
+    # n = 3
+    slice = cc[n]
+    stx = st[, which(st$condition == slice)]
+    
+    resultsdir <- paste0(resDir, '/SpatialDE_SPARK/')
+    system(paste0('mkdir -p ', resultsdir))
+    
+    rawcount = stx@assays$Spatial@counts
+    coords <- eval(parse(text = paste0('stx@images$',  slice, '@coordinates')))
+    coords = coords[, c(4, 5)]
+    
+    ##########################################
+    # Analyze the data with SPARK-X
+    ##########################################
+    if(use.sparkX){
+      info <- cbind.data.frame(x=as.numeric(coords[,1]),
+                               y=as.numeric(coords[, 2]))
+      rownames(info) <- colnames(rawcount)
+      location        <- as.matrix(info)
+      
+      tic()
+      
+      sparkX <- sparkx(rawcount,location,numCores=8,option="mixture")
+      
+      toc()
+      
+      head(sparkX$res_mtest)
+      
+      mtest = sparkX$res_mtest
+      mtest = mtest[order(mtest$adjustedPval), ]
+      
+      write.csv(mtest, file = paste0(resultsdir, 'SpatialDE_sparkX_', slice, '.csv'), row.names = TRUE)
+      
+    }else{
+      info <- cbind.data.frame(x=as.numeric(coords[,1]),
+                               y=as.numeric(coords[, 2]),
+                               total_counts=apply(rawcount,2,sum))
+      
+      rownames(info) <- colnames(rawcount)
+      
+      ## filter genes and cells/spots and 
+      spark <- CreateSPARKObject(counts=rawcount, 
+                                 location=info[,1:2],
+                                 percentage = 0.1, 
+                                 min_total_counts = 10)
+      
+      ## total counts for each cell/spot
+      spark@lib_size <- apply(spark@counts, 2, sum)
+      
+      ## Estimating Parameter Under Null
+      tic()
+      spark <- spark.vc(spark, 
+                        covariates = NULL, 
+                        lib_size = spark@lib_size, 
+                        num_core = 8,
+                        verbose = F)
+      
+      toc()
+      
+      ## Calculating pval
+      tic()
+      spark <- spark.test(spark, 
+                          check_positive = T, 
+                          verbose = F)
+      toc()
+      
+      ## Output the final results, i.e., combined p-values, adjusted p-values, etc.
+      head(spark@res_mtest[,c("combined_pvalue","adjusted_pvalue")])
+      
+    }
+    
+  }
+ 
+}
+
 
 

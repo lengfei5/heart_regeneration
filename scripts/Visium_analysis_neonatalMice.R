@@ -11,7 +11,7 @@
 rm(list = ls())
 version.analysis = '_R11934_20210827_neonatal'
 
-resDir = paste0("../results/visium_mouse", version.analysis)
+resDir = paste0("../results/visium_neonatalMice", version.analysis)
 RdataDir = paste0('../results/Rdata/')
 
 if(!dir.exists(resDir)) dir.create(resDir)
