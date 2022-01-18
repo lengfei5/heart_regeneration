@@ -11,6 +11,8 @@
 # setup for data import and sequencing QCs
 rm(list = ls())
 
+species = 'axolotl'
+
 version.analysis = '_R12830_2020118'
 
 resDir = paste0("../results/visium_axolotl", version.analysis)
@@ -26,7 +28,6 @@ library(pryr) # monitor the memory usage
 require(ggplot2)
 mem_used()
 
-
 ########################################################
 ########################################################
 # Section I: import the processed visium data by nf from Tomas and 
@@ -34,21 +35,21 @@ mem_used()
 ########################################################
 ########################################################
 design = data.frame(sampleID = seq(183623, 183626), 
-                    condition = c(paste0('Amex_d1', c(1, 4, 7, 14))), stringsAsFactors = FALSE)
-
+                    condition = c(paste0('Amex_d', c(1, 4, 7, 14))), stringsAsFactors = FALSE)
 varibleGenes = c()
 
 for(n in 1:nrow(design))
 {
   # n = 1
-  
+  cat('-----------', design$condition[n], '-------------\n')
   # load nf output and process
   source('functions_Visium.R')
-  aa = make_SeuratObj_visium(topdir = paste0(dataDir, '/', design$condition[n], '_', design$sampleID[n]), 
-                             saveDir = paste0(resDir, '/', design$condition[n], '_', design$sampleID[n]))
+  aa = make_SeuratObj_visium(topdir = paste0(dataDir, '/', design$condition[n], '_', design$sampleID[n], '/'), 
+                             saveDir = paste0(resDir, '/', design$condition[n], '_', design$sampleID[n], '/'))
   
   aa$condition = design$condition[n]
   #aa <- SCTransform(aa, assay = "Spatial",  method = "glmGamPoi", verbose = FALSE)
+  
   aa <- SCTransform(aa, assay = "Spatial", verbose = FALSE, variable.features.n = 3000, return.only.var.genes = FALSE)
   
   test.clustering.each.condtiion = FALSE
@@ -75,15 +76,17 @@ for(n in 1:nrow(design))
   }
   
   remove(aa)
+  
 }
 
+
+save(design, varibleGenes, st, file = paste0(RdataDir, 'seuratObject_design_variableGenes_', species, '.Rdata'))
 
 ##########################################
 # cell and gene filtering
 ##########################################
-species = 'mouse_adult'
-
 load(file = paste0(RdataDir, 'seuratObject_design_variableGenes_', species, '.Rdata'))
+
 
 ##########################################
 # gene and cell filtering (to add later)
