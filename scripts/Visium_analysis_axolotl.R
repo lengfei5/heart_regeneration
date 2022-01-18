@@ -45,11 +45,13 @@ for(n in 1:nrow(design))
   # load nf output and process
   source('functions_Visium.R')
   aa = make_SeuratObj_visium(topdir = paste0(dataDir, '/', design$condition[n], '_', design$sampleID[n], '/'), 
-                             saveDir = paste0(resDir, '/', design$condition[n], '_', design$sampleID[n], '/'))
+                             saveDir = paste0(resDir, '/', design$condition[n], '_', design$sampleID[n], '/'), 
+                             keyname = design$condition[n])
   
   aa$condition = design$condition[n]
   #aa <- SCTransform(aa, assay = "Spatial",  method = "glmGamPoi", verbose = FALSE)
   
+  aa = subset(aa, subset = nCount_Spatial > 100) # 100 umi from the umi rank
   aa <- SCTransform(aa, assay = "Spatial", verbose = FALSE, variable.features.n = 3000, return.only.var.genes = FALSE)
   
   test.clustering.each.condtiion = FALSE
@@ -78,7 +80,6 @@ for(n in 1:nrow(design))
   remove(aa)
   
 }
-
 
 save(design, varibleGenes, st, file = paste0(RdataDir, 'seuratObject_design_variableGenes_', species, '.Rdata'))
 
@@ -114,7 +115,7 @@ VariableFeatures(st) <- varibleGenes
 st <- RunPCA(st, verbose = FALSE)
 ElbowPlot(st)
 
-st <- FindNeighbors(st, dims = 1:20)
+st <- FindNeighbors(st, dims = 1:10)
 st <- FindClusters(st, verbose = FALSE, resolution = 0.5)
 
 st <- RunUMAP(st, dims = 1:20, n.neighbors = 30, min.dist = 0.05)
@@ -123,9 +124,10 @@ DimPlot(st, reduction = "umap", group.by = c("ident", "condition"))
 
 ggsave(filename = paste0(resDir, '/UMAP_all.timepoints_', species, '.pdf'), width = 16, height = 8)
 
-FeaturePlot(st, features = c("Myh6", 'Nppa'))
+features = rownames(st)[grep('MYH6|NPPA', rownames(st))]
+FeaturePlot(st, features = features)
 
-SpatialFeaturePlot(st, features = 'Myh6', image.alpha = 0.5)
+SpatialFeaturePlot(st, features = features[2])
 
 save(design, varibleGenes, st, file = paste0(RdataDir, 'seuratObject_design_variableGenes_adultMice_umap.clustered.Rdata'))
 
@@ -133,10 +135,10 @@ QCs.with.marker.genes = FALSE
 if(QCs.with.marker.genes){
   # import marker genes
   library(openxlsx)
-  #aa = read.xlsx('../data/Markers_updated_v2.xlsx', sheet = 1, colNames = TRUE)
-  aa = read.csv('../data/Tzahor_geneList.csv', header = TRUE)
+  aa = read.xlsx('../data/Markers_updated_v2.xlsx', sheet = 1, colNames = TRUE)
+  #aa = read.csv('../data/Tzahor_geneList.csv', header = TRUE)
   
-  aa = aa[-c(1), c(1:2)]
+  #aa = aa[-c(1), c(1:2)]
   
   markers = c()
   for(n in 1:ncol(aa))
@@ -147,11 +149,17 @@ if(QCs.with.marker.genes){
   markers = firstup(tolower(unique(markers)))
   markers = gsub(' ', '', markers)
   
-  markers[is.na(match(markers, rownames(st)))]
+  xx = c()
+  for(n in 1:length(markers))
+  {
+    xx = c(xx, rownames(st)[grep(toupper(markers[n]), rownames(st))])
+  }
+  xx = unique(xx)
+  markers = xx
+  #markers[is.na(match(markers, rownames(st)))]
+  #markers = markers[!is.na(match(markers, rownames(st)))]
   
-  markers = markers[!is.na(match(markers, rownames(st)))]
-  
-  pdfname = paste0(resDir, "/check_detected_celltypes_using_AdditionalMarkerGenes_", species, '_', colnames(aa)[1],   ".pdf")
+  pdfname = paste0(resDir, "/check_detected_celltypes_using_AdditionalMarkerGenes_", species, ".pdf")
   pdf(pdfname, width = 16, height = 8)
   par(cex = 1.0, las = 1, mgp = c(2,0.2,0), mar = c(3,2,2,0.2), tcl = -0.3)
   
@@ -166,5 +174,4 @@ if(QCs.with.marker.genes){
   dev.off()
   
 }
-
 

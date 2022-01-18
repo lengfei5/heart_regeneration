@@ -189,7 +189,6 @@ for(n in 1:nrow(design))
   dev.off()
   saveRDS(aa, file = paste0(RdataDir, 'seuratObject_design_st_mouse_', design$condition[n], '.rds'))
   
-  
 }
 
 #save(design, varibleGenes, st, file = paste0(RdataDir, 'seuratObject_design_variableGenes_mouse_adult.Rdata'))

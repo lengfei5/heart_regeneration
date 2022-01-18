@@ -28,7 +28,7 @@ firstup <- function(x) {
 # original codes from nf pipeline from Ashley and Tomas
 ########################################################
 ########################################################
-make_SeuratObj_visium = function(topdir = './', saveDir = './results', changeGeneName = TRUE)
+make_SeuratObj_visium = function(topdir = './', saveDir = './results', changeGeneName = TRUE, keyname = 'slice1')
 {
   #topdir = "./" # source dir
   library(Seurat)
@@ -74,6 +74,7 @@ make_SeuratObj_visium = function(topdir = './', saveDir = './results', changeGen
   legend("bottomleft", lty=2, col=c("dodgerblue", "forestgreen"),
          legend=c("knee", "inflection"))
   
+  
   dev.off()
   
   # UMI duplication
@@ -101,18 +102,14 @@ make_SeuratObj_visium = function(topdir = './', saveDir = './results', changeGen
   dev.off()
   
   # create Seurat object and add image information
-  count.data = count.data[rowSums(count.data) >0, ]
-  cat(nrow(count.data), ' features with >0 UMI \n')
-  
   cat('creat seurat object with counts and image \n')
-  
   srat <- CreateSeuratObject(counts = count.data, assay = "Spatial") # create object
   
   image <- Read10X_Image(image.dir = paste0(topdir, "mock/outs/spatial/"),
                          filter.matrix = FALSE) # read in the images
   image <- image[Cells(x = srat)] # filter image by the spots
   DefaultAssay(object = image) <- "Spatial" # set default assay
-  srat[["slice1"]] <- image # slice name might be changed
+  srat[[keyname]] <- image # slice name might be changed
   
   # estimate ambient proportion
   cat('estimate ambience prop \n')
@@ -120,6 +117,19 @@ make_SeuratObj_visium = function(topdir = './', saveDir = './results', changeGen
   
   srat@assays$Spatial@meta.features = data.frame(row.names = rownames(srat@assays$Spatial@meta.features),
                                                  "ambient_prop" = amb_prop)
+  
+  # keep only the spots identified for tissue
+  cat('keep only spots that have been deteremed to be over tissue \n')
+  tissue = read.csv(paste0(topdir, 'mock/outs/spatial/tissue_positions_list.csv'), header =FALSE)
+  tissue = tissue[which(tissue$V2>0), ]
+  mm = match(tissue$V1, colnames(srat))
+  
+  srat = subset(srat, cells = tissue$V1[!is.na(mm)])
+  cat(ncol(srat), ' spots determined to be tissue  \n')
+  
+  srat = srat[rowSums(srat@assays$Spatial@counts) > 0, ]
+  cat(nrow(srat), ' features with >0 UMI \n')
+  
   
   # get MT% (genes curated from NCBI chrMT genes)
   # mtgenes = c("COX1", "COX2", "COX3", "ATP6", "ND1", "ND5", "CYTB", "ND2", "ND4",
