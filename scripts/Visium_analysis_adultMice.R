@@ -25,6 +25,8 @@ library(pryr) # monitor the memory usage
 require(ggplot2)
 mem_used()
 
+species = 'mouse_adult'
+
 ########################################################
 ########################################################
 # Section I: import the processed visium data by spaceranger
@@ -90,7 +92,6 @@ for(n in 1:nrow(design))
 ##########################################
 # cell and gene filtering
 ##########################################
-species = 'mouse_adult'
 
 load(file = paste0(RdataDir, 'seuratObject_design_variableGenes_', species, '.Rdata'))
 
@@ -133,7 +134,8 @@ FeaturePlot(st, features = c("Myh6", 'Nppa'))
 
 SpatialFeaturePlot(st, features = 'Myh6', image.alpha = 0.5)
 
-save(design, varibleGenes, st, file = paste0(RdataDir, 'seuratObject_design_variableGenes_adultMice_umap.clustered.Rdata'))
+save(design, varibleGenes, st, 
+     file = paste0(RdataDir, 'seuratObject_design_variableGenes_', species, '_umap.clustered.Rdata'))
 
 QCs.with.marker.genes = FALSE
 if(QCs.with.marker.genes){
@@ -179,7 +181,7 @@ if(QCs.with.marker.genes){
 # 
 ########################################################
 ########################################################
-load(file = paste0(RdataDir, 'seuratObject_design_variableGenes_adultMice_umap.clustered.Rdata'))
+load(file = paste0(RdataDir, 'seuratObject_design_variableGenes_', species, '_umap.clustered.Rdata'))
 source('functions_Visium.R')
 
 refs = readRDS(file = paste0('../results/Rdata/', 
@@ -193,7 +195,7 @@ st = Run.celltype.deconvolution.RCTD(st, refs)
 # 
 ########################################################
 ########################################################
-load(file = paste0(RdataDir, 'seuratObject_design_variableGenes_adultMice_umap.clustered.Rdata'))
+load(file = paste0(RdataDir, 'seuratObject_design_variableGenes_', species, '_umap.clustered.Rdata'))
 
 source('functions_Visium.R')
 

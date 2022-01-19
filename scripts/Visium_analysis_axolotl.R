@@ -155,20 +155,23 @@ st <- RunPCA(st, verbose = FALSE)
 ElbowPlot(st)
 
 st <- FindNeighbors(st, dims = 1:10)
-st <- FindClusters(st, verbose = FALSE, resolution = 0.5)
+st <- FindClusters(st, verbose = FALSE, resolution = 1.0)
 
 st <- RunUMAP(st, dims = 1:20, n.neighbors = 20, min.dist = 0.05)
+SpatialDimPlot(st, image.alpha = 0.5)
 
 DimPlot(st, reduction = "umap", group.by = c("ident", "condition")) 
 
 ggsave(filename = paste0(resDir, '/UMAP_all.timepoints_', species, '.pdf'), width = 16, height = 8)
 
-features = rownames(st)[grep('MYH6|NPPA', rownames(st))]
+features = rownames(st)[grep('MYH6|NPPA|CLU-AMEX60DD032706', rownames(st))]
 FeaturePlot(st, features = features)
 
 SpatialFeaturePlot(st, features = features[2])
 
-save(design, varibleGenes, st, file = paste0(RdataDir, 'seuratObject_design_variableGenes_adultMice_umap.clustered.Rdata'))
+save(design, varibleGenes, st, file = paste0(RdataDir, 'seuratObject_design_variableGenes_umap.clustered', species, '.Rdata'))
+
+load(file = paste0(RdataDir, 'seuratObject_design_variableGenes_umap.clustered', species, '.Rdata'))
 
 QCs.with.marker.genes = FALSE
 if(QCs.with.marker.genes){
@@ -197,8 +200,13 @@ if(QCs.with.marker.genes){
   }
   xx = unique(xx)
   markers = xx
+  
   #markers[is.na(match(markers, rownames(st)))]
   #markers = markers[!is.na(match(markers, rownames(st)))]
+  xx = rownames(st)[grep('CLU', rownames(st))]
+  p0 = SpatialFeaturePlot(st, features = xx[2], image.alpha = 0.5)
+  p1 = SpatialDimPlot(st, image.alpha = 0.5)
+  plot(wrap_plots(p0, p1, nrow = 2))
   
   pdfname = paste0(resDir, "/check_detected_celltypes_using_AdditionalMarkerGenes_", species, ".pdf")
   pdf(pdfname, width = 16, height = 8)
