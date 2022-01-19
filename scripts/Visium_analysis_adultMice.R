@@ -25,7 +25,6 @@ library(pryr) # monitor the memory usage
 require(ggplot2)
 mem_used()
 
-
 ########################################################
 ########################################################
 # Section I: import the processed visium data by spaceranger
@@ -188,10 +187,9 @@ refs = readRDS(file = paste0('../results/Rdata/',
 
 st = Run.celltype.deconvolution.RCTD(st, refs)
 
-
 ########################################################
 ########################################################
-# Section III: spatialDE analysis 
+# Section III: spatial organization of cell types and genes  
 # 
 ########################################################
 ########################################################
