@@ -44,7 +44,7 @@ for(n in 1:nrow(design))
   aa = make_SeuratObj_visium(topdir = paste0(dataDir, '/', design$condition[n], '_', design$sampleID[n], '/'), 
                              saveDir = paste0(resDir, '/', design$condition[n], '_', design$sampleID[n], '/'), 
                              keyname = design$condition[n], 
-                             QC.umi = FALSE)
+                             QC.umi = TRUE)
   
   aa$condition = design$condition[n]
   
@@ -157,7 +157,7 @@ ElbowPlot(st)
 st <- FindNeighbors(st, dims = 1:10)
 st <- FindClusters(st, verbose = FALSE, resolution = 0.5)
 
-st <- RunUMAP(st, dims = 1:20, n.neighbors = 30, min.dist = 0.05)
+st <- RunUMAP(st, dims = 1:20, n.neighbors = 20, min.dist = 0.05)
 
 DimPlot(st, reduction = "umap", group.by = c("ident", "condition")) 
 
@@ -184,6 +184,8 @@ if(QCs.with.marker.genes){
   {
     markers = c(markers, aa[!is.na(aa[,n]), n])
   }
+  markers = unique(c(markers, c('hmgb2', 'top2a')))
+  
   markers = markers[which(markers != '')]
   markers = firstup(tolower(unique(markers)))
   markers = gsub(' ', '', markers)
@@ -208,6 +210,7 @@ if(QCs.with.marker.genes){
     p3 = SpatialFeaturePlot(st, features = markers[n], image.alpha = 0.5)
     
     plot(p3)
+    
   }
   
   dev.off()

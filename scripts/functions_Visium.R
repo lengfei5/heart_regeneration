@@ -52,7 +52,7 @@ make_SeuratObj_visium = function(topdir = './', saveDir = './results', changeGen
                            'geneAnnotation_geneSymbols_cleaning_synteny_sameSymbols.hs.nr_curated.geneSymbol.toUse.rds'))
     
     mm = match(g$V1, annot$geneID)
-    ggs = paste0(annot$gene.symbol.toUse[mm], '_',  annot$geneID[mm])
+    ggs = paste0(annot$gene.symbol.toUse[mm], '|',  annot$geneID[mm])
     g$V1[!is.na(mm)] = ggs[!is.na(mm)]
     
   }
@@ -77,21 +77,32 @@ make_SeuratObj_visium = function(topdir = './', saveDir = './results', changeGen
     legend("bottomleft", lty=2, col=c("dodgerblue", "forestgreen"),
            legend=c("knee", "inflection"))
     
-    
     dev.off()
     
-    # UMI duplication
-    cat('umi duplication \n')
+    # UMI duplication 
+    cat('umi duplication check \n')
     umi = read.table(paste0(topdir, "umicount.txt"), sep = "\t", header = F, stringsAsFactors = F)
+    colnames(umi) = c('cell.bc', 'umi', 'kallisto.seqIndex', 'counts')
     
     sumUMI = c()
-    sumi = sum(umi$V4)
+    sumi = sum(umi$counts)
     
     for(i in 0:250){
-      sumUMI = c(sumUMI, sum(umi$V4[umi$V4>i])/sumi)
+      sumUMI = c(sumUMI, sum(umi$counts[umi$counts>i])/sumi)
     }
     
+    counts.umi = c()
+    for(i in 1:100){
+      counts.umi = c(counts.umi, length(which(umi$counts == i))/nrow(umi))
+    }
+    
+    
     pdf(paste0(saveDir, "UMIduplication.pdf"), height = 6, width = 12, useDingbats = F)
+    
+    par(mfrow = c(1,1))
+    plot(1:100, counts.umi, ylim = c(0, 1), col = 'gray30', 
+         ylab = '% of umi', xlab = 'duplication nb of umi', pch = 20)
+    
     
     par(mfrow = c(1,2))
     
