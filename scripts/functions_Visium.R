@@ -28,7 +28,8 @@ firstup <- function(x) {
 # original codes from nf pipeline from Ashley and Tomas
 ########################################################
 ########################################################
-make_SeuratObj_visium = function(topdir = './', saveDir = './results', changeGeneName = TRUE, keyname = 'slice1')
+make_SeuratObj_visium = function(topdir = './', saveDir = './results', changeGeneName = TRUE, keyname = 'slice1', 
+                                 QC.umi = TRUE)
 {
   #topdir = "./" # source dir
   library(Seurat)
@@ -39,7 +40,7 @@ make_SeuratObj_visium = function(topdir = './', saveDir = './results', changeGen
   
   # import read in from kallisto output
   cat('import reads from kallisto output\n')
-  exp = Matrix::readMM(paste0(topdir, "genecounts.mtx")) #read matrix
+  exp = Matrix::readMM(paste0(topdir, "genecounts.mtx")) # UMI count matrix
   
   bc = read.csv(paste0(topdir, "genecounts.barcodes.txt"), header = F, stringsAsFactors = F)
   g = read.csv(paste0(topdir, "genecounts.genes.txt"), header = F, stringsAsFactors = F)
@@ -59,47 +60,51 @@ make_SeuratObj_visium = function(topdir = './', saveDir = './results', changeGen
   dimnames(exp) = list(paste0(bc$V1,"-1"),g$V1) # number added because of seurat format for barcodes
   count.data = Matrix::t(exp)
   
-  # plot rankings for number of UMI
-  cat('plot UMI rank \n')
-  br.out <- barcodeRanks(count.data)
   
-  pdf(paste0(saveDir, "UMIrank.pdf"), height = 8, width = 8, useDingbats = FALSE)
-  
-  plot(br.out$rank, br.out$total, log="xy", xlab="Rank", ylab="Total")
-  
-  o <- order(br.out$rank)
-  lines(br.out$rank[o], br.out$fitted[o], col="red")
-  abline(h=metadata(br.out)$knee, col="dodgerblue", lty=2)
-  abline(h=metadata(br.out)$inflection, col="forestgreen", lty=2)
-  legend("bottomleft", lty=2, col=c("dodgerblue", "forestgreen"),
-         legend=c("knee", "inflection"))
-  
-  
-  dev.off()
-  
-  # UMI duplication
-  cat('umi duplication \n')
-  umi = read.table(paste0(topdir, "umicount.txt"), sep = "\t", header = F, stringsAsFactors = F)
-  
-  sumUMI = c()
-  sumi = sum(umi$V4)
-  
-  for(i in 0:250){
-    sumUMI = c(sumUMI, sum(umi$V4[umi$V4>i])/sumi)
+  if(QC.umi){
+    # plot rankings for number of UMI
+    cat('plot UMI rank \n')
+    br.out <- barcodeRanks(count.data)
+    
+    pdf(paste0(saveDir, "UMIrank.pdf"), height = 8, width = 8, useDingbats = FALSE)
+    
+    plot(br.out$rank, br.out$total, log="xy", xlab="Rank", ylab="Total")
+    
+    o <- order(br.out$rank)
+    lines(br.out$rank[o], br.out$fitted[o], col="red")
+    abline(h=metadata(br.out)$knee, col="dodgerblue", lty=2)
+    abline(h=metadata(br.out)$inflection, col="forestgreen", lty=2)
+    legend("bottomleft", lty=2, col=c("dodgerblue", "forestgreen"),
+           legend=c("knee", "inflection"))
+    
+    
+    dev.off()
+    
+    # UMI duplication
+    cat('umi duplication \n')
+    umi = read.table(paste0(topdir, "umicount.txt"), sep = "\t", header = F, stringsAsFactors = F)
+    
+    sumUMI = c()
+    sumi = sum(umi$V4)
+    
+    for(i in 0:250){
+      sumUMI = c(sumUMI, sum(umi$V4[umi$V4>i])/sumi)
+    }
+    
+    pdf(paste0(saveDir, "UMIduplication.pdf"), height = 6, width = 12, useDingbats = F)
+    
+    par(mfrow = c(1,2))
+    
+    plot(sumUMI, ylim = c(0,1), pch = 20, col = "grey30", ylab = "% of total reads",
+         xlab = "More than xx UMI")
+    
+    diffUMI = sumUMI[-length(sumUMI)] - sumUMI[-1]
+    plot(diffUMI, ylim = c(0,0.2), pch = 20, col = "grey30", ylab = "Change in % of total reads",
+         xlab = "More than xx UMI")
+    
+    dev.off()
+    
   }
-  
-  pdf(paste0(saveDir, "UMIduplication.pdf"), height = 6, width = 12, useDingbats = F)
-  
-  par(mfrow = c(1,2))
-  
-  plot(sumUMI, ylim = c(0,1), pch = 20, col = "grey30", ylab = "% of total reads",
-       xlab = "More than xx UMI")
-  
-  diffUMI = sumUMI[-length(sumUMI)] - sumUMI[-1]
-  plot(diffUMI, ylim = c(0,0.2), pch = 20, col = "grey30", ylab = "Change in % of total reads",
-       xlab = "More than xx UMI")
-  
-  dev.off()
   
   # create Seurat object and add image information
   cat('creat seurat object with counts and image \n')
@@ -129,16 +134,6 @@ make_SeuratObj_visium = function(topdir = './', saveDir = './results', changeGen
   
   srat = srat[rowSums(srat@assays$Spatial@counts) > 0, ]
   cat(nrow(srat), ' features with >0 UMI \n')
-  
-  
-  # get MT% (genes curated from NCBI chrMT genes)
-  # mtgenes = c("COX1", "COX2", "COX3", "ATP6", "ND1", "ND5", "CYTB", "ND2", "ND4",
-  #             "ATP8", "MT-CO1", "COI", "LOC9829747")
-  # mtgenes = c(mtgenes, paste0("MT", mtgenes), paste0("MT-", mtgenes))
-  # mtgenes = mtgenes[mtgenes %in% g[,1]]
-  # srat = PercentageFeatureSet(srat, col.name = "percent.mt", assay = "Spatial",
-  #                             features = mtgenes)
-  
   
   saveRDS(srat, file = paste0(saveDir, "srat.RDS"))
   
