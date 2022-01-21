@@ -225,3 +225,61 @@ if(QCs.with.marker.genes){
   
 }
 
+
+########################################################
+########################################################
+# Section : analyze the axolotl visium per condition
+# To identify the boarder zone
+########################################################
+########################################################
+##########################################
+# loop over all conditions of st
+##########################################
+load(file = paste0(RdataDir, 'seuratObject_design_variableGenes_umap.clustered', species, '.Rdata'))
+#st = Seurat::SplitObject(st, split.by = 'condition')
+
+cat('visium conditions :\n')
+print(table(design$condition))
+cc = design$condition
+
+
+for(n in 1:length(cc))
+#for(n in 1:2)
+{
+  # n = 2
+  aa = readRDS(file = paste0(RdataDir, 'seuratObject_design_st_', cc[n],  '.rds'))
+  
+  DefaultAssay(aa) <- "SCT"
+  
+  aa <- RunPCA(aa, verbose = FALSE, weight.by.var = TRUE)
+  ElbowPlot(aa)
+  
+  aa <- FindNeighbors(aa, dims = 1:10)
+  
+  aa <- FindClusters(aa, verbose = FALSE, algorithm = 3, resolution = 1.0)
+  aa <- RunUMAP(aa, dims = 1:20, n.neighbors = 30, min.dist = 0.05)
+  
+  p1 = DimPlot(aa, reduction = "umap", group.by = c("ident"), label = TRUE, label.size = 8)
+  p2 <- SpatialDimPlot(aa, label = TRUE, label.size = 5)
+  
+  p1 + p2
+  
+  ggsave(filename = paste0(resDir, '/Visium_Clustering_SptialDimPLot', cc[n], '.pdf'), width = 16, height = 8)
+  
+  # find marker of those clusters
+  aa.markers <- FindAllMarkers(aa, only.pos = TRUE, min.pct = 0.2, logfc.threshold = 0.3)
+  # saveRDS(aa.markers, file = paste0(RdataDir, 'Forte2020_logNormalize_allgenes_majorCellTypes_markerGenes.rds'))
+  
+  aa.markers %>%
+    group_by(cluster) %>%
+    top_n(n = 20, wt = avg_log2FC) -> top10
+  
+  DoHeatmap(aa, features = top10$gene)
+  
+  ggsave(paste0(resDir, '/heatmap_markerGenes_', mcells, '_subtypes.pdf'), width = 12, height = 26)
+  
+  
+  
+}
+
+
