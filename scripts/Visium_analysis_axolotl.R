@@ -246,7 +246,7 @@ cc = design$condition
 for(n in 1:length(cc))
 #for(n in 1:2)
 {
-  # n = 2
+  # n = 4
   aa = readRDS(file = paste0(RdataDir, 'seuratObject_design_st_', cc[n],  '.rds'))
   
   DefaultAssay(aa) <- "SCT"
@@ -254,10 +254,10 @@ for(n in 1:length(cc))
   aa <- RunPCA(aa, verbose = FALSE, weight.by.var = TRUE)
   ElbowPlot(aa)
   
-  aa <- FindNeighbors(aa, dims = 1:10)
+  aa <- FindNeighbors(aa, dims = 1:30)
   
   aa <- FindClusters(aa, verbose = FALSE, algorithm = 3, resolution = 1.0)
-  aa <- RunUMAP(aa, dims = 1:20, n.neighbors = 30, min.dist = 0.05)
+  aa <- RunUMAP(aa, dims = 1:30, n.neighbors = 30, min.dist = 0.05)
   
   p1 = DimPlot(aa, reduction = "umap", group.by = c("ident"), label = TRUE, label.size = 8)
   p2 <- SpatialDimPlot(aa, label = TRUE, label.size = 5)
@@ -268,16 +268,14 @@ for(n in 1:length(cc))
   
   # find marker of those clusters
   aa.markers <- FindAllMarkers(aa, only.pos = TRUE, min.pct = 0.2, logfc.threshold = 0.3)
-  # saveRDS(aa.markers, file = paste0(RdataDir, 'Forte2020_logNormalize_allgenes_majorCellTypes_markerGenes.rds'))
   
   aa.markers %>%
     group_by(cluster) %>%
-    top_n(n = 20, wt = avg_log2FC) -> top10
+    top_n(n = 15, wt = avg_log2FC) -> top10
   
   DoHeatmap(aa, features = top10$gene)
   
-  ggsave(paste0(resDir, '/heatmap_markerGenes_', mcells, '_subtypes.pdf'), width = 12, height = 26)
-  
+  ggsave(paste0(resDir, '/heatmap_markerGenes_', cc[n], '.pdf'), width = 12, height = 20)
   
   
 }
