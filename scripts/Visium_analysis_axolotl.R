@@ -259,7 +259,7 @@ for(n in 1:length(cc))
     all.genes <- rownames(aa)
     aa <- ScaleData(aa, features = all.genes)
   }
- 
+  
   aa <- RunPCA(aa, verbose = FALSE, features = VariableFeatures(object = aa), weight.by.var = TRUE)
   ElbowPlot(aa)
   
@@ -270,9 +270,10 @@ for(n in 1:length(cc))
   
   p1 = DimPlot(aa, reduction = "umap", group.by = c("ident"), label = TRUE, label.size = 8)
   p2 <- SpatialDimPlot(aa, label = TRUE, label.size = 5)
-  
   p1 + p2
   
+  source('functions_Visium.R')
+  aa = findClusters_SC3(aa)
   
   ggsave(filename = paste0(resDir, '/Visium_Clustering_SptialDimPLot', cc[n], '.pdf'), width = 16, height = 8)
   
