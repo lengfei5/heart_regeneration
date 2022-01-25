@@ -272,6 +272,13 @@ for(n in 1:length(cc))
   p2 <- SpatialDimPlot(aa, label = TRUE, label.size = 5)
   p1 + p2
   
+  features = rownames(st)[grep('MYH6|NPPA|CLU-AMEX60DD032706', rownames(st))]
+  FeaturePlot(st, features = features)
+
+  
+  SpatialFeaturePlot(st, features = features[2])
+  
+  
   source('functions_Visium.R')
   aa = findClusters_SC3(aa)
   

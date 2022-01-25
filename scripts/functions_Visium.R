@@ -163,7 +163,7 @@ findClusters_SC3 = function(aa)
 {
   #load(file=paste0(RdataDir, version.DATA, '_QCed_cells_genes_filtered_normalized_SCE.Rdata')) 
   library(SC3)
-  require(M3)
+  #require(M3)
   #require(scran)
   require(SingleCellExperiment)
   DefaultAssay(aa) = 'Spatial'
