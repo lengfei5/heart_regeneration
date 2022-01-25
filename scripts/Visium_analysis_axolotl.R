@@ -255,25 +255,23 @@ for(n in 1:length(cc))
   }else{
     DefaultAssay(aa) = 'Spatial'
     aa <- NormalizeData(aa, normalization.method = "LogNormalize", scale.factor = 10000)
-    aa <- FindVariableFeatures(aa, selection.method = "vst", nfeatures = 8000)
+    aa <- FindVariableFeatures(aa, selection.method = "vst", nfeatures = 2000)
     all.genes <- rownames(aa)
     aa <- ScaleData(aa, features = all.genes)
-    
   }
  
-  aa <- RunPCA(aa, verbose = FALSE, features = VariableFeatures(object = aa), weight.by.var = FALSE)
+  aa <- RunPCA(aa, verbose = FALSE, features = VariableFeatures(object = aa), weight.by.var = TRUE)
   ElbowPlot(aa)
   
   aa <- RunUMAP(aa, dims = 1:20, n.neighbors = 30, min.dist = 0.05)
   
-  aa <- FindNeighbors(aa, dims = 1:10)
-  aa <- FindClusters(aa, verbose = FALSE, algorithm = 3, resolution = 2.0)
+  aa <- FindNeighbors(aa, dims = 1:20)
+  aa <- FindClusters(aa, verbose = FALSE, algorithm = 3, resolution = 1.5)
   
   p1 = DimPlot(aa, reduction = "umap", group.by = c("ident"), label = TRUE, label.size = 8)
   p2 <- SpatialDimPlot(aa, label = TRUE, label.size = 5)
   
   p1 + p2
-  
   
   
   ggsave(filename = paste0(resDir, '/Visium_Clustering_SptialDimPLot', cc[n], '.pdf'), width = 16, height = 8)
