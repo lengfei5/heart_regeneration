@@ -251,22 +251,30 @@ for(n in 1:length(cc))
   aa = readRDS(file = paste0(RdataDir, 'seuratObject_design_st_', cc[n],  '.rds'))
   
   if(use.SCTransform){
+    DefaultAssay(aa) <- "SCT"
+  }else{
+    DefaultAssay(aa) = 'Spatial'
+    aa <- NormalizeData(aa, normalization.method = "LogNormalize", scale.factor = 10000)
+    aa <- FindVariableFeatures(aa, selection.method = "vst", nfeatures = 8000)
+    all.genes <- rownames(aa)
+    aa <- ScaleData(aa, features = all.genes)
     
   }
-  DefaultAssay(aa) <- "SCT"
-  
-  aa <- RunPCA(aa, verbose = FALSE, weight.by.var = TRUE)
+ 
+  aa <- RunPCA(aa, verbose = FALSE, features = VariableFeatures(object = aa), weight.by.var = FALSE)
   ElbowPlot(aa)
   
-  aa <- FindNeighbors(aa, dims = 1:30)
+  aa <- RunUMAP(aa, dims = 1:20, n.neighbors = 30, min.dist = 0.05)
   
-  aa <- FindClusters(aa, verbose = FALSE, algorithm = 3, resolution = 1.0)
-  aa <- RunUMAP(aa, dims = 1:30, n.neighbors = 30, min.dist = 0.05)
+  aa <- FindNeighbors(aa, dims = 1:10)
+  aa <- FindClusters(aa, verbose = FALSE, algorithm = 3, resolution = 2.0)
   
   p1 = DimPlot(aa, reduction = "umap", group.by = c("ident"), label = TRUE, label.size = 8)
   p2 <- SpatialDimPlot(aa, label = TRUE, label.size = 5)
   
   p1 + p2
+  
+  
   
   ggsave(filename = paste0(resDir, '/Visium_Clustering_SptialDimPLot', cc[n], '.pdf'), width = 16, height = 8)
   
