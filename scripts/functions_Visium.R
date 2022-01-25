@@ -1092,7 +1092,7 @@ analyze.celltype.proximity.network = function()
 # test SPARK first (original code from https://xzhoulab.github.io/SPARK/02_SPARK_Example/)
 ########################################################
 ########################################################
-Find.SpatialDE = function(st, use.method = 'moransi')
+Find.SpatialDE = function(st, use.method = 'sparkX')
 {
   
   # use.method = c('spark', 'sparkX', 'moransi')

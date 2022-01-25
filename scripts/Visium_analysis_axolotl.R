@@ -241,7 +241,7 @@ cat('visium conditions :\n')
 print(table(design$condition))
 cc = design$condition
 
-use.SCTransform = FALSE
+use.SCTransform = TRUE
 
 
 for(n in 1:length(cc))
@@ -274,7 +274,6 @@ for(n in 1:length(cc))
   
   features = rownames(st)[grep('MYH6|NPPA|CLU-AMEX60DD032706', rownames(st))]
   FeaturePlot(st, features = features)
-
   
   SpatialFeaturePlot(st, features = features[2])
   
