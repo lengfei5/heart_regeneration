@@ -7,7 +7,6 @@
 # Date of creation: Tue Jan 18 10:16:57 2022
 ##########################################################################
 ##########################################################################
-
 rm(list = ls())
 
 species = 'axolotl'
@@ -242,13 +241,18 @@ cat('visium conditions :\n')
 print(table(design$condition))
 cc = design$condition
 
+use.SCTransform = FALSE
+
 
 for(n in 1:length(cc))
 #for(n in 1:2)
 {
-  # n = 4
+  # n = 2
   aa = readRDS(file = paste0(RdataDir, 'seuratObject_design_st_', cc[n],  '.rds'))
   
+  if(use.SCTransform){
+    
+  }
   DefaultAssay(aa) <- "SCT"
   
   aa <- RunPCA(aa, verbose = FALSE, weight.by.var = TRUE)
