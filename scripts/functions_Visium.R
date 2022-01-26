@@ -1092,40 +1092,33 @@ analyze.celltype.proximity.network = function()
 # test SPARK first (original code from https://xzhoulab.github.io/SPARK/02_SPARK_Example/)
 ########################################################
 ########################################################
-Find.SpatialDE = function(st, use.method = 'sparkX')
+Find.SpatialDE = function(aa, use.method = 'sparkX')
 {
   
   # use.method = c('spark', 'sparkX', 'moransi')
   cat('visium conditions :\n')
-  print(table(st$condition))
-  cc = names(table(st$condition))
+  print(table(aa$condition))
+  slice = names(table(aa$condition))
   
-  for(n in 1:length(cc))
-  {
-    # n = 1
-    slice = cc[n]
-    stx = st[, which(st$condition == slice)]
+  stx = aa
+  
+  ##########################################
+  # Analyze the data with SPARK-X or monansi in Seurat
+  ##########################################
+  if(use.method == 'monansi'){
+    DefaultAssay(stx) <- "SCT"
+    stx <- FindSpatiallyVariableFeatures(stx, 
+                                         assay = "SCT", 
+                                         slot = "scale.data", 
+                                         features = VariableFeatures(stx)[1:1000],
+                                         selection.method = "moransi", 
+                                         x.cuts = 100, y.cuts = 100)
     
-    ##########################################
-    # Analyze the data with SPARK-X or monansi in Seurat
-    ##########################################
-    if(use.method == 'monansi'){
-      DefaultAssay(stx) <- "SCT"
-      stx <- FindSpatiallyVariableFeatures(stx, 
-                                           assay = "SCT", 
-                                           slot = "scale.data", 
-                                           features = VariableFeatures(stx)[1:1000],
-                                           selection.method = "moransi", 
-                                           x.cuts = 100, y.cuts = 100)
-      
-    }
+  }else{
+    require(SPARK)
+    require(parallel)
     
-    if(use.method == 'spark'){
-      require(SPARK)
-      require(parallel)
-      
-      resultsdir <- paste0(resDir, '/SpatialDE_SPARK/')
-      system(paste0('mkdir -p ', resultsdir))
+    if(use.method == 'sparkX'){
       
       rawcount = stx@assays$Spatial@counts
       coords <- eval(parse(text = paste0('stx@images$',  slice, '@coordinates')))
@@ -1147,12 +1140,13 @@ Find.SpatialDE = function(st, use.method = 'sparkX')
       mtest = sparkX$res_mtest
       mtest = mtest[order(mtest$adjustedPval), ]
       
-      write.csv(mtest, file = paste0(resultsdir, 'SpatialDE_sparkX_', slice, '.csv'), row.names = TRUE)
+      #resultsdir <- paste0(resDir, '/SpatialDE_SPARKX/')
+      #system(paste0('mkdir -p ', resultsdir))
+      #write.csv(mtest, file = paste0(resultsdir, 'SpatialDE_sparkX_', slice, '.csv'), row.names = TRUE)
+      
     }
     
-    if(use.method == 'sparkX'){
-      require(SPARK)
-      require(parallel)
+    if(use.method == 'spark'){
       
       resultsdir <- paste0(resDir, '/SpatialDE_SPARK/')
       system(paste0('mkdir -p ', resultsdir))
@@ -1199,5 +1193,7 @@ Find.SpatialDE = function(st, use.method = 'sparkX')
     }
     
   }
+  
+  return(mtest)
  
 }

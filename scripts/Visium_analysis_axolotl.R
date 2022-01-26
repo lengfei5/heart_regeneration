@@ -244,10 +244,11 @@ cc = design$condition
 use.SCTransform = TRUE
 
 
+
 for(n in 1:length(cc))
 #for(n in 1:2)
 {
-  # n = 2
+  # n = 3
   aa = readRDS(file = paste0(RdataDir, 'seuratObject_design_st_', cc[n],  '.rds'))
   
   if(use.SCTransform){
@@ -277,7 +278,30 @@ for(n in 1:length(cc))
   
   SpatialFeaturePlot(st, features = features[2])
   
+  # test SpatialDE
+  source('functions_Visium.R')
+  ggs = Find.SpatialDE(aa, use.method = 'sparkX')
   
+  markers = rownames(ggs)[which(ggs$adjustedPval<10^-6)]
+  markers = markers[c(1:300)]
+  
+  pdfname = paste0(resDir, "/Spatial_patterningGenes_", species, '_', cc[n], ".pdf")
+  pdf(pdfname, width = 20, height = 8)
+  par(cex = 1.0, las = 1, mgp = c(2,0.2,0), mar = c(3,2,2,0.2), tcl = -0.3)
+  
+  for(n in 1:length(markers))
+  {
+    cat(n, '--', markers[n], '\n')
+    p3 = SpatialFeaturePlot(st, features = markers[n], alpha = c(0.1, 1))
+    
+    plot(p3)
+    
+  }
+  
+  dev.off()
+  
+  
+  # test different clustering methods
   source('functions_Visium.R')
   aa = findClusters_SC3(aa)
   
