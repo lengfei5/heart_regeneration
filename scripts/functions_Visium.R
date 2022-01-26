@@ -296,10 +296,12 @@ run_bayesSpace = function(aa)
   scc <- as.SingleCellExperiment(aa, assay = 'Spatial')
   coords <- eval(parse(text = paste0('aa@images$',  slice, '@coordinates')))
   
+  ## flip first x y and reverse x to match seurat Spatial plots
   scc$row = coords$row
   scc$col = coords$col
   scc$imagerow = coords$imagerow
   scc$imagecol = coords$imagecol
+  
   
   clusters <- quickCluster(scc)
   scc <- computeSumFactors(scc, clusters=clusters)
@@ -309,7 +311,7 @@ run_bayesSpace = function(aa)
   
   set.seed(101)
   dec <- scran::modelGeneVar(scc)
-  top <- scran::getTopHVGs(dec, n = 2000)
+  top <- scran::getTopHVGs(dec, n = 3000)
   
   set.seed(102)
   scc <- scater::runPCA(scc, subset_row=top)
@@ -317,14 +319,14 @@ run_bayesSpace = function(aa)
   ## Add BayesSpace metadata
   scc <- spatialPreprocess(scc, platform="Visium", skip.PCA=TRUE)
   
-  scc <- qTune(scc, qs=seq(2, 20))
-  qPlot(scc)
+  #scc <- qTune(scc, qs=seq(2, 20))
+  #qPlot(scc)
   
+  # sptial clustering 
   q <- 10  # Number of clusters
-  d <- 15  # Number of PCs
+  d <- 20  # Number of PCs
   
-  ## Here we run mclust externally so the random seeding is consistent with ## original analyses
-  library(mclust)
+  library(mclust) ## Here we run mclust externally so the random seeding is consistent with ## original analyses
   Y <- reducedDim(scc, "PCA")[, seq_len(d)]
   set.seed(101)
   init <- Mclust(Y, q, "EEE", verbose=FALSE)$classification
@@ -334,6 +336,16 @@ run_bayesSpace = function(aa)
   scc <- spatialCluster(scc, q=q, d=d, platform='Visium', init=init,
                         nrep=10000, gamma=3)
   
+  palette <- RColorBrewer::brewer.pal(q, "Paired")
+  
+  spot.plot <- clusterPlot(scc, palette=palette, size=0.1) +
+    labs(title="Spot-level clustering") +
+    guides(fill=FALSE) + 
+    coord_flip() + 
+    #ggplot2::scale_y_reverse() +
+    ggplot2::scale_x_reverse()  # flip first and reverse x to match seurat Spatial plots
+    
+  
   ## Run BayesSpace enhanced clustering
   set.seed(100)
   scc.enhanced <- spatialEnhance(scc, q=q, d=d, platform="Visium",
@@ -342,12 +354,6 @@ run_bayesSpace = function(aa)
                                  save.chain=TRUE)
   
   # We compared the two clusterings using clusterPlot().
-  palette <- RColorBrewer::brewer.pal(q, "Paired")
-  
-  spot.plot <- clusterPlot(scc, palette=palette, size=0.05) +
-    labs(title="Spot-level clustering") +
-    guides(fill=FALSE)
-  
   enhanced.plot <- clusterPlot(scc.enhanced, palette=palette, size=0.05) +
     labs(title="Enhanced clustering")
   
