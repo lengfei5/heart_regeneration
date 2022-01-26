@@ -244,7 +244,6 @@ cc = design$condition
 use.SCTransform = TRUE
 
 
-
 for(n in 1:length(cc))
 #for(n in 1:2)
 {
@@ -273,12 +272,23 @@ for(n in 1:length(cc))
   p2 <- SpatialDimPlot(aa, label = TRUE, label.size = 5)
   p1 + p2
   
+  ggsave(filename =  paste0(resDir, "/Spatial_patterning_", species, '_', cc[n], ".pdf"), width = 12, height = 8)
+  
   features = rownames(st)[grep('MYH6|NPPA|CLU-AMEX60DD032706', rownames(st))]
   FeaturePlot(st, features = features)
   
   SpatialFeaturePlot(st, features = features[2])
   
-  # test SpatialDE
+  ##########################################
+  # test BayesSpace to predict spatial domain
+  ##########################################
+  source('functions_Visium.R')
+  
+  
+  
+  ##########################################
+  # # test SpatialDE
+  ##########################################
   source('functions_Visium.R')
   ggs = Find.SpatialDE(aa, use.method = 'sparkX')
   
@@ -301,7 +311,9 @@ for(n in 1:length(cc))
   dev.off()
   
   
-  # test different clustering methods
+  ##########################################
+  #  # test different clustering methods
+  ##########################################
   source('functions_Visium.R')
   aa = findClusters_SC3(aa)
   

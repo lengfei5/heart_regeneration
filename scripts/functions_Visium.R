@@ -275,6 +275,87 @@ findClusters_SC3 = function(aa)
 }
 
 
+########################################################
+########################################################
+# Section : run bayesSpace to detect border zone
+# original code from 
+# https://edward130603.github.io/BayesSpace/articles/ji_SCC.html
+########################################################
+########################################################
+run_bayesSpace = function(aa)
+{
+  require(SingleCellExperiment)
+  library(BayesSpace)
+  library(ggplot2)
+  library(patchwork)
+  library(scran)
+  library(scuttle)
+  
+  # DefaultAssay(aa) = 'Spatial'
+  slice = names(table(aa$condition))
+  scc <- as.SingleCellExperiment(aa, assay = 'Spatial')
+  coords <- eval(parse(text = paste0('aa@images$',  slice, '@coordinates')))
+  
+  scc$row = coords$row
+  scc$col = coords$col
+  scc$imagerow = coords$imagerow
+  scc$imagecol = coords$imagecol
+  
+  clusters <- quickCluster(scc)
+  scc <- computeSumFactors(scc, clusters=clusters)
+  summary(sizeFactors(scc))
+  
+  sce <- logNormCounts(sce)
+  
+  set.seed(101)
+  dec <- scran::modelGeneVar(scc)
+  top <- scran::getTopHVGs(dec, n = 2000)
+  
+  set.seed(102)
+  scc <- scater::runPCA(scc, subset_row=top)
+  
+  ## Add BayesSpace metadata
+  scc <- spatialPreprocess(scc, platform="Visium", skip.PCA=TRUE)
+  
+  scc <- qTune(scc, qs=seq(2, 20))
+  qPlot(scc)
+  
+  q <- 10  # Number of clusters
+  d <- 15  # Number of PCs
+  
+  ## Here we run mclust externally so the random seeding is consistent with ## original analyses
+  library(mclust)
+  Y <- reducedDim(scc, "PCA")[, seq_len(d)]
+  set.seed(101)
+  init <- Mclust(Y, q, "EEE", verbose=FALSE)$classification
+  
+  ## Run BayesSpace clustering
+  set.seed(100)
+  scc <- spatialCluster(scc, q=q, d=d, platform='Visium', init=init,
+                        nrep=10000, gamma=3)
+  
+  ## Run BayesSpace enhanced clustering
+  set.seed(100)
+  scc.enhanced <- spatialEnhance(scc, q=q, d=d, platform="Visium",
+                                 nrep=200000, gamma=3, verbose=TRUE,
+                                 jitter_scale=5.5, jitter_prior=0.3,
+                                 save.chain=TRUE)
+  
+  # We compared the two clusterings using clusterPlot().
+  palette <- RColorBrewer::brewer.pal(q, "Paired")
+  
+  spot.plot <- clusterPlot(scc, palette=palette, size=0.05) +
+    labs(title="Spot-level clustering") +
+    guides(fill=FALSE)
+  
+  enhanced.plot <- clusterPlot(scc.enhanced, palette=palette, size=0.05) +
+    labs(title="Enhanced clustering")
+  
+  spot.plot + enhanced.plot
+  
+  
+}
+
 
 ########################################################
 ########################################################
