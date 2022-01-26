@@ -319,12 +319,14 @@ run_bayesSpace = function(aa)
   ## Add BayesSpace metadata
   scc <- spatialPreprocess(scc, platform="Visium", skip.PCA=TRUE)
   
-  #scc <- qTune(scc, qs=seq(2, 20))
-  #qPlot(scc)
+  scc <- qTune(scc, qs=seq(5, 15))
+  qPlot(scc)
   
   # sptial clustering 
   q <- 10  # Number of clusters
   d <- 20  # Number of PCs
+  
+  palette <- RColorBrewer::brewer.pal(q, "Paired")
   
   library(mclust) ## Here we run mclust externally so the random seeding is consistent with ## original analyses
   Y <- reducedDim(scc, "PCA")[, seq_len(d)]
@@ -336,7 +338,6 @@ run_bayesSpace = function(aa)
   scc <- spatialCluster(scc, q=q, d=d, platform='Visium', init=init,
                         nrep=10000, gamma=3)
   
-  palette <- RColorBrewer::brewer.pal(q, "Paired")
   
   spot.plot <- clusterPlot(scc, palette=palette, size=0.1) +
     labs(title="Spot-level clustering") +
