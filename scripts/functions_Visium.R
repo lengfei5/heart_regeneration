@@ -280,22 +280,38 @@ findClusters_SC3 = function(aa)
 # 
 ########################################################
 ########################################################
-manual_selection_spots_image_Spata = function(aa)
+manual_selection_spots_image_Spata = function(aa, slice = 'Amex_d7')
 {
-  dyn.load("/software/f2021/software/proj/7.2.1-gcccore-10.2.0/lib/libproj.so")
-  dyn.load("/software/f2021/software/gdal/3.2.1-foss-2020b/lib/libgdal.so") 
-  library(rgdal)
+  #dyn.load("/software/f2021/software/proj/7.2.1-gcccore-10.2.0/lib/libproj.so")
+  #dyn.load("/software/f2021/software/gdal/3.2.1-foss-2020b/lib/libgdal.so") 
+  #library(rgdal)
   require(SPATA2)
+  # slice = cc[n]
   
+  aa <- ScaleData(aa, features = rownames(aa), assay = 'Spatial')
   spata_obj = transformSeuratToSpata(aa, sample_name = unique(aa$condition), method = 'spatial', assay_name = 'Spatial', 
-                                     image_name = 'Amex_d7', coords_from = 'umap')
+                                     assay_slot = 'scale.data', 
+                                     image_name = slice, coords_from = 'umap')
   
+  #setActiveExpressionMatrix(spata_obj, 'data')
   
   spata_obj <- createSegmentation(object = spata_obj)
-  plotSegmentation(object = spata_obj, pt_size = 1.9)
-  getFeatureVariables(spata_obj, features = "segmentation", return = "data.frame")
   
-  getSegmentDf(spata_obj, segment_names = "test_zone")
+  plotSegmentation(object = spata_obj, pt_size = 1.9) +
+  ggplot2::scale_y_reverse()
+  
+  #coord_flip() + 
+    #ggplot2::scale_y_reverse() +
+  #  ggplot2::scale_x_reverse()  # flip first and reverse x to match seurat Spatial plots
+  
+  #getFeatureVariables(spata_obj, features = "segmentation", return = "data.frame")
+  
+  aa$segmentation = 'others'
+  aa$segmentation[match(getSegmentDf(spata_obj, segment_names = c('border_zone'))$barcodes, colnames(aa))] = 'border_zone'
+  aa$segmentation[match(getSegmentDf(spata_obj, segment_names = c('remote_zone1'))$barcodes, colnames(aa))] = 'remote_zone1'
+  aa$segmentation[match(getSegmentDf(spata_obj, segment_names = c('remote_zone2'))$barcodes, colnames(aa))] = 'remote_zone2'
+  
+  return(aa)
   
 }
 

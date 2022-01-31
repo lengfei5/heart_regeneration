@@ -248,7 +248,7 @@ use.SCTransform = TRUE
 for(n in 1:length(cc))
 #for(n in 1:2)
 {
-  # n = 3
+  # n = 2
   aa = readRDS(file = paste0(RdataDir, 'seuratObject_design_st_', cc[n],  '.rds'))
   
   if(use.SCTransform){
@@ -285,6 +285,25 @@ for(n in 1:length(cc))
   # to check if there is border zone, manually select border zone and remote zones from images 
   ##########################################
   source('functions_Visium.R')
+  aa = manual_selection_spots_image_Spata(aa, slice = cc[n])
+  
+  SpatialDimPlot(aa, group.by = 'segmentation', label = TRUE, label.size = 5)
+  
+  ggsave(filename =  paste0(resDir, "/manual_segmentation_", species, '_', cc[n], ".pdf"), width = 12, height = 8)
+  
+  Idents(aa) = aa$segmentation
+  
+  border_markers1 = FindMarkers(aa, ident.1 = 'border_zone', ident.2 = 'remote_zone1', only.pos = FALSE, 
+                               min.pct = 0.2, logfc.threshold = 0.25)
+  
+  border_markers2 = FindMarkers(aa, ident.1 = 'border_zone', ident.2 = 'remote_zone2', only.pos = FALSE, 
+                               min.pct = 0.2, logfc.threshold = 0.25)
+  
+  SpatialFeaturePlot(aa, features = rownames(border_markers1)[c(1:4)])
+  
+  SpatialFeaturePlot(aa, features = rownames(border_markers2)[c(1:4)])
+  
+  
   
   ##########################################
   # test BayesSpace to predict spatial domain
