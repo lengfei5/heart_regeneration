@@ -23,6 +23,7 @@ library(pryr) # monitor the memory usage
 require(ggplot2)
 mem_used()
 
+
 ########################################################
 ########################################################
 # Section I: import the processed visium data by nf from Tomas and 
@@ -272,6 +273,7 @@ for(n in 1:length(cc))
   p2 <- SpatialDimPlot(aa, label = TRUE, label.size = 5)
   p1 + p2
   
+  
   ggsave(filename =  paste0(resDir, "/Spatial_patterning_", species, '_', cc[n], ".pdf"), width = 12, height = 8)
   
   features = rownames(st)[grep('MYH6|NPPA|CLU-AMEX60DD032706', rownames(st))]
@@ -280,11 +282,14 @@ for(n in 1:length(cc))
   SpatialFeaturePlot(st, features = features[2])
   
   ##########################################
-  # test BayesSpace to predict spatial domain
+  # to check if there is border zone, manually select border zone and remote zones from images 
   ##########################################
   source('functions_Visium.R')
   
-  
+  ##########################################
+  # test BayesSpace to predict spatial domain
+  ##########################################
+  source('functions_Visium.R')
   
   ##########################################
   # # test SpatialDE

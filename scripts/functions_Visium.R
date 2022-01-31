@@ -274,6 +274,30 @@ findClusters_SC3 = function(aa)
   
 }
 
+########################################################
+########################################################
+# Section : test SPATA to manual select border zone and remote zones
+# 
+########################################################
+########################################################
+manual_selection_spots_image_Spata = function(aa)
+{
+  dyn.load("/software/f2021/software/proj/7.2.1-gcccore-10.2.0/lib/libproj.so")
+  dyn.load("/software/f2021/software/gdal/3.2.1-foss-2020b/lib/libgdal.so") 
+  library(rgdal)
+  require(SPATA2)
+  
+  spata_obj = transformSeuratToSpata(aa, sample_name = unique(aa$condition), method = 'spatial', assay_name = 'Spatial', 
+                                     image_name = 'Amex_d7', coords_from = 'umap')
+  
+  
+  spata_obj <- createSegmentation(object = spata_obj)
+  plotSegmentation(object = spata_obj, pt_size = 1.9)
+  getFeatureVariables(spata_obj, features = "segmentation", return = "data.frame")
+  
+  getSegmentDf(spata_obj, segment_names = "test_zone")
+  
+}
 
 ########################################################
 ########################################################
@@ -307,7 +331,7 @@ run_bayesSpace = function(aa)
   scc <- computeSumFactors(scc, clusters=clusters)
   summary(sizeFactors(scc))
   
-  sce <- logNormCounts(sce)
+  scc <- logNormCounts(scc)
   
   set.seed(101)
   dec <- scran::modelGeneVar(scc)
@@ -319,12 +343,12 @@ run_bayesSpace = function(aa)
   ## Add BayesSpace metadata
   scc <- spatialPreprocess(scc, platform="Visium", skip.PCA=TRUE)
   
-  scc <- qTune(scc, qs=seq(5, 15))
-  qPlot(scc)
+  #scc <- qTune(scc, qs=seq(5, 15))
+  #qPlot(scc)
   
   # sptial clustering 
   q <- 10  # Number of clusters
-  d <- 20  # Number of PCs
+  d <- 15  # Number of PCs
   
   palette <- RColorBrewer::brewer.pal(q, "Paired")
   
@@ -338,9 +362,8 @@ run_bayesSpace = function(aa)
   scc <- spatialCluster(scc, q=q, d=d, platform='Visium', init=init,
                         nrep=10000, gamma=3)
   
-  
   spot.plot <- clusterPlot(scc, palette=palette, size=0.1) +
-    labs(title="Spot-level clustering") +
+    labs(title= paste0("Spot-level clustering : ",  slice)) +
     guides(fill=FALSE) + 
     coord_flip() + 
     #ggplot2::scale_y_reverse() +
@@ -354,9 +377,12 @@ run_bayesSpace = function(aa)
                                  jitter_scale=5.5, jitter_prior=0.3,
                                  save.chain=TRUE)
   
-  # We compared the two clusterings using clusterPlot().
+  # We compared the two clusterings using clusterPlot()
   enhanced.plot <- clusterPlot(scc.enhanced, palette=palette, size=0.05) +
-    labs(title="Enhanced clustering")
+    labs(title= paste0("Enhanced clustering :", slice)) +
+    coord_flip() + 
+    ggplot2::scale_x_reverse()  # flip first and reverse x to match seurat Spatial plots
+  
   
   spot.plot + enhanced.plot
   
