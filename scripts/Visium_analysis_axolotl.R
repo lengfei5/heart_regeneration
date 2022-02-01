@@ -198,6 +198,7 @@ if(QCs.with.marker.genes){
   {
     xx = c(xx, rownames(st)[grep(toupper(markers[n]), rownames(st))])
   }
+  
   xx = unique(xx)
   markers = xx
   
@@ -248,21 +249,31 @@ use.SCTransform = TRUE
 for(n in 1:length(cc))
 #for(n in 1:2)
 {
-  # n = 2
+  # n = 3
   aa = readRDS(file = paste0(RdataDir, 'seuratObject_design_st_', cc[n],  '.rds'))
   
   if(use.SCTransform){
     DefaultAssay(aa) <- "SCT"
   }else{
+    
     DefaultAssay(aa) = 'Spatial'
     aa <- NormalizeData(aa, normalization.method = "LogNormalize", scale.factor = 10000)
     aa <- FindVariableFeatures(aa, selection.method = "vst", nfeatures = 2000)
     all.genes <- rownames(aa)
     aa <- ScaleData(aa, features = all.genes)
+    
   }
   
   aa <- RunPCA(aa, verbose = FALSE, features = VariableFeatures(object = aa), weight.by.var = TRUE)
   ElbowPlot(aa)
+  
+  DimPlot(aa, reduction = 'pca')
+  
+  par(mfrow = c(2,2))
+  plot(aa@reductions$pca@cell.embeddings[,1], aa$nCount_Spatial, xlab = 'PC1')
+  plot(aa@reductions$pca@cell.embeddings[,2], aa$nCount_Spatial, xlab = 'PC2')
+  plot(aa@reductions$pca@cell.embeddings[,3], aa$nCount_Spatial, xlab = 'PC3')
+  plot(aa@reductions$pca@cell.embeddings[,4], aa$nCount_Spatial, xlab = 'PC4')
   
   aa <- RunUMAP(aa, dims = 1:20, n.neighbors = 30, min.dist = 0.05)
   
@@ -302,7 +313,6 @@ for(n in 1:length(cc))
   SpatialFeaturePlot(aa, features = rownames(border_markers1)[c(1:4)])
   
   SpatialFeaturePlot(aa, features = rownames(border_markers2)[c(1:4)])
-  
   
   
   ##########################################

@@ -117,6 +117,8 @@ make_SeuratObj_visium = function(topdir = './', saveDir = './results', changeGen
     
   }
   
+  #xx = as.data.frame(count.data)
+  
   # create Seurat object and add image information
   cat('creat seurat object with counts and image \n')
   srat <- CreateSeuratObject(counts = count.data, assay = "Spatial") # create object
@@ -152,20 +154,43 @@ make_SeuratObj_visium = function(topdir = './', saveDir = './results', changeGen
    
 }
 
+
+
 ########################################################
 ########################################################
 # Section : clustering visium data
 # 
 ########################################################
 ########################################################
+Normalize_with_scran = function(aa)
+{
+  require(SingleCellExperiment)
+  library(scran)
+  library(scuttle)
+  
+  sce <- as.SingleCellExperiment(aa, assay = 'Spatial')
+  
+  clusters <- quickCluster(sce)
+  sce <- computeSumFactors(sce, clusters=clusters)
+  #summary(sizeFactors(scc))
+  
+  sce <- logNormCounts(sce)
+  
+  aa = Seurat::as.Seurat(sce)
+  
+  return(aa)
+  
+}
+
 ### test SC3
 findClusters_SC3 = function(aa)
 {
   #load(file=paste0(RdataDir, version.DATA, '_QCed_cells_genes_filtered_normalized_SCE.Rdata')) 
   library(SC3)
-  #require(M3)
-  #require(scran)
+  require(M3Drop)
+  require(scran)
   require(SingleCellExperiment)
+  
   DefaultAssay(aa) = 'Spatial'
   sce <- as.SingleCellExperiment(aa)
   
