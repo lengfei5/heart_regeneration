@@ -367,7 +367,6 @@ run_bayesSpace = function(aa)
   scc$imagerow = coords$imagerow
   scc$imagecol = coords$imagecol
   
-  
   clusters <- quickCluster(scc)
   scc <- computeSumFactors(scc, clusters=clusters)
   summary(sizeFactors(scc))
@@ -388,7 +387,7 @@ run_bayesSpace = function(aa)
   #qPlot(scc)
   
   # sptial clustering 
-  q <- 10  # Number of clusters
+  q <- 15  # Number of clusters
   d <- 15  # Number of PCs
   
   palette <- RColorBrewer::brewer.pal(q, "Paired")
