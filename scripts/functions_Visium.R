@@ -783,6 +783,8 @@ Convert.batch.corrected.expression.matrix.to.UMIcount = function(refs){
                 repel = TRUE)
   p1 + p2
   
+  ggsave(filename = paste0(resDir, '/AdultMice_scRNAref_overView.pdf'),  width = 20, height = 8)
+  
   VlnPlot(refs, features = c("nCount_RNA"), group.by = 'dataset')
   
   metadata = refs@meta.data   

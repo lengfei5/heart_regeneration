@@ -113,6 +113,7 @@ if(Filtering.cells.genes){
   
 }
 
+
 #st = SCTransform(st, assay = "Spatial", verbose = FALSE)
 
 DefaultAssay(st) <- "SCT"
@@ -189,18 +190,29 @@ refs = readRDS(file = paste0('../results/Rdata/',
 
 st = Run.celltype.deconvolution.RCTD(st, refs)
 
+
+##########################################
+# cell proximity analysis 
+##########################################
+
+
 ########################################################
 ########################################################
-# Section III: spatial organization of cell types and genes  
+# Section IV: spatial organization of cell types and genes  
 # 
 ########################################################
 ########################################################
 load(file = paste0(RdataDir, 'seuratObject_design_variableGenes_', species, '_umap.clustered.Rdata'))
 
 source('functions_Visium.R')
-
 st = Find.SpatialDE(st)
 
 
+########################################################
+########################################################
+# Section : cell-cell signaling pathway analysis
+# 
+########################################################
+########################################################
 
 

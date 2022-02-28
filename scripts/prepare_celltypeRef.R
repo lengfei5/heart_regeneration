@@ -302,6 +302,7 @@ if(Merge.adult.mice.cardiomyocyte.noncardiomyocyte){
   p2 <- DimPlot(ref.combined, reduction = "umap", group.by = "celltype", label = TRUE,
                 repel = TRUE)
   p1 + p2 
+  
   ggsave(paste0(resDir, '/Forte2020_Ren2020_IntegrationRPCA_', Normalization, '.pdf'), 
                    width = 24, height = 10)
   
@@ -313,7 +314,19 @@ if(Merge.adult.mice.cardiomyocyte.noncardiomyocyte){
   kk = which(ref.combined$dataset == 'Forte2020'| (ref.combined$dataset == 'Ren2020' & ref.combined$celltype == 'CM'))
   refs = ref.combined[,kk]
   
+  p1 <- DimPlot(refs, reduction = "umap", group.by = "dataset")
+  p2 <- DimPlot(refs, reduction = "umap", group.by = "celltype", label = TRUE,
+                repel = TRUE)
+  p1 + p2 
+  
+  DimPlot(refs, reduction = "umap", group.by = "celltype", split.by = 'dataset',  label = TRUE, repel = TRUE)
+  
+  ggsave(paste0(resDir, '/Forte2020_Ren2020_IntegrationRPCA_', Normalization, '.pdf'), 
+         width = 24, height = 10)
+  
   rm(ref.combined)
+  
+  
   
   saveRDS(refs, file = paste0(RdataDir, 
                               'Seurat.obj_adultMiceHeart_Forte2020.nonCM_Ren2020CM_refCombined_cleanAnnot_logNormalize_v2.rds'))
