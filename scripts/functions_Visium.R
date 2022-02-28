@@ -390,7 +390,10 @@ run_bayesSpace = function(aa)
   q <- 15  # Number of clusters
   d <- 15  # Number of PCs
   
-  palette <- RColorBrewer::brewer.pal(q, "Paired")
+  require(RColorBrewer)
+  #palette <- RColorBrewer::brewer.pal(q, "Paired")
+  palette =  c(brewer.pal(name="Dark2", n = (q-8)), brewer.pal(name="Paired", n = 8))
+
   
   library(mclust) ## Here we run mclust externally so the random seeding is consistent with ## original analyses
   Y <- reducedDim(scc, "PCA")[, seq_len(d)]
@@ -402,27 +405,62 @@ run_bayesSpace = function(aa)
   scc <- spatialCluster(scc, q=q, d=d, platform='Visium', init=init,
                         nrep=10000, gamma=3)
   
-  spot.plot <- clusterPlot(scc, palette=palette, size=0.1) +
+  clusterPlot(scc, palette=palette, size=0.1) +
     labs(title= paste0("Spot-level clustering : ",  slice)) +
     guides(fill=FALSE) + 
     coord_flip() + 
     #ggplot2::scale_y_reverse() +
     ggplot2::scale_x_reverse()  # flip first and reverse x to match seurat Spatial plots
     
+  ggsave(filename =  paste0(resDir, "/BayesSpace_SpatialSlustered_", species, '_', cc[n], ".pdf"), width = 12, height = 8)
+  
+  saveRDS(scc, file = paste0(RdataDir,  "/BayesSpace_SpatialSlustered_", species, '_', cc[n], ".rds"))
+  
+  # top markers of spatial clusters 
+  library(dplyr)
+  
+  ## Convert SCE to Seurat object and use BayesSpace cluster as identifier
+  sobj <- Seurat::CreateSeuratObject(counts=logcounts(scc),
+                                     assay='Spatial',
+                                     meta.data=as.data.frame(colData(scc)))
+  sobj <- Seurat::SetIdent(sobj, value = "spatial.cluster")
+  
+  
+  ## Scale data
+  sobj = Seurat::ScaleData(sobj)
+  #sobj@assays$Spatial@scale.data <-
+  #  sobj@assays$Spatial@data %>% as.matrix %>% t %>% scale %>% t
+  
+  ## Select top n markers from each cluster (by log fold change)
+  top_markers <- Seurat::FindAllMarkers(sobj, assay='Spatial', slot='data',
+                                        group.by='spatial.cluster',
+                                        only.pos=TRUE) 
+  
+  top_markers %>% group_by(cluster) %>%
+   top_n(10, avg_log2FC) -> top10
+  
+  ## Plot expression of markers
+  Seurat::DoHeatmap(sobj, features = top10$gene, 
+                    group.by = "spatial.cluster", group.colors=palette, 
+                    angle=0, size=4, label = FALSE, raster=FALSE) + 
+    guides(col = FALSE)
+  
+  SpatialFeaturePlot(aa, features = "CTSS-AMEX60DD007394" )
+  
   
   ## Run BayesSpace enhanced clustering
   set.seed(100)
   scc.enhanced <- spatialEnhance(scc, q=q, d=d, platform="Visium",
-                                 nrep=200000, gamma=3, verbose=TRUE,
+                                 nrep=20000, gamma=3, verbose=TRUE,
                                  jitter_scale=5.5, jitter_prior=0.3,
-                                 save.chain=TRUE)
+                                 save.chain=FALSE)
+  
   
   # We compared the two clusterings using clusterPlot()
   enhanced.plot <- clusterPlot(scc.enhanced, palette=palette, size=0.05) +
     labs(title= paste0("Enhanced clustering :", slice)) +
     coord_flip() + 
     ggplot2::scale_x_reverse()  # flip first and reverse x to match seurat Spatial plots
-  
   
   spot.plot + enhanced.plot
   

@@ -249,7 +249,7 @@ use.SCTransform = TRUE
 for(n in 1:length(cc))
 #for(n in 1:2)
 {
-  # n = 3
+  # n = 4
   aa = readRDS(file = paste0(RdataDir, 'seuratObject_design_st_', cc[n],  '.rds'))
   
   if(use.SCTransform){
