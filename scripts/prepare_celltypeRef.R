@@ -326,13 +326,13 @@ if(Merge.adult.mice.cardiomyocyte.noncardiomyocyte){
   
   p2 
   ggsave(paste0(resDir, '/Forte2020_Ren2020onlyCM_IntegrationRPCA_celltypes.in.Refs_', Normalization, '.pdf'), 
-         width = 24, height = 10)
+         width = 12, height = 10)
   
   DimPlot(refs, reduction = "umap", group.by = "subtype", label = TRUE,
           repel = TRUE)
   
   ggsave(paste0(resDir, '/Forte2020_Ren2020onlyCM_IntegrationRPCA_subtypes.in.Refs_', Normalization, '.pdf'), 
-         width = 24, height = 10)
+         width = 12, height = 10)
   
   # xx = subset(refs, cells = colnames(refs)[which(refs$dataset == 'Ren2020')])
   # 

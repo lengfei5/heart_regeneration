@@ -904,7 +904,6 @@ Run.celltype.deconvolution.RCTD = function(st, refs, Normalization = 'lognormali
     subtypes <- as.factor(subtypes) # convert to factor data type
     reference_subtype <- Reference(E.corrected, subtypes, nUMI = NULL, require_int = FALSE)
     table(reference_subtype@cell_types)
-    
   }
   
   rm(E.corrected)
@@ -917,9 +916,8 @@ Run.celltype.deconvolution.RCTD = function(st, refs, Normalization = 'lognormali
   cc = names(table(st$condition))
   
   for(n in 1:length(cc))
-  #for(n in 1:2)
   {
-    # n = 2
+    # n = 3
     slice = cc[n]
     stx = st[, which(st$condition == slice)]
     
@@ -942,7 +940,7 @@ Run.celltype.deconvolution.RCTD = function(st, refs, Normalization = 'lognormali
     
     ## Examine SpatialRNA object (optional)
     print(dim(puck@counts)) # observe Digital Gene Expression matrix
-    hist(log(puck@nUMI,2)) # histogram of log_2 nUMI
+    hist(log(puck@nUMI, 2)) # histogram of log_2 nUMI
     
     print(head(puck@coords)) # start of coordinate data.frame
     barcodes <- colnames(puck@counts) # pixels to be used (a list of barcode names). 
@@ -957,9 +955,10 @@ Run.celltype.deconvolution.RCTD = function(st, refs, Normalization = 'lognormali
     myRCTD <- create.RCTD(puck, reference, max_cores = 16, gene_cutoff = 0.000125, fc_cutoff = 0.5, 
                           gene_cutoff_reg = 2e-04,  fc_cutoff_reg = 0.75,
                           UMI_min = 100, UMI_max = 2e+07, 
-                          CELL_MIN_INSTANCE = 25)
+                          CELL_MIN_INSTANCE = 50)
     
     tic()
+    
     myRCTD <- run.RCTD(myRCTD, doublet_mode = 'doublet')
     
     saveRDS(myRCTD, file = paste0(RdataDir, 'RCTD_results_refCombined_Forte2020.Ren2020_', slice, '.rds'))
@@ -1012,6 +1011,7 @@ Run.celltype.deconvolution.RCTD = function(st, refs, Normalization = 'lognormali
       # 
       # set color vector
       getPalette <- colorRampPalette(brewer.pal(8, "Dark2"))
+      
       # use a panel of colors from https://gotellilab.github.io/GotelliLabMeetingHacks/NickGotelli/ColorPalettes.html
       tol10qualitative=c("#332288", "#88CCEE", "#44AA99", "#117733", "#999933", "#DDCC77",
                          "#661100", "#CC6677", "#882255", "#AA4499")
