@@ -854,7 +854,8 @@ Run.celltype.deconvolution.RCTD = function(st, refs, Normalization = 'lognormali
 {
   require(RCTD)
   require(Matrix)
-  # slice = 'adult.day4'; Normalization = 'lognormalize';
+  # PLOT.scatterpie = FALSE; Normalization = 'lognormalize'; run.RCTD.subtype = FALSE; save.RCTD.in.seuratObj = FALSE
+  # slice = 'adult.day4'; 
   #refs = readRDS(file = paste0(RdataDir, 
   #                             'SeuratObj_adultMiceHeart_refCombine_Forte2020.nonCM_Ren2020CM_cleanAnnot_logNormalize_v1.rds'))
   
@@ -917,7 +918,8 @@ Run.celltype.deconvolution.RCTD = function(st, refs, Normalization = 'lognormali
   
   for(n in 1:length(cc))
   {
-    # n = 3
+    # n = 4
+    cat('slice -- ', cc[n], '\n')
     slice = cc[n]
     stx = st[, which(st$condition == slice)]
     
@@ -952,21 +954,22 @@ Run.celltype.deconvolution.RCTD = function(st, refs, Normalization = 'lognormali
                          title ='plot of nUMI') 
     ggsave(paste0(resultsdir, '/RCTD_nUMI_plot_', slice, '.pdf'), width = 12, height = 10)
     
-    myRCTD <- create.RCTD(puck, reference, max_cores = 16, gene_cutoff = 0.000125, fc_cutoff = 0.5, 
+    # make RCTD object
+    myRCTD <- create.RCTD(puck, reference, max_cores = 32, gene_cutoff = 0.000125, fc_cutoff = 0.5, 
                           gene_cutoff_reg = 2e-04,  fc_cutoff_reg = 0.75,
                           UMI_min = 100, UMI_max = 2e+07, 
                           CELL_MIN_INSTANCE = 50)
     
+    # run RCTD main function
     tic()
-    
-    myRCTD <- run.RCTD(myRCTD, doublet_mode = 'doublet')
-    
-    saveRDS(myRCTD, file = paste0(RdataDir, 'RCTD_results_refCombined_Forte2020.Ren2020_', slice, '.rds'))
-    
+    myRCTD <- run.RCTD(myRCTD, doublet_mode = "multi")
+    saveRDS(myRCTD, file = paste0(RdataDir, 'RCTD_results_refCombined_Forte2020.Ren2020_multiMode_', slice, '.rds'))
     toc()
     
-    # myRCTD = readRDS(file = paste0(RdataDir, 'RCTD_results_refCombined_Forte2020.Ren2020_', slice, '.rds'))
-    
+    ##########################################
+    # check the result
+    ##########################################
+    myRCTD = readRDS(file = paste0(RdataDir, 'RCTD_results_refCombined_Forte2020.Ren2020_', slice, '.rds'))
     results <- myRCTD@results
     
     # normalize the cell type proportions to sum to 1.
@@ -992,6 +995,23 @@ Run.celltype.deconvolution.RCTD = function(st, refs, Normalization = 'lognormali
       # 'results/all_cell_types.pdf')
       plot_all_cell_types(results$results_df, spatialRNA@coords, cell_type_names, resultsdir)
       
+      # doublets
+      #obtain a dataframe of only doublets
+      doublets <- results$results_df[results$results_df$spot_class == "doublet_certain",] 
+      # Plots all doublets in space (saved as 
+      # 'results/all_doublets.pdf')
+      plot_doublets(spatialRNA, doublets, resultsdir, cell_type_names) 
+      
+      # Plots all doublets in space for each cell type (saved as 
+      # 'results/all_doublets_type.pdf')
+      plot_doublets_type(spatialRNA, doublets, resultsdir, cell_type_names) 
+      # a table of frequency of doublet pairs 
+      doub_occur <- table(doublets$second_type, doublets$first_type) 
+      # Plots a stacked bar plot of doublet ocurrences (saved as 
+      # 'results/doublet_stacked_bar.pdf')
+      
+      plot_doub_occur_stack(doub_occur, resultsdir, cell_type_names) 
+      
     }
     
     ##########################################
@@ -1010,26 +1030,60 @@ Run.celltype.deconvolution.RCTD = function(st, refs, Normalization = 'lognormali
       # col_vector  <-  unlist(mapply(brewer.pal, qual_col_pals$maxcolors, rownames(qual_col_pals)))
       # 
       # set color vector
-      getPalette <- colorRampPalette(brewer.pal(8, "Dark2"))
+      getPalette <- colorRampPalette(brewer.pal(9, "Set1"))
       
       # use a panel of colors from https://gotellilab.github.io/GotelliLabMeetingHacks/NickGotelli/ColorPalettes.html
-      tol10qualitative=c("#332288", "#88CCEE", "#44AA99", "#117733", "#999933", "#DDCC77",
-                         "#661100", "#CC6677", "#882255", "#AA4499")
-      cell_types_plt <- sort(unique(cell_type_names))
-      #col_vector = getPalette(length(cell_types_plt))
-      col_vector = tol10qualitative
-      
-      col_ct <- col_vector[seq_len(length(cell_types_plt))]
-      names(col_ct) = cell_types_plt
-      
-      #plot(1:length(col_ct), 1:length(col_ct), col = getPalette(length(col_ct)))
+      #tol10qualitative=c("#332288", "#88CCEE", "#44AA99", "#117733", "#999933", "#DDCC77",
+      #                   "#661100", "#CC6677", "#882255", "#AA4499")
       
       ## Preprocess coordinates 
       spatial_coord <-  spatialRNA@coords %>%
         tibble::rownames_to_column("ID")
       
-      #colnames(spatial_coord)[2:3] = c('x', 'y')
-      spatial_coord = data.frame(spatial_coord, norm_weights[match(spatial_coord$ID, rownames(norm_weights)), ])
+      weights = norm_weights[match(spatial_coord$ID, rownames(norm_weights)), ]
+      
+      ## process the cell type weights
+      dfs = data.frame(results$results_df, results$weights_doublet)
+      colnames(dfs)[10:11] = c('first_type_weights', 'second_type_weights')
+      
+      #weights = weights[, match(cell_types_plt, colnames(weights))]
+      
+      celltype_keep = c()
+      for(j in 1:nrow(weights))
+      {
+        # j = 1
+        cat(j, '\n')
+        if(dfs$spot_class[j] == 'singlet'){
+          weights[j, which(colnames(weights) == dfs$first_type[j])] = 1.0
+          weights[j, which(colnames(weights) != dfs$first_type[j])] = 0.0
+          celltype_keep = c(celltype_keep, as.character(dfs$first_type[j]))
+        }
+        
+        if(dfs$spot_class[j] == 'doublet_certain'){
+          weights[j, which(colnames(weights) == dfs$first_type[j])] = dfs$first_type_weights[j]
+          weights[j, which(colnames(weights) == dfs$second_type[j])] = dfs$second_type_weights[j]
+          weights[j, which(colnames(weights) != dfs$first_type[j] & colnames(weights) != dfs$second_type[j])]  = 0.0
+          celltype_keep = c(celltype_keep, c(as.character(dfs$first_type[j]), as.character(dfs$second_type[j])))
+        }
+      }
+      
+      ss = colSums(weights)
+      cell_types_plt = unique(celltype_keep)
+      ss = ss[match(cell_types_plt, names(ss))]
+      #cell_types_counts = table(results$results_df$first_type)
+      #cell_types_counts = cell_types_counts[which(cell_types_counts>0)]
+      #cell_types_counts = cell_types_counts[order(-cell_types_counts)]
+      cell_types_plt <- cell_types_plt[order(-ss)]
+      col_vector = getPalette(length(cell_types_plt))
+      #col_vector = tol10qualitative
+      
+      col_ct <- col_vector[seq_len(length(cell_types_plt))]
+      names(col_ct) = cell_types_plt
+      
+      plot(1:length(col_ct), 1:length(col_ct), col = getPalette(length(col_ct)))
+      text(1:length(col_ct), 1:length(col_ct), cell_types_plt, offset = 2, adj = 0.5,  col = getPalette(length(col_ct)))
+      
+      spatial_coord = data.frame(spatial_coord, weights)
       
       ggplot() + geom_scatterpie(aes(x=x, y=y), data=spatial_coord,
                                  cols=cell_type_names, 
@@ -1052,7 +1106,7 @@ Run.celltype.deconvolution.RCTD = function(st, refs, Normalization = 'lognormali
           plot.title = ggplot2::element_text(hjust = 0.5, size = 20)) +
         ggplot2::guides(fill = guide_legend(ncol = 1))
       
-      ggsave(paste0(resultsdir, '/RCTD_scatterpie_', slice, '.pdf'), width = 22, height = 16)
+      ggsave(paste0(resultsdir, '/RCTD_scatterpie_', slice, '_v2.pdf'), width = 22, height = 16)
       
     }
     
