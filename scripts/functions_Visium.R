@@ -356,6 +356,7 @@ run_bayesSpace = function(aa)
   library(patchwork)
   library(scran)
   library(scuttle)
+  require(RColorBrewer)
   
   ## aa = st
   # DefaultAssay(aa) = 'Spatial'
@@ -392,7 +393,6 @@ run_bayesSpace = function(aa)
   q <- 15  # Number of clusters
   d <- 15  # Number of PCs
   
-  require(RColorBrewer)
   #palette <- RColorBrewer::brewer.pal(q, "Paired")
   palette =  c(brewer.pal(name="Dark2", n = (q-8)), brewer.pal(name="Paired", n = 8))
 
@@ -414,9 +414,9 @@ run_bayesSpace = function(aa)
     #ggplot2::scale_y_reverse() +
     ggplot2::scale_x_reverse()  # flip first and reverse x to match seurat Spatial plots
     
-  ggsave(filename =  paste0(resDir, "/BayesSpace_SpatialSlustered_", species, '_', cc[n], ".pdf"), width = 12, height = 8)
+  ggsave(filename =  paste0(resDir, "/BayesSpace_SpatialSlustered_", species, '_', slice, ".pdf"), width = 12, height = 8)
   
-  saveRDS(scc, file = paste0(RdataDir,  "/BayesSpace_SpatialSlustered_", species, '_', cc[n], ".rds"))
+  saveRDS(scc, file = paste0(RdataDir,  "/BayesSpace_SpatialSlustered_", species, '_', slice, ".rds"))
   
   # top markers of spatial clusters 
   library(dplyr)
