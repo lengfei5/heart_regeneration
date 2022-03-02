@@ -135,6 +135,8 @@ FeaturePlot(st, features = c("Myh6", 'Nppa'))
 
 SpatialFeaturePlot(st, features = 'Myh6', image.alpha = 0.5)
 
+SpatialFeaturePlot(st, features = 'Agrn', image.alpha = 0.6)
+
 save(design, varibleGenes, st, 
      file = paste0(RdataDir, 'seuratObject_design_variableGenes_', species, '_umap.clustered.Rdata'))
 
@@ -185,6 +187,16 @@ if(QCs.with.marker.genes){
 load(file = paste0(RdataDir, 'seuratObject_design_variableGenes_', species, '_umap.clustered.Rdata'))
 source('functions_Visium.R')
 
+##########################################
+# spatial domain searching and potential define remote regions and border zone 
+##########################################
+obj.list <- SplitObject(st, split.by = "condition")
+aa = obj.list[[3]]
+run_bayesSpace(aa)
+
+##########################################
+# cell type deconvolution
+##########################################
 refs = readRDS(file = paste0('../results/Rdata/', 
                              'Seurat.obj_adultMiceHeart_Forte2020.nonCM_Ren2020CM_refCombined_cleanAnnot_logNormalize_v3.rds'))
 
@@ -196,6 +208,7 @@ st = Run.celltype.deconvolution.RCTD(st, refs)
 ##########################################
 # cell proximity analysis 
 ##########################################
+
 
 
 ########################################################

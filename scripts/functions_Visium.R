@@ -349,6 +349,7 @@ manual_selection_spots_image_Spata = function(aa, slice = 'Amex_d7')
 ########################################################
 run_bayesSpace = function(aa)
 {
+  ## aa is a seurat objet with one slice / one image
   require(SingleCellExperiment)
   library(BayesSpace)
   library(ggplot2)
@@ -356,6 +357,7 @@ run_bayesSpace = function(aa)
   library(scran)
   library(scuttle)
   
+  ## aa = st
   # DefaultAssay(aa) = 'Spatial'
   slice = names(table(aa$condition))
   scc <- as.SingleCellExperiment(aa, assay = 'Spatial')
@@ -920,7 +922,7 @@ Run.celltype.deconvolution.RCTD = function(st, refs, Normalization = 'lognormali
   for(n in 1:length(cc))
   #for(n in c(1, 2, 4))
   {
-    # n = 2
+    # n = 4
     cat('slice -- ', cc[n], '\n')
     slice = cc[n]
     stx = st[, which(st$condition == slice)]

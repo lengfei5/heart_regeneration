@@ -202,6 +202,9 @@ if(QCs.with.marker.genes){
   xx = unique(xx)
   markers = xx
   
+  xx = rownames(st)[grep('AGRN', rownames(st))]
+  SpatialFeaturePlot(st, features = xx, image.alpha = 0.5)
+  
   #markers[is.na(match(markers, rownames(st)))]
   #markers = markers[!is.na(match(markers, rownames(st)))]
   xx = rownames(st)[grep('CLU', rownames(st))]

@@ -198,16 +198,8 @@ for(n in 1:nrow(design))
 # cell and gene filtering
 ##########################################
 species = 'mouse_neonadal'
-# # merge slices from different time points and 
-# if(n == 1) {
-#   st = aa
-# }else{
-#   st = merge(st, aa)
-# }
 
 load(file = paste0(RdataDir, 'seuratObject_design_variableGenes_', species, '.Rdata'))
-
-#st = SCTransform(st, assay = "Spatial", verbose = FALSE)
 
 DefaultAssay(st) <- "SCT"
 VariableFeatures(st) <- varibleGenes
@@ -222,6 +214,8 @@ st <- RunUMAP(st, dims = 1:10, n.neighbors = 20, min.dist = 0.1)
 DimPlot(st, reduction = "umap", group.by = c("ident", "condition"))
 
 SpatialFeaturePlot(st, features = 'Cd24a', image.alpha = 0.5)
+
+SpatialFeaturePlot(st, features = 'Agrn', image.alpha = 0.5)
 
 # import marker genes
 library(openxlsx)
