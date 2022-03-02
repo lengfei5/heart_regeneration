@@ -918,7 +918,7 @@ Run.celltype.deconvolution.RCTD = function(st, refs, Normalization = 'lognormali
   
   for(n in 1:length(cc))
   {
-    # n = 4
+    # n = 3
     cat('slice -- ', cc[n], '\n')
     slice = cc[n]
     stx = st[, which(st$condition == slice)]
@@ -960,10 +960,20 @@ Run.celltype.deconvolution.RCTD = function(st, refs, Normalization = 'lognormali
                           UMI_min = 100, UMI_max = 2e+07, 
                           CELL_MIN_INSTANCE = 50)
     
+    doubleCheck.markerGenes = FALSE
+    if(doubleCheck.markerGenes){
+      require(pheatmap)
+      yy = myRCTD@cell_type_info$info[[1]]
+      
+      pheatmap(yy)
+      
+    }
+    
+    
     # run RCTD main function
     tic()
-    myRCTD <- run.RCTD(myRCTD, doublet_mode = "multi")
-    saveRDS(myRCTD, file = paste0(RdataDir, 'RCTD_results_refCombined_Forte2020.Ren2020_multiMode_', slice, '.rds'))
+    myRCTD <- run.RCTD(myRCTD, doublet_mode = "doublet")
+    saveRDS(myRCTD, file = paste0(RdataDir, 'RCTD_results_refCombined_Forte2020.Ren2020_doubletMode_', slice, '.rds'))
     toc()
     
     ##########################################
@@ -1107,6 +1117,7 @@ Run.celltype.deconvolution.RCTD = function(st, refs, Normalization = 'lognormali
         ggplot2::guides(fill = guide_legend(ncol = 1))
       
       ggsave(paste0(resultsdir, '/RCTD_scatterpie_', slice, '_v2.pdf'), width = 22, height = 16)
+      
       
     }
     

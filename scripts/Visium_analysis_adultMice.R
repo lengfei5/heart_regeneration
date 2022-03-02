@@ -188,6 +188,8 @@ source('functions_Visium.R')
 refs = readRDS(file = paste0('../results/Rdata/', 
                              'Seurat.obj_adultMiceHeart_Forte2020.nonCM_Ren2020CM_refCombined_cleanAnnot_logNormalize_v3.rds'))
 
+refs$celltype[which(refs$celltype == 'immune.others')] = 'Mphage.MCT'
+
 st = Run.celltype.deconvolution.RCTD(st, refs)
 
 ##########################################
