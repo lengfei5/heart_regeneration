@@ -1057,30 +1057,37 @@ Run.celltype.deconvolution.RCTD = function(st, refs, Normalization = 'lognormali
         tibble::rownames_to_column("ID")
       
       weights = norm_weights[match(spatial_coord$ID, rownames(norm_weights)), ]
+      celltype_keep = colnames(weights)
       
-      ## process the cell type weights
-      dfs = data.frame(results$results_df, results$weights_doublet)
-      colnames(dfs)[10:11] = c('first_type_weights', 'second_type_weights')
-      
-      #weights = weights[, match(cell_types_plt, colnames(weights))]
-      
-      celltype_keep = c()
-      for(j in 1:nrow(weights))
-      {
-        # j = 1
-        cat(j, '\n')
-        if(dfs$spot_class[j] == 'singlet'){
-          weights[j, which(colnames(weights) == dfs$first_type[j])] = 1.0
-          weights[j, which(colnames(weights) != dfs$first_type[j])] = 0.0
-          celltype_keep = c(celltype_keep, as.character(dfs$first_type[j]))
+      Process_celltype_weight_singlet = FALSE
+      if(Process_celltype_weight_singlet){
+        ## process the cell type weights
+        dfs = data.frame(results$results_df, results$weights_doublet)
+        colnames(dfs)[10:11] = c('first_type_weights', 'second_type_weights')
+        
+        #weights = weights[, match(cell_types_plt, colnames(weights))]
+        
+        celltype_keep = c()
+        for(j in 1:nrow(weights))
+        {
+          # j = 1
+          cat(j, '\n')
+          if(dfs$spot_class[j] == 'singlet'){
+            weights[j, which(colnames(weights) == dfs$first_type[j])] = 1.0
+            weights[j, which(colnames(weights) != dfs$first_type[j])] = 0.0
+            celltype_keep = c(celltype_keep, as.character(dfs$first_type[j]))
+          }
+          
+          if(dfs$spot_class[j] == 'doublet_certain'){
+            weights[j, which(colnames(weights) == dfs$first_type[j])] = dfs$first_type_weights[j]
+            weights[j, which(colnames(weights) == dfs$second_type[j])] = dfs$second_type_weights[j]
+            weights[j, which(colnames(weights) != dfs$first_type[j] & colnames(weights) != dfs$second_type[j])]  = 0.0
+            celltype_keep = c(celltype_keep, c(as.character(dfs$first_type[j]), as.character(dfs$second_type[j])))
+          }
         }
         
-        if(dfs$spot_class[j] == 'doublet_certain'){
-          weights[j, which(colnames(weights) == dfs$first_type[j])] = dfs$first_type_weights[j]
-          weights[j, which(colnames(weights) == dfs$second_type[j])] = dfs$second_type_weights[j]
-          weights[j, which(colnames(weights) != dfs$first_type[j] & colnames(weights) != dfs$second_type[j])]  = 0.0
-          celltype_keep = c(celltype_keep, c(as.character(dfs$first_type[j]), as.character(dfs$second_type[j])))
-        }
+
+        
       }
       
       ss = colSums(weights)
@@ -1122,7 +1129,7 @@ Run.celltype.deconvolution.RCTD = function(st, refs, Normalization = 'lognormali
           plot.title = ggplot2::element_text(hjust = 0.5, size = 20)) +
         ggplot2::guides(fill = guide_legend(ncol = 1))
       
-      ggsave(paste0(resultsdir, '/RCTD_scatterpie_', slice, '_v2.pdf'), width = 22, height = 16)
+      ggsave(paste0(resultsdir, '/RCTD_scatterpie_', slice, '_v3.pdf'), width = 22, height = 16)
       
       
     }
