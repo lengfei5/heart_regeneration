@@ -964,16 +964,22 @@ Run.celltype.deconvolution.RCTD = function(st, refs, Normalization = 'lognormali
     if(doubleCheck.markerGenes){
       require(pheatmap)
       yy = myRCTD@cell_type_info$info[[1]]
+      ggs = myRCTD@internal_vars$gene_list_reg
+      yy = yy[!is.na(match(rownames(yy), ggs)), ]
+      #yy[which(yy == 0)] = 10^-7
       
-      pheatmap(yy)
+      #yy[which(is.na(yy))] 
+      yy = log10(yy + 10^-7)
       
+      pheatmap(yy, cluster_cols =  FALSE, scale = 'row', show_rownames = FALSE)
+      ggsave(filename = paste0(resDir, '/MarkerGenes_mainCelltypes_used_inRCTD.pdf'), width = 12, height = 10)
+        
     }
-    
     
     # run RCTD main function
     tic()
     myRCTD <- run.RCTD(myRCTD, doublet_mode = "doublet")
-    saveRDS(myRCTD, file = paste0(RdataDir, 'RCTD_results_refCombined_Forte2020.Ren2020_doubletMode_', slice, '.rds'))
+    saveRDS(myRCTD, file = paste0(RdataDir, 'RCTD_results_refCombined_Forte2020.Ren2020_doubletMode_rmSMC_', slice, '.rds'))
     toc()
     
     ##########################################
