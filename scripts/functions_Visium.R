@@ -917,10 +917,10 @@ Run.celltype.deconvolution.RCTD = function(st, refs, Normalization = 'lognormali
   print(table(st$condition))
   cc = names(table(st$condition))
   
-  #for(n in 1:length(cc))
-  for(n in c(1, 2, 4))
+  for(n in 1:length(cc))
+  #for(n in c(1, 2, 4))
   {
-    # n = 3
+    # n = 2
     cat('slice -- ', cc[n], '\n')
     slice = cc[n]
     stx = st[, which(st$condition == slice)]
@@ -987,7 +987,7 @@ Run.celltype.deconvolution.RCTD = function(st, refs, Normalization = 'lognormali
     ##########################################
     # check the result
     ##########################################
-    myRCTD = readRDS(file = paste0(RdataDir, 'RCTD_results_refCombined_Forte2020.Ren2020_', slice, '.rds'))
+    myRCTD = readRDS(file = paste0(RdataDir, 'RCTD_results_refCombined_Forte2020.Ren2020_doubletMode_rmSMC_', slice, '.rds'))
     results <- myRCTD@results
     
     # normalize the cell type proportions to sum to 1.
@@ -1090,21 +1090,22 @@ Run.celltype.deconvolution.RCTD = function(st, refs, Normalization = 'lognormali
         
       }
       
-      ss = colSums(weights)
+      #ss = colSums(weights)
       cell_types_plt = unique(celltype_keep)
-      ss = ss[match(cell_types_plt, names(ss))]
+      #ss = ss[match(cell_types_plt, names(ss))]
       #cell_types_counts = table(results$results_df$first_type)
       #cell_types_counts = cell_types_counts[which(cell_types_counts>0)]
       #cell_types_counts = cell_types_counts[order(-cell_types_counts)]
-      cell_types_plt <- cell_types_plt[order(-ss)]
-      col_vector = getPalette(length(cell_types_plt))
-      #col_vector = tol10qualitative
+      #cell_types_plt <- cell_types_plt[order(-ss)]
+      #col_vector = getPalette(length(cell_types_plt))
+      #names(col_vector) = cell_types_plt
+      col_ct = readRDS(file = paste0(RdataDir, 'main_celltype_colors_4RCTD.rds'))
+      #col_ct <- col_vector[seq_len(length(cell_types_plt))]
+      #names(col_ct) = cell_types_plt
+      #saveRDS(col_ct, file = paste0(RdataDir, 'main_celltype_colors_4RCTD.rds'))
       
-      col_ct <- col_vector[seq_len(length(cell_types_plt))]
-      names(col_ct) = cell_types_plt
-      
-      plot(1:length(col_ct), 1:length(col_ct), col = getPalette(length(col_ct)))
-      text(1:length(col_ct), 1:length(col_ct), cell_types_plt, offset = 2, adj = 0.5,  col = getPalette(length(col_ct)))
+      plot(1:length(col_ct), 1:length(col_ct), col = col_ct)
+      text(1:length(col_ct), 1:length(col_ct), names(col_ct), offset = 2, adj = 0.5,  col = col_ct)
       
       spatial_coord = data.frame(spatial_coord, weights)
       
