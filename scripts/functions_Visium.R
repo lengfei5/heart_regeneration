@@ -854,7 +854,8 @@ Run.celltype.deconvolution.RCTD = function(st, refs, Normalization = 'lognormali
 {
   require(RCTD)
   require(Matrix)
-  # PLOT.scatterpie = FALSE; Normalization = 'lognormalize'; run.RCTD.subtype = FALSE; save.RCTD.in.seuratObj = FALSE
+  # PLOT.scatterpie = TRUE; Normalization = 'lognormalize'; plot.RCTD.summary = TRUE; save.RCTD.in.seuratObj = FALSE;
+  # 
   # slice = 'adult.day4'; 
   #refs = readRDS(file = paste0(RdataDir, 
   #                             'SeuratObj_adultMiceHeart_refCombine_Forte2020.nonCM_Ren2020CM_cleanAnnot_logNormalize_v1.rds'))
@@ -916,14 +917,15 @@ Run.celltype.deconvolution.RCTD = function(st, refs, Normalization = 'lognormali
   print(table(st$condition))
   cc = names(table(st$condition))
   
-  for(n in 1:length(cc))
+  #for(n in 1:length(cc))
+  for(n in c(1, 2, 4))
   {
     # n = 3
     cat('slice -- ', cc[n], '\n')
     slice = cc[n]
     stx = st[, which(st$condition == slice)]
     
-    resultsdir <- paste0(resDir, '/RCTD/', slice)
+    resultsdir <- paste0(resDir, '/RCTD_v2/', slice)
     system(paste0('mkdir -p ', resultsdir))
     
     ##########################################
@@ -972,7 +974,7 @@ Run.celltype.deconvolution.RCTD = function(st, refs, Normalization = 'lognormali
       yy = log10(yy + 10^-7)
       
       pheatmap(yy, cluster_cols =  FALSE, scale = 'row', show_rownames = FALSE)
-      ggsave(filename = paste0(resDir, '/MarkerGenes_mainCelltypes_used_inRCTD.pdf'), width = 12, height = 10)
+      ggsave(filename = paste0(resultsdir, '/MarkerGenes_mainCelltypes_used_inRCTD.pdf'), width = 12, height = 10)
         
     }
     
@@ -1086,8 +1088,6 @@ Run.celltype.deconvolution.RCTD = function(st, refs, Normalization = 'lognormali
           }
         }
         
-
-        
       }
       
       ss = colSums(weights)
@@ -1131,7 +1131,6 @@ Run.celltype.deconvolution.RCTD = function(st, refs, Normalization = 'lognormali
       
       ggsave(paste0(resultsdir, '/RCTD_scatterpie_', slice, '_v3.pdf'), width = 22, height = 16)
       
-      
     }
     
     ##########################################
@@ -1158,7 +1157,6 @@ Run.celltype.deconvolution.RCTD = function(st, refs, Normalization = 'lognormali
     if(run.RCTD.subtype){
       cat('run RCTD with subtypes \n')
       cat('to construct ...\n')
-      
     }
     
   }
