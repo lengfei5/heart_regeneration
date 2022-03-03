@@ -219,7 +219,8 @@ findClusters_SC3 = function(aa)
   sce.HVG.Brenneck = sce[rownames(sce)%in%Brennecke_HVG, ]
   sce.HVG.DM = sce[rownames(sce)%in%DM_HVG, ]
   
-  save(sce, sce.HVG.Brenneck, sce.HVG.DM, file=paste0(RdataDir, version.DATA, '_QCed_cells_genes_filtered_normalized_SCE_HVGsels.Rdata'))
+  save(sce, sce.HVG.Brenneck, sce.HVG.DM, file=paste0(RdataDir, version.DATA, 
+                                                      '_QCed_cells_genes_filtered_normalized_SCE_HVGsels.Rdata'))
   #HVG_genes <- Brennecke_HVG$Gene
   #load(file=paste0(RdataDir, version.DATA, '_QCed_cells_genes_filtered_normalized_SCE_HVGsels.Rdata'))
   
@@ -378,7 +379,7 @@ run_bayesSpace = function(aa)
   
   set.seed(101)
   dec <- scran::modelGeneVar(scc)
-  top <- scran::getTopHVGs(dec, n = 3000)
+  top <- scran::getTopHVGs(dec, n = 2000)
   
   set.seed(102)
   scc <- scater::runPCA(scc, subset_row=top)
@@ -386,11 +387,14 @@ run_bayesSpace = function(aa)
   ## Add BayesSpace metadata
   scc <- spatialPreprocess(scc, platform="Visium", skip.PCA=TRUE)
   
-  #scc <- qTune(scc, qs=seq(5, 15))
-  #qPlot(scc)
+  scc <- qTune(scc, qs=seq(4, 15))
+  qPlot(scc)
+  
+  ggsave(filename =  paste0(resDir, "/BayesSpace_SpatialCluster_nbSelection_", species, '_', slice, ".pdf"), 
+         width = 12, height = 8)
   
   # sptial clustering 
-  q <- 15  # Number of clusters
+  q <- 10  # Number of clusters
   d <- 15  # Number of PCs
   
   #palette <- RColorBrewer::brewer.pal(q, "Paired")
@@ -409,10 +413,10 @@ run_bayesSpace = function(aa)
   
   clusterPlot(scc, palette=palette, size=0.1) +
     labs(title= paste0("Spot-level clustering : ",  slice)) +
-    guides(fill=FALSE) + 
-    coord_flip() + 
+    guides(fill=FALSE)# + 
+    #coord_flip() + 
     #ggplot2::scale_y_reverse() +
-    ggplot2::scale_x_reverse()  # flip first and reverse x to match seurat Spatial plots
+    #ggplot2::scale_x_reverse()  # flip first and reverse x to match seurat Spatial plots
     
   ggsave(filename =  paste0(resDir, "/BayesSpace_SpatialSlustered_", species, '_', slice, ".pdf"), width = 12, height = 8)
   
@@ -676,7 +680,8 @@ Double.check.adult.non.cardiomyocyte.major.celltypes.subtypes = function(aa)
       gg.examples = c('Col1a2', 'Vim', 'Fstl1', 'Ddr2', 'Acta2', 'Postn', 'Tcf21', 'Pdgfra', 'Col3a1', 'Col1a1', 
                       'Gsn', 'Fbln2', 'Sparc', 'Mmp2', 'Msln', 'Rspo1', 'Lum', 'Col8a1')
       
-      gg.examples = c('Tek', 'Pecam1', 'Emcn', 'Cdh5', 'Kdr', 'Vwf', 'Fabp4', 'Tie1', 'Flt1', 'Epas1', 'Ednrb', 'Gpihbp1', 'Npr3')
+      gg.examples = c('Tek', 'Pecam1', 'Emcn', 'Cdh5', 'Kdr', 'Vwf', 'Fabp4', 'Tie1', 
+                      'Flt1', 'Epas1', 'Ednrb', 'Gpihbp1', 'Npr3')
       VlnPlot(ax, features = gg.examples)
       ggsave(paste0(resDir, '/VlnPlot_markerGenes_', mcells, '_subtypes.pdf'), width = 20, height = 16)
       
@@ -837,7 +842,7 @@ Convert.batch.corrected.expression.matrix.to.UMIcount = function(refs){
   #aa = readRDS(file = paste0(RdataDir, 'Seurat.obj_adultMiceHeart_week0.week2_Ren2020_seuratNormalization.rds'))
   
   saveRDS(refs, file = paste0(RdataDir, 
-                              'SeuratObj_adultMiceHeart_refCombine_Forte2020.nonCM_Ren2020CM_cleanAnnot_correctedUMIcounts_v1.rds'))
+          'SeuratObj_adultMiceHeart_refCombine_Forte2020.nonCM_Ren2020CM_cleanAnnot_correctedUMIcounts_v1.rds'))
   
 }
 
@@ -1037,7 +1042,8 @@ Run.celltype.deconvolution.RCTD = function(st, refs, Normalization = 'lognormali
     ##########################################
     # visualization using scatterpie plot 
     # (original code from 
-    # https://github.com/MarcElosua/SPOTlight_deconvolution_analysis/blob/master/analysis/pancreas_PDAC/3b-PDAC_piecharts_immune.Rmd)
+    # https://github.com/MarcElosua/SPOTlight_deconvolution_analysis/blob/master/
+    # analysis/pancreas_PDAC/3b-PDAC_piecharts_immune.Rmd)
     ##########################################
     if(PLOT.scatterpie){
       require(scatterpie)
@@ -1171,7 +1177,7 @@ Run.celltype.deconvolution.RCTD = function(st, refs, Normalization = 'lognormali
 # Section : Analyze the cell type proximity
 # original code from https://github.com/madhavmantri/chicken_heart/blob/master/scripts/anchor_integeration.R
 # and the paper (https://www.nature.com/articles/s41467-021-21892-z#data-availability)
-
+# 
 ########################################################
 ########################################################
 analyze.celltype.proximity.network = function()
@@ -1223,7 +1229,8 @@ analyze.celltype.proximity.network = function()
   prediction.scores$celltype_prediction <- NA
   dim(prediction.scores)
   for(i in 1:nrow(prediction.scores)){
-    prediction.scores$celltype_prediction[i] <- colnames(prediction.scores)[prediction.scores[i,1:15] == max(prediction.scores[i,1:15])]
+    prediction.scores$celltype_prediction[i] <- 
+      colnames(prediction.scores)[prediction.scores[i,1:15] == max(prediction.scores[i,1:15])]
   }
   
   table(prediction.scores$celltype_prediction)
@@ -1239,7 +1246,8 @@ analyze.celltype.proximity.network = function()
   dim(prediction.scores)
   prediction.scores.1 <- prediction.scores[colnames(chicken_visium)[chicken_visium$orig.ident == "D10"],]
   dim(prediction.scores.1)
-  interaction_matrix = matrix(0, ncol = length(unique(chicken_visium$celltype_prediction)), nrow = length(unique(chicken_visium$celltype_prediction)))
+  interaction_matrix = matrix(0, ncol = length(unique(chicken_visium$celltype_prediction)), 
+                              nrow = length(unique(chicken_visium$celltype_prediction)))
   rownames(interaction_matrix) <- unique(chicken_visium$celltype_prediction)
   colnames(interaction_matrix) <- unique(chicken_visium$celltype_prediction)
   for(i in 1:nrow(prediction.scores.1)){
@@ -1262,7 +1270,9 @@ analyze.celltype.proximity.network = function()
   
   interaction_matrix <- interaction_matrix + t(interaction_matrix)
   colnames(interaction_matrix)
-  temp <- colnames(interaction_matrix)[!colnames(interaction_matrix) %in% c("Erythrocytes", "Macrophages", "Mitochondria enriched cardiomyocytes")]
+  temp <- colnames(interaction_matrix)[!colnames(interaction_matrix) %in% c("Erythrocytes", 
+                                                                            "Macrophages", 
+                                                                            "Mitochondria enriched cardiomyocytes")]
   interaction_matrix <- interaction_matrix[temp, temp]
   
   library(pals)
@@ -1278,7 +1288,8 @@ analyze.celltype.proximity.network = function()
   row_col <- color_used
   row_col[names(row_col) != "TMSB4X high cells"] <- "#cecece"
   
-  col <- matrix(rep(color_used, each = ncol(interaction_matrix), T), nrow = nrow(interaction_matrix), ncol = ncol(interaction_matrix))
+  col <- matrix(rep(color_used, each = ncol(interaction_matrix), T), nrow = nrow(interaction_matrix), 
+                ncol = ncol(interaction_matrix))
   rownames(col) <- rownames(interaction_matrix)
   colnames(col) <- colnames(interaction_matrix)
   
@@ -1300,7 +1311,8 @@ analyze.celltype.proximity.network = function()
   table(chicken_visium$orig.ident)
   colnames(chicken_visium)
   Images(chicken_visium)
-  sample_cell_id_map <- data.frame(sample = chicken_visium$orig.ident, cell_id = str_split_fixed(colnames(chicken_visium), "_", 2)[,2])
+  sample_cell_id_map <- data.frame(sample = chicken_visium$orig.ident, 
+                                   cell_id = str_split_fixed(colnames(chicken_visium), "_", 2)[,2])
   head(sample_cell_id_map)
   # save(sample_cell_id_map, file="robjs/sample_cell_id_map.Robj")
   load("robjs/sample_cell_id_map.Robj")
@@ -1320,7 +1332,9 @@ analyze.celltype.proximity.network = function()
   load("robjs/chicken_visium.4.prediction.1.Robj")
   
   
-  #####################  This section uses the cell spot similarity map and defines spot type in 2 differet ways (optional: not used in manuscript) ############################
+  #####################  This section uses the cell spot similarity map and
+  ##################### defines spot type in 2 differet ways (optional: not used in manuscript) 
+  ############################
   
   # Spot type defined by cell type with maxium 
   prediction.scores <- as.data.frame(t(GetAssayData(chicken_visium, assay = "predictions_cells")))
@@ -1329,7 +1343,8 @@ analyze.celltype.proximity.network = function()
   prediction.scores$cellprediction_max <- NA
   dim(prediction.scores)
   for(i in 1:nrow(prediction.scores)){
-    prediction.scores$cellprediction_max[i] <- colnames(prediction.scores)[prediction.scores[i,1:22315] == prediction.scores$max[i]]
+    prediction.scores$cellprediction_max[i] <- colnames(prediction.scores)[prediction.scores[i,1:22315] == 
+                                                                             prediction.scores$max[i]]
   }
   prediction.scores$cellprediction_max
   sum(is.na(prediction.scores$cellprediction_max))

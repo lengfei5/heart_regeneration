@@ -191,7 +191,8 @@ source('functions_Visium.R')
 # spatial domain searching and potential define remote regions and border zone 
 ##########################################
 obj.list <- SplitObject(st, split.by = "condition")
-aa = obj.list[[3]]
+# select day4
+aa = obj.list[[2]]
 run_bayesSpace(aa)
 
 ##########################################
