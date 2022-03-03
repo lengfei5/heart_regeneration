@@ -390,16 +390,12 @@ run_bayesSpace = function(aa)
   scc <- qTune(scc, qs=seq(4, 15))
   qPlot(scc)
   
-  ggsave(filename =  paste0(resDir, "/BayesSpace_SpatialCluster_nbSelection_", species, '_', slice, ".pdf"), 
+  ggsave(filename =  paste0(resDir, "/BayesSpace_SpatialCluster_cluster.nb.selection_", species, '_', slice, ".pdf"), 
          width = 12, height = 8)
   
   # sptial clustering 
-  q <- 10  # Number of clusters
+  q <- 8  # Number of clusters
   d <- 15  # Number of PCs
-  
-  #palette <- RColorBrewer::brewer.pal(q, "Paired")
-  palette =  c(brewer.pal(name="Dark2", n = (q-8)), brewer.pal(name="Paired", n = 8))
-
   
   library(mclust) ## Here we run mclust externally so the random seeding is consistent with ## original analyses
   Y <- reducedDim(scc, "PCA")[, seq_len(d)]
@@ -411,68 +407,93 @@ run_bayesSpace = function(aa)
   scc <- spatialCluster(scc, q=q, d=d, platform='Visium', init=init,
                         nrep=10000, gamma=3)
   
-  clusterPlot(scc, palette=palette, size=0.1) +
-    labs(title= paste0("Spot-level clustering : ",  slice)) +
-    guides(fill=FALSE)# + 
+  
+  # scc = readRDS(file = paste0(RdataDir, "/BayesSpace_SpatialSlustered_", species, '_', slice,  "_with.", q, "clusters.rds"))
+  p1 = SpatialDimPlot(aa, group.by = 'spatial_domain_manual', images = slice)
+  
+  palette <- RColorBrewer::brewer.pal(q, "Paired")
+  #palette =  c(brewer.pal(name="Dark2", n = (q-8)), brewer.pal(name="Paired", n = 8))
+  
+  p2 = clusterPlot(scc, palette=palette, size=0.1) +
+    labs(title= paste0("Spot-level clustering : ",  slice)) 
+    # + 
     #coord_flip() + 
     #ggplot2::scale_y_reverse() +
     #ggplot2::scale_x_reverse()  # flip first and reverse x to match seurat Spatial plots
+  
+  p1 + p2  
+  
+  ggsave(filename =  paste0(resDir, "/BayesSpace_SpatialSlustered_", species, '_', slice, "manual_vs_bayeSpace_with.", 
+                            q, ".clusters.pdf"), width = 16, height = 8)
+  
+  saveRDS(scc, file = paste0(RdataDir, "/BayesSpace_SpatialSlustered_", species, '_', slice,  "_with.", q, "clusters.rds"))
+  
+  aa$spatial_domain_bayeSpace = NA
+  aa$spatial_domain_bayeSpace[match(colnames(scc), colnames(aa))] = scc$spatial.cluster
+  
+  SpatialDimPlot(aa, group.by = 'spatial_domain_bayeSpace', images = slice)
+  
+  saveRDS(aa, file = paste0(paste0(RdataDir, "/SeuratObj_spatialDomain_BayesSpace_", 
+                                   species, '_', slice,  "_with.", q, "clusters.rds")))
+  
+  Find.top.markers.for.spatial.clusters = FALSE
+  if(Find.top.markers.for.spatial.clusters){
+    # top markers of spatial clusters 
+    library(dplyr)
     
-  ggsave(filename =  paste0(resDir, "/BayesSpace_SpatialSlustered_", species, '_', slice, ".pdf"), width = 12, height = 8)
+    ## Convert SCE to Seurat object and use BayesSpace cluster as identifier
+    sobj <- Seurat::CreateSeuratObject(counts=logcounts(scc),
+                                       assay='Spatial',
+                                       meta.data=as.data.frame(colData(scc)))
+    sobj <- Seurat::SetIdent(sobj, value = "spatial.cluster")
+    
+    
+    ## Scale data
+    sobj = Seurat::ScaleData(sobj)
+    #sobj@assays$Spatial@scale.data <-
+    #  sobj@assays$Spatial@data %>% as.matrix %>% t %>% scale %>% t
+    
+    ## Select top n markers from each cluster (by log fold change)
+    top_markers <- Seurat::FindAllMarkers(sobj, assay='Spatial', slot='data',
+                                          group.by='spatial.cluster',
+                                          only.pos=TRUE) 
+    
+    top_markers %>% group_by(cluster) %>%
+      top_n(10, avg_log2FC) -> top10
+    
+    ## Plot expression of markers
+    Seurat::DoHeatmap(sobj, features = top10$gene, 
+                      group.by = "spatial.cluster", group.colors=palette, 
+                      angle=0, size=4, label = FALSE, raster=FALSE) + 
+      guides(col = FALSE)
+    
+    SpatialFeaturePlot(aa, features = "CTSS-AMEX60DD007394" )
+    
+  }
+ 
+  Run.bayesSpace.enhanced.clustering = FALSE # this takes >1hour at least long time
+  if(Run.bayesSpace.enhanced.clustering){
+    ## Run BayesSpace enhanced clustering
+    set.seed(100)
+    scc.enhanced <- spatialEnhance(scc, q=q, d=d, platform="Visium",
+                                   nrep=20000, gamma=3, verbose=TRUE,
+                                   jitter_scale=5.5, jitter_prior=0.3,
+                                   save.chain=FALSE)
+    
+    
+    # We compared the two clusterings using clusterPlot()
+    enhanced.plot <- clusterPlot(scc.enhanced, palette=palette, size=0.05) +
+      labs(title= paste0("Enhanced clustering :", slice)) +
+      coord_flip() + 
+      ggplot2::scale_x_reverse()  # flip first and reverse x to match seurat Spatial plots
+    
+    spot.plot + enhanced.plot
+    
+  }
   
-  saveRDS(scc, file = paste0(RdataDir,  "/BayesSpace_SpatialSlustered_", species, '_', slice, ".rds"))
-  
-  # top markers of spatial clusters 
-  library(dplyr)
-  
-  ## Convert SCE to Seurat object and use BayesSpace cluster as identifier
-  sobj <- Seurat::CreateSeuratObject(counts=logcounts(scc),
-                                     assay='Spatial',
-                                     meta.data=as.data.frame(colData(scc)))
-  sobj <- Seurat::SetIdent(sobj, value = "spatial.cluster")
-  
-  
-  ## Scale data
-  sobj = Seurat::ScaleData(sobj)
-  #sobj@assays$Spatial@scale.data <-
-  #  sobj@assays$Spatial@data %>% as.matrix %>% t %>% scale %>% t
-  
-  ## Select top n markers from each cluster (by log fold change)
-  top_markers <- Seurat::FindAllMarkers(sobj, assay='Spatial', slot='data',
-                                        group.by='spatial.cluster',
-                                        only.pos=TRUE) 
-  
-  top_markers %>% group_by(cluster) %>%
-   top_n(10, avg_log2FC) -> top10
-  
-  ## Plot expression of markers
-  Seurat::DoHeatmap(sobj, features = top10$gene, 
-                    group.by = "spatial.cluster", group.colors=palette, 
-                    angle=0, size=4, label = FALSE, raster=FALSE) + 
-    guides(col = FALSE)
-  
-  SpatialFeaturePlot(aa, features = "CTSS-AMEX60DD007394" )
-  
-  
-  ## Run BayesSpace enhanced clustering
-  set.seed(100)
-  scc.enhanced <- spatialEnhance(scc, q=q, d=d, platform="Visium",
-                                 nrep=20000, gamma=3, verbose=TRUE,
-                                 jitter_scale=5.5, jitter_prior=0.3,
-                                 save.chain=FALSE)
-  
-  
-  # We compared the two clusterings using clusterPlot()
-  enhanced.plot <- clusterPlot(scc.enhanced, palette=palette, size=0.05) +
-    labs(title= paste0("Enhanced clustering :", slice)) +
-    coord_flip() + 
-    ggplot2::scale_x_reverse()  # flip first and reverse x to match seurat Spatial plots
-  
-  spot.plot + enhanced.plot
-  
+  return(aa)
   
 }
-
 
 ########################################################
 ########################################################
@@ -1180,6 +1201,84 @@ Run.celltype.deconvolution.RCTD = function(st, refs, Normalization = 'lognormali
 # 
 ########################################################
 ########################################################
+run_cell_proximity_analysis = function(aa)
+{
+  # import the manual spatial domain or by bayesSpace
+  slice = "adult.day4"
+  q = 8
+  aa =  readRDS(file = paste0(paste0(RdataDir, "/SeuratObj_spatialDomain_BayesSpace_", 
+                            species, '_', slice,  "_with.", q, "clusters.rds")))
+  
+  SpatialDimPlot(aa, group.by = 'spatial_domain_bayeSpace', images = slice, label = TRUE)
+  
+  # import the cell type deconvolution result
+  myRCTD = readRDS(file = paste0(RdataDir, 'RCTD_results_refCombined_Forte2020.Ren2020_doubletMode_rmSMC_', slice, '.rds'))
+  results <- myRCTD@results
+  
+  # normalize the cell type proportions to sum to 1.
+  norm_weights = sweep(results$weights, 1, rowSums(results$weights), '/') 
+  
+  # use a threshold to binarize weights
+  weights = norm_weights >= 0.05 
+  
+  index_ctl = match(colnames(aa)[which(aa$spatial_domain_bayeSpace == '4')], rownames(weights))
+  index_border = match(colnames(aa)[which(aa$spatial_domain_bayeSpace == '7')], rownames(weights))
+  
+  ctl = weights[index_ctl, -5]
+  border = weights[index_border, -5]
+  
+  ss1 = apply(ctl, 2, sum)
+  ss2 = apply(border, 2, sum)
+  
+  #bgs = bgs/sum(bgs)
+  #border = border[, which(bgs>0)]
+  #bgs = bgs[which(bgs>0)]
+  cell_type_names <- colnames(ctl)
+  
+  coc = matrix(0, nrow = length(cell_type_names), ncol = length(cell_type_names))
+  colnames(coc) = cell_type_names
+  rownames(coc) = cell_type_names
+  
+  for(m in 1:ncol(coc))
+  {
+    # m = 2
+    jj = which(border[,m] == TRUE)
+    jj0 = which(ctl[,m] == TRUE)
+    
+    if(length(jj) == 1){
+      xx = border[jj, ]
+    }
+    if(length(jj) > 1){
+      xx = apply(border[jj, ], 2, sum)
+    }
+    
+    if(length(jj0) == 1){
+      xx0 = ctl[jj0, ]
+    }
+    if(length(jj0) > 1){
+      xx0 = apply(ctl[jj0, ], 2, sum)
+    }
+    
+    #xx = xx/length(jj)
+    xx = xx/nrow(border)
+    xx0 = (xx0+0.1)/nrow(ctl)
+    #xx = xx/bgs[m]
+    coc[m,] = xx/xx0
+    
+  }
+  
+  coc = log10(coc + 10^-2)
+  library(corrplot)
+  require(RColorBrewer)
+  corrplot(coc, method = 'color', is.corr = FALSE, hclust.method = c("ward.D2"),
+           col = colorRampPalette(rev(brewer.pal(n = 7, name = "RdYlBu")))(10))
+  
+  ggsave(filename =  paste0(resDir, "/celltype_cooccurence_score_border_vs_", species, '_', slice, ".pdf"), 
+         width = 12, height = 8)
+  
+  
+}
+
 analyze.celltype.proximity.network = function()
 {
   # setRepositories(ind = 1:2)

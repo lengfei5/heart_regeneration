@@ -193,7 +193,17 @@ source('functions_Visium.R')
 obj.list <- SplitObject(st, split.by = "condition")
 # select day4
 aa = obj.list[[2]]
-run_bayesSpace(aa)
+aa$sampleID = design$sampleID[which(design$condition == names(table(aa$condition)))]
+
+# import manually defined spatial domain by Elad
+sdomain = read.csv('/groups/tanaka/Collaborations/Jingkui-Elad/Mouse_Visium_annotations/Anno_166906.csv')
+sdomain = sdomain[which(sdomain$Anno_1 != ''), ]
+aa$spatial_domain_manual = NA
+
+cells = gsub('_2_1', '',  colnames(aa))
+aa$spatial_domain_manual[match(sdomain$Barcode, cells)] = sdomain$Anno_1
+
+aa = run_bayesSpace(aa)
 
 ##########################################
 # cell type deconvolution
@@ -209,7 +219,7 @@ st = Run.celltype.deconvolution.RCTD(st, refs)
 ##########################################
 # cell proximity analysis 
 ##########################################
-
+run_cell_proximity_analysis(aa)
 
 
 ########################################################
