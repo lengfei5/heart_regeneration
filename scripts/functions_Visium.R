@@ -1584,3 +1584,141 @@ Find.SpatialDE = function(aa, use.method = 'sparkX')
   return(mtest)
  
 }
+
+########################################################
+########################################################
+# Section : functions of cell-cell interaction, ligand-receptor analysis
+# 
+########################################################
+########################################################
+# original code from https://saezlab.github.io/liana/articles/liana_nichenet.html
+
+run_liana_nitchenet = function()
+{
+  
+  library(tidyverse)
+  library(liana)
+  library(nichenetr)
+  library(Seurat)
+  library(ggrepel)
+  library(cowplot)
+  options(timeout=180) # required for downloading single-cell expression on slow connection
+  
+  # single-cell expression matrix described in Puram et al. 2017
+  hnscc_expression <-  readRDS(url("https://zenodo.org/record/3260758/files/hnscc_expression.rds"))
+  expression <- hnscc_expression$expression
+  sample_info <- hnscc_expression$sample_info
+  colnames(sample_info) <- make.names(colnames(sample_info))
+  
+  # filter samples based on vignette's information and add cell type
+  tumors_remove <-  c("HN10", "HN", "HN12", "HN13", "HN24", "HN7", "HN8", "HN23")
+  sample_info <- sample_info %>%
+    subset( !(tumor %in% tumors_remove) & Lymph.node == 0) %>%
+    # fix some cell type identity names
+    mutate(cell_type = ifelse(classified..as.cancer.cell == 1, "Tumor", non.cancer.cell.type)) %>%
+    subset(cell_type %in% c("Tumor", "CAF"))
+  
+  # cell ID as rownames
+  rownames(sample_info) <- sample_info$cell
+  
+  # subset expression to selected cells
+  expression <- expression[sample_info$cell, ]
+  
+  # model weights
+  ligand_target_matrix <- readRDS(url("https://zenodo.org/record/3260758/files/ligand_target_matrix.rds"))
+  
+  # gene set of interest
+  geneset_oi <- read_tsv(url("https://zenodo.org/record/3260758/files/pemt_signature.txt"), col_types = cols(), col_names = "gene") %>%
+    pull(gene) %>%
+    .[. %in% rownames(ligand_target_matrix)]
+  
+  # create seurat object
+  seurat_object <- Seurat::CreateAssayObject(counts = expm1(t(expression))) %>%
+    Seurat::CreateSeuratObject(., meta.data = sample_info) %>%
+    Seurat::NormalizeData()
+  
+  # set cell identity to cell type
+  Idents(seurat_object) <- seurat_object@meta.data$cell_type
+  
+  liana_results <- liana_wrap(seurat_object) %>%
+    liana_aggregate()
+  
+  
+  # filter results to cell types of interest
+  caf_tumor_results <- liana_results %>%
+    subset(source == "CAF" & target == "Tumor")
+  
+  # filter results to top N interactions
+  n <- 50
+  top_n_caf_tumor <- caf_tumor_results %>%
+    arrange(aggregate_rank) %>%
+    slice_head(n = n) %>%
+    mutate(id = fct_inorder(paste0(ligand, " -> ", receptor)))
+  
+  # visualize median rank
+  top_n_caf_tumor %>%
+    ggplot(aes(y = aggregate_rank, x = id)) +
+    geom_bar(stat = "identity") +
+    xlab("Interaction") + ylab("LIANA's aggregate rank") +
+    theme_cowplot() +
+    theme(axis.text.x = element_text(size = 8, angle = 60, hjust = 1, vjust = 1))
+  
+  
+  # get ligands and filter to those included in NicheNet's ligand-target matrix
+  ligands <- unique(top_n_caf_tumor$ligand)
+  ligands <- ligands[ligands %in% colnames(ligand_target_matrix)]
+  ligands
+  
+  background_genes <- expression[sample_info$cell[sample_info$cell_type == "Tumor"], ] %>%
+    apply(2,function(x){10*(2**x - 1)}) %>%
+    apply(2,function(x){log2(mean(x) + 1)}) %>%
+    .[. >= 4] %>%
+    names()
+  
+  nichenet_activities <- predict_ligand_activities(
+    geneset = geneset_oi,
+    background_expressed_genes = background_genes,
+    ligand_target_matrix = ligand_target_matrix, potential_ligands = ligands
+  )
+  
+  # prepare data for visualization
+  vis_liana_nichenet <- top_n_caf_tumor %>%
+    inner_join(nichenet_activities, by = c("ligand" = "test_ligand")) %>%
+    arrange(pearson) %>%
+    mutate(ligand = fct_inorder(ligand))
+  
+  # prepare NicheNet figure
+  nichenet_scores_plot <- vis_liana_nichenet %>%
+    group_by(ligand) %>%
+    summarize(pearson = mean(pearson)) %>%
+    ggplot(aes(y = ligand, x = pearson)) +
+    geom_bar(stat = "identity") +
+    ggtitle("NicheNet") +
+    xlab("Pearson's score") +
+    theme_cowplot() +
+    theme(axis.text.y = element_blank(),
+          axis.ticks.y = element_blank(),
+          axis.title.y = element_blank(),
+          axis.line.y = element_line(color = "white"),
+          plot.title = element_text(hjust = 0.5),
+          axis.text.x = element_text(angle = 60, hjust = 1, vjust = 1))
+  
+  # prepare LIANA figure
+  liana_receptor_heatmap <- vis_liana_nichenet %>%
+    ggplot(aes(y = ligand, x = receptor, fill = aggregate_rank)) +
+    geom_tile() +
+    theme_cowplot() +
+    ggtitle("LIANA") +
+    ylab("Ligand") + xlab("Receptor") +
+    theme(axis.text.x = element_text(angle = 60, hjust = 1, vjust = 1),
+          plot.title = element_text(hjust = 0.5),
+          panel.grid.major = element_line(colour = "gray", linetype = 2),
+          legend.position = "left")
+  
+  # combine plots
+  plot_grid(liana_receptor_heatmap, nichenet_scores_plot,
+            align = "h", nrow = 1, rel_widths = c(0.8,0.3))
+  
+}
+
+
