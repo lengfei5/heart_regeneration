@@ -277,12 +277,15 @@ if(Merge.adult.mice.cardiomyocyte.noncardiomyocyte){
   # original unmodified data still resides in the 'RNA' assay
   DefaultAssay(ref.combined) <- "integrated"
   
-  xx = DietSeurat(ref.combined, counts = FALSE, data = TRUE, scale.data = FALSE, assays = 'integrated')
-  saveRDS(xx, file = paste0(RdataDir, 'Seurat.obj_adultMiceHeart_Forte2020_Ren2020_refCombined_logNormalize_v2.rds'))
+  xx = DietSeurat(ref.combined, counts = TRUE, data = TRUE, scale.data = FALSE, assays = 'integrated')
+  xx@assays$integrated@counts = ref.combined@assays$RNA@counts
+  
+  saveRDS(xx, file = paste0(RdataDir, 'Seurat.obj_adultMiceHeart_Forte2020_Ren2020_refCombined_logNormalize_counts_v3.rds'))
   
   
   # Run the standard workflow for visualization and clustering
-  ref.combined = readRDS(file =paste0(RdataDir, 'Seurat.obj_adultMiceHeart_Forte2020_Ren2020_refCombined_logNormalize_v2.rds'))
+  ref.combined = readRDS(file =paste0(RdataDir, 
+                                      'Seurat.obj_adultMiceHeart_Forte2020_Ren2020_refCombined_logNormalize_counts_v3.rds'))
   
   ref.combined <- ScaleData(ref.combined, verbose = FALSE)
   ref.combined <- RunPCA(ref.combined, npcs = 30, verbose = FALSE)
@@ -357,9 +360,9 @@ if(Merge.adult.mice.cardiomyocyte.noncardiomyocyte){
   rm(ref.combined)
   
   saveRDS(refs, file = paste0(RdataDir, 
-                              'Seurat.obj_adultMiceHeart_Forte2020.nonCM_Ren2020CM_refCombined_cleanAnnot_logNormalize_v3.rds'))
+                              'Seurat.obj_adultMiceHeart_Forte2020.nonCM_Ren2020CM_refCombined_cleanAnnot_logNormalize_v4.rds'))
   saveRDS(refs, file = paste0(RdataDir, 
-                              'SeuratObj_adultMiceHeart_refCombine_Forte2020.nonCM_Ren2020CM_cleanAnnot_logNormalize_v3.rds'))
+                              'SeuratObj_adultMiceHeart_refCombine_Forte2020.nonCM_Ren2020CM_cleanAnnot_logNormalize_v4.rds'))
   
   
 }

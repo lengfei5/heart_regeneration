@@ -33,11 +33,7 @@ species = 'mouse_adult'
 # first processing and QCs 
 ########################################################
 ########################################################
-#design = data.frame(seq(166904, 166911), c(paste0("adult.day", c(14, 7, 4, 1)), 
-#                                      paste0('neonatal.day', c(1, 4, 7, 14))), stringsAsFactors = FALSE)
-#design = data.frame(seq(166907, 166904), c(paste0("adult.day", c(1, 4, 7, 14))), stringsAsFactors = FALSE)
-
-design = data.frame(seq(166908, 166911), c(paste0('neonatal.day', c(1, 4, 7, 14))), stringsAsFactors = FALSE)
+design = data.frame(seq(166907, 166904), c(paste0("adult.day", c(1, 4, 7, 14))), stringsAsFactors = FALSE)
 
 colnames(design) = c('sampleID', 'condition')
 
@@ -221,6 +217,11 @@ st = Run.celltype.deconvolution.RCTD(st, refs)
 ##########################################
 run_cell_proximity_analysis(aa)
 
+##########################################
+# ligand-receptor-target prediction 
+##########################################
+source('functions_Visium.R')
+run_LIANA()
 
 ########################################################
 ########################################################

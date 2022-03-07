@@ -1591,8 +1591,83 @@ Find.SpatialDE = function(aa, use.method = 'sparkX')
 # 
 ########################################################
 ########################################################
-run_LIANA = function()
+run_LIANA = function() # original code from https://saezlab.github.io/liana/articles/liana_tutorial.html
 {
+  require(tidyverse)
+  require(magrittr)
+  require(liana)
+  
+  # Resource currently included in OmniPathR (and hence `liana`) include:
+  show_resources()
+  
+  # Resource currently included in OmniPathR (and hence `liana`) include:
+  show_methods()
+  
+  liana_path <- system.file(package = "liana")
+  testdata <- readRDS(file.path(liana_path , "testdata", "input", "testdata.rds"))
+  
+  testdata %>% glimpse()
+  
+  sels =c(which(refs$celltype == 'CM')[1:1000], which(refs$celltype == 'FB')[1:1000], 
+          which(refs$celltype == 'prolife.Mphage'))
+  subref = subset(refs, cells = colnames(refs)[sels])
+  
+  Idents(subref) = subref$celltype
+  
+  # Run liana
+  #liana_test <- liana_wrap(testdata)
+  sce <- as.SingleCellExperiment(subref)
+  liana_test <- liana_wrap(sce, assay.type = "logcounts")
+  
+  #> Warning in .filter_sce(sce): 3465 genes and/or 0 cells were removed as they had
+  #> no counts!
+  
+  # Liana returns a list of results, each element of which corresponds to a method
+  liana_test %>% glimpse
+  
+  # We can aggregate these results into a tibble with consensus ranks
+  liana_test <- liana_test %>%
+    liana_aggregate()
+  
+  liana_test %>% 
+    filter(source =="B") %>%
+    top_n(25, desc(aggregate_rank)) %>%
+    liana_dotplot(source_groups = c("B"),
+                  target_groups = c("NK", "CD8 T", "B"))
+  
+  # run any method of choice
+  # Load Sce testdata
+  sce <- readRDS(file.path(liana_path , "testdata", "input", "testsce.rds"))
+  
+  # RUN CPDB alone
+  cpdb_test <- liana_wrap(sce,
+                          method = 'cellphonedb',
+                          resource = c('CellPhoneDB'),
+                          permutation.params = list(nperms=100,
+                                                    parallelize=FALSE,
+                                                    workers=4))
+  
+  # Plot toy results
+  cpdb_test %>%
+    # filter(pvalue <= 0.05) %>% # only keep interactions with p-val <= 0.05
+    # invert size (low p-value/high specificity = larger dot size)
+    # + add a small value to avoid Infinity for 0s
+    mutate(pvalue = -log10(pvalue + 1e-10)) %>% 
+    liana_dotplot(source_groups = c("c"),
+                  target_groups = c("c", "a", "b"),
+                  specificity = "pvalue",
+                  magnitude = "lr.mean",
+                  show_complex = TRUE)
+  
+  # Run liana re-implementations with the CellPhoneDB resource
+  complex_test <- liana_wrap(testdata,
+                             method = c('natmi', 'sca', 'logfc'),
+                             resource = c('CellPhoneDB'))
+  #> Warning in .filter_sce(sce): 3465 genes and/or 0 cells were removed as they had
+  #> no counts!
+  
+  complex_test %>% liana_aggregate()
+  
   
   
 }
