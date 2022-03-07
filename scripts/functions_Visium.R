@@ -1591,6 +1591,12 @@ Find.SpatialDE = function(aa, use.method = 'sparkX')
 # 
 ########################################################
 ########################################################
+run_LIANA = function()
+{
+  
+  
+}
+
 run_nicheNet = function() # original code from https://github.com/saeyslab/nichenetr/blob/master/vignettes/seurat_steps.md
 {
   library(nichenetr)
