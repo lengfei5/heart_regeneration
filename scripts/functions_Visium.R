@@ -1593,7 +1593,66 @@ Find.SpatialDE = function(aa, use.method = 'sparkX')
 ########################################################
 run_nicheNet = function() # original code from https://github.com/saeyslab/nichenetr/blob/master/vignettes/seurat_steps.md
 {
+  library(nichenetr)
+  library(Seurat) # please update to Seurat V4
+  library(tidyverse)
   
+  ## import NicheNet’s ligand-target prior model, ligand-receptor network and weighted integrated networks
+  ligand_target_matrix = readRDS(url("https://zenodo.org/record/3260758/files/ligand_target_matrix.rds"))
+  ligand_target_matrix[1:5,1:5] # target genes in rows, ligands in columns
+    
+  lr_network = readRDS(url("https://zenodo.org/record/3260758/files/lr_network.rds"))
+  head(lr_network)
+    
+  weighted_networks = readRDS(url("https://zenodo.org/record/3260758/files/weighted_networks.rds"))
+  head(weighted_networks$lr_sig) # interactions and their weights in the ligand-receptor + signaling network
+  
+  head(weighted_networks$gr) # interactions and their weights in the gene regulatory network
+  
+  ## Read in the expression data of interacting cells
+  seuratObj = readRDS(url("https://zenodo.org/record/3531889/files/seuratObj.rds"))
+  seuratObj@meta.data %>% head()
+  
+  # note that the number of cells of some cell types is very low and should preferably be higher for a real application
+  seuratObj@meta.data$celltype %>% table() 
+  
+  DimPlot(seuratObj, reduction = "tsne")
+  
+  seuratObj@meta.data$aggregate %>% table()
+  
+  DimPlot(seuratObj, reduction = "tsne", group.by = "aggregate")
+  
+  ## Perform the NicheNet analysis
+  # indicated cell types should be cell class identities
+  # check via: 
+  # seuratObj %>% Idents() %>% table()
+  nichenet_output = nichenet_seuratobj_aggregate(
+    seurat_obj = seuratObj, 
+    receiver = "CD8 T", 
+    condition_colname = "aggregate", condition_oi = "LCMV", condition_reference = "SS", 
+    sender = c("CD4 T","Treg", "Mono", "NK", "B", "DC"), 
+    ligand_target_matrix = ligand_target_matrix, 
+    lr_network = lr_network, 
+    weighted_networks = weighted_networks, 
+    organism = "mouse")
+  
+  ## Interpret the NicheNet analysis output
+  nichenet_output$ligand_activities
+  
+  nichenet_output$top_ligands
+  nichenet_output$ligand_expression_dotplot
+  
+  nichenet_output$ligand_differential_expression_heatmap
+  
+  nichenet_output$ligand_target_heatmap
+  
+  nichenet_output$ligand_target_heatmap + 
+    scale_fill_gradient2(low = "whitesmoke",  high = "royalblue", breaks = c(0,0.0045,0.009)) + 
+    xlab("anti-LCMV response genes in CD8 T cells") + 
+    ylab("Prioritized immmune cell ligands")
+  
+  
+  nichenet_output$ligand_activity_target_heatmap
   
 }
 
