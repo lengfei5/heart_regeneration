@@ -1596,6 +1596,7 @@ run_LIANA = function() # original code from https://saezlab.github.io/liana/arti
   require(tidyverse)
   require(magrittr)
   require(liana)
+  require(scran)
   
   # Resource currently included in OmniPathR (and hence `liana`) include:
   show_resources()
@@ -1608,7 +1609,8 @@ run_LIANA = function() # original code from https://saezlab.github.io/liana/arti
   
   testdata %>% glimpse()
   
-  sels =c(which(refs$celltype == 'CM')[1:1000], which(refs$celltype == 'FB')[1:1000], 
+  sels =c(#which(refs$celltype == 'CM')[1:1000], 
+          which(refs$celltype == 'FB')[1:1000], 
           which(refs$celltype == 'prolife.Mphage'))
   subref = subset(refs, cells = colnames(refs)[sels])
   
@@ -1617,7 +1619,10 @@ run_LIANA = function() # original code from https://saezlab.github.io/liana/arti
   # Run liana
   #liana_test <- liana_wrap(testdata)
   sce <- as.SingleCellExperiment(subref)
-  liana_test <- liana_wrap(sce, assay.type = "logcounts")
+  colLabels(sce) = sce$celltype
+  
+  liana_test <- liana_wrap(sce, method = 'cellphonedb', resource = 'CellPhoneDB')
+  liana_prep(subref)
   
   #> Warning in .filter_sce(sce): 3465 genes and/or 0 cells were removed as they had
   #> no counts!
@@ -1678,21 +1683,30 @@ run_nicheNet = function() # original code from https://github.com/saeyslab/niche
   library(Seurat) # please update to Seurat V4
   library(tidyverse)
   
+  
   ## import NicheNet’s ligand-target prior model, ligand-receptor network and weighted integrated networks
-  ligand_target_matrix = readRDS(url("https://zenodo.org/record/3260758/files/ligand_target_matrix.rds"))
+  dataPath_nichenet = '../data/NicheNet/'
+  ligand_target_matrix = readRDS(paste0(dataPath_nichenet,  "ligand_target_matrix.rds"))
   ligand_target_matrix[1:5,1:5] # target genes in rows, ligands in columns
     
-  lr_network = readRDS(url("https://zenodo.org/record/3260758/files/lr_network.rds"))
+  lr_network = readRDS(paste0(dataPath_nichenet, "lr_network.rds"))
   head(lr_network)
     
-  weighted_networks = readRDS(url("https://zenodo.org/record/3260758/files/weighted_networks.rds"))
+  weighted_networks = readRDS(paste0(dataPath_nichenet,  "weighted_networks.rds"))
   head(weighted_networks$lr_sig) # interactions and their weights in the ligand-receptor + signaling network
   
   head(weighted_networks$gr) # interactions and their weights in the gene regulatory network
   
   ## Read in the expression data of interacting cells
-  seuratObj = readRDS(url("https://zenodo.org/record/3531889/files/seuratObj.rds"))
+  seuratObj = readRDS(paste0(dataPath_nichenet,  "seuratObj.rds"))
   seuratObj@meta.data %>% head()
+  
+  sels =c(#which(refs$celltype == 'CM')[1:1000], 
+    which(refs$celltype == 'FB')[1:1000], 
+    which(refs$celltype == 'prolife.Mphage'))
+  subref = subset(refs, cells = colnames(refs)[sels])
+  Idents(subref) = subref$celltype
+  subref@meta.data$celltype %>% table()
   
   # note that the number of cells of some cell types is very low and should preferably be higher for a real application
   seuratObj@meta.data$celltype %>% table() 
@@ -1731,7 +1745,6 @@ run_nicheNet = function() # original code from https://github.com/saeyslab/niche
     scale_fill_gradient2(low = "whitesmoke",  high = "royalblue", breaks = c(0,0.0045,0.009)) + 
     xlab("anti-LCMV response genes in CD8 T cells") + 
     ylab("Prioritized immmune cell ligands")
-  
   
   nichenet_output$ligand_activity_target_heatmap
   
