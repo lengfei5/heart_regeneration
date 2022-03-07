@@ -1724,8 +1724,11 @@ run_nicheNet = function() # original code from https://github.com/saeyslab/niche
   nichenet_output = nichenet_seuratobj_aggregate(
     seurat_obj = seuratObj, 
     receiver = "CD8 T", 
-    condition_colname = "aggregate", condition_oi = "LCMV", condition_reference = "SS", 
-    sender = c("CD4 T","Treg", "Mono", "NK", "B", "DC"), 
+    condition_colname = "aggregate", 
+    condition_oi = "LCMV", 
+    condition_reference = "SS", 
+    sender = c("CD4 T","Treg", "Mono", "NK", "B", "DC"),
+    
     ligand_target_matrix = ligand_target_matrix, 
     lr_network = lr_network, 
     weighted_networks = weighted_networks, 
