@@ -49,8 +49,9 @@ make_SeuratObj_visium = function(topdir = './', saveDir = './results', changeGen
     cat('change gene names \n')
     # change the gene names before making Seurat object
     annot = readRDS(paste0('/groups/tanaka/People/current/jiwang/Genomes/axolotl/annotations/', 
-                           'geneAnnotation_geneSymbols_cleaning_synteny_sameSymbols.hs.nr_curated.geneSymbol.toUse.rds'))
+          'geneAnnotation_geneSymbols_cleaning_synteny_sameSymbols.hs.nr_curated.geneSymbol.toUse_manual_v1.rds'))
     
+        
     mm = match(g$V1, annot$geneID)
     ggs = paste0(annot$gene.symbol.toUse[mm], '|',  annot$geneID[mm])
     g$V1[!is.na(mm)] = ggs[!is.na(mm)]
@@ -1597,6 +1598,12 @@ run_LIANA = function() # original code from https://saezlab.github.io/liana/arti
   require(magrittr)
   require(liana)
   require(scran)
+  require(scater)
+  require(DelayedMatrixStats)
+  require(genefilter)
+  require(matrixStats)
+  require(MatrixGenerics)
+  require(sparseMatrixStats)
   
   # Resource currently included in OmniPathR (and hence `liana`) include:
   show_resources()
@@ -1609,20 +1616,38 @@ run_LIANA = function() # original code from https://saezlab.github.io/liana/arti
   
   testdata %>% glimpse()
   
-  sels =c(#which(refs$celltype == 'CM')[1:1000], 
+  sels =c(which(refs$celltype == 'CM')[1:1000], 
           which(refs$celltype == 'FB')[1:1000], 
           which(refs$celltype == 'prolife.Mphage'))
+  
   subref = subset(refs, cells = colnames(refs)[sels])
+  
+  #rownames(subref) = toupper(rownames(subref))
   
   Idents(subref) = subref$celltype
   
   # Run liana
-  #liana_test <- liana_wrap(testdata)
-  sce <- as.SingleCellExperiment(subref)
-  colLabels(sce) = sce$celltype
+  # liana_test <- liana_wrap(testdata, method = 'cellphonedb', resource = 'CellPhoneDB')
   
-  liana_test <- liana_wrap(sce, method = 'cellphonedb', resource = 'CellPhoneDB')
-  liana_prep(subref)
+  sce <- as.SingleCellExperiment(subref)
+  colLabels(sce) = as.factor(sce$celltype)
+  rownames(sce) = toupper(rownames(sce))
+  
+  raw = counts(sce)
+  
+  expr = logcounts(sce)
+  #logcounts(sce) = exp(expr)
+  ss1 = apply(raw, 1, sum)
+  ss2 = apply(expr, 1, sum)
+  cc1 = apply(raw, 2, sum)
+  cc2 = apply(expr, 2, sum)
+  
+  sce = sce[which(ss1>10 & ss2> 10), which(cc1>10 & cc2 > 0)]
+  
+  ## !! not working 
+  liana_test <- liana_wrap(sce,  
+                           resource = c("Consensus", 'CellPhoneDB',  "CellChatDB",  "CellTalkDB"), 
+                           assay.type = "logcounts")
   
   #> Warning in .filter_sce(sce): 3465 genes and/or 0 cells were removed as they had
   #> no counts!
@@ -1631,58 +1656,77 @@ run_LIANA = function() # original code from https://saezlab.github.io/liana/arti
   liana_test %>% glimpse
   
   # We can aggregate these results into a tibble with consensus ranks
+  liana_test %>% glimpse
+  
+  # We can aggregate these results into a tibble with consensus ranks
   liana_test <- liana_test %>%
-    liana_aggregate()
+    liana_aggregate(resource = 'Consensus')
   
   liana_test %>% 
-    filter(source =="B") %>%
-    top_n(25, desc(aggregate_rank)) %>%
-    liana_dotplot(source_groups = c("B"),
-                  target_groups = c("NK", "CD8 T", "B"))
+    filter(source =="FB") %>%
+    top_n(25,  desc(aggregate_rank)) %>%
+    liana_dotplot(source_groups = c("FB"),
+                  target_groups = c("CM", "prolife.Mphage"))
+  ggsave(filename = paste0(resDir, '/liana_LR_prediction_FB_to_CM_prolife.Mphage.pdf'), width = 12, height = 8)
+  
+  
+  liana_test %>% 
+    filter(source =="CM") %>%
+    top_n(25,  desc(aggregate_rank)) %>%
+    liana_dotplot(source_groups = c("CM"),
+                  target_groups = c("FB", "prolife.Mphage"))
+  ggsave(filename = paste0(resDir, '/liana_LR_prediction_CM_to_FB_prolife.Mphage.pdf'), width = 12, height = 8)
+  
+  liana_test %>% 
+    filter(source =="prolife.Mphage") %>%
+    top_n(25,  desc(aggregate_rank)) %>%
+    liana_dotplot(source_groups = c("prolife.Mphage"),
+                  target_groups = c("FB", "CM"))
+  ggsave(filename = paste0(resDir, '/liana_LR_prediction_prolife.Mphage_to_FB_CM.pdf'), width = 12, height = 8)
+  
   
   # run any method of choice
   # Load Sce testdata
-  sce <- readRDS(file.path(liana_path , "testdata", "input", "testsce.rds"))
-  
-  # RUN CPDB alone
-  cpdb_test <- liana_wrap(sce,
-                          method = 'cellphonedb',
-                          resource = c('CellPhoneDB'),
-                          permutation.params = list(nperms=100,
-                                                    parallelize=FALSE,
-                                                    workers=4))
-  
-  # Plot toy results
-  cpdb_test %>%
-    # filter(pvalue <= 0.05) %>% # only keep interactions with p-val <= 0.05
-    # invert size (low p-value/high specificity = larger dot size)
-    # + add a small value to avoid Infinity for 0s
-    mutate(pvalue = -log10(pvalue + 1e-10)) %>% 
-    liana_dotplot(source_groups = c("c"),
-                  target_groups = c("c", "a", "b"),
-                  specificity = "pvalue",
-                  magnitude = "lr.mean",
-                  show_complex = TRUE)
-  
-  # Run liana re-implementations with the CellPhoneDB resource
-  complex_test <- liana_wrap(testdata,
-                             method = c('natmi', 'sca', 'logfc'),
-                             resource = c('CellPhoneDB'))
-  #> Warning in .filter_sce(sce): 3465 genes and/or 0 cells were removed as they had
-  #> no counts!
-  
-  complex_test %>% liana_aggregate()
-  
-  
+  # sce <- readRDS(file.path(liana_path , "testdata", "input", "testsce.rds"))
+  # 
+  # # RUN CPDB alone
+  # cpdb_test <- liana_wrap(sce,
+  #                         method = 'cellphonedb',
+  #                         resource = c('CellPhoneDB'),
+  #                         permutation.params = list(nperms=100,
+  #                                                   parallelize=FALSE,
+  #                                                   workers=4))
+  # 
+  # # Plot toy results
+  # cpdb_test %>%
+  #   # filter(pvalue <= 0.05) %>% # only keep interactions with p-val <= 0.05
+  #   # invert size (low p-value/high specificity = larger dot size)
+  #   # + add a small value to avoid Infinity for 0s
+  #   mutate(pvalue = -log10(pvalue + 1e-10)) %>% 
+  #   liana_dotplot(source_groups = c("c"),
+  #                 target_groups = c("c", "a", "b"),
+  #                 specificity = "pvalue",
+  #                 magnitude = "lr.mean",
+  #                 show_complex = TRUE)
+  # 
+  # # Run liana re-implementations with the CellPhoneDB resource
+  # complex_test <- liana_wrap(testdata,
+  #                            method = c('natmi', 'sca', 'logfc'),
+  #                            resource = c('CellPhoneDB'))
+  # #> Warning in .filter_sce(sce): 3465 genes and/or 0 cells were removed as they had
+  # #> no counts!
+  # 
+  # complex_test %>% liana_aggregate()
+  # 
+  # 
   
 }
 
-run_nicheNet = function() # original code from https://github.com/saeyslab/nichenetr/blob/master/vignettes/seurat_steps.md
+run_NicheNet = function() # original code from https://github.com/saeyslab/nichenetr/blob/master/vignettes/seurat_steps.md
 {
   library(nichenetr)
   library(Seurat) # please update to Seurat V4
   library(tidyverse)
-  
   
   ## import NicheNet’s ligand-target prior model, ligand-receptor network and weighted integrated networks
   dataPath_nichenet = '../data/NicheNet/'
@@ -1789,7 +1833,8 @@ run_liana_nitchenet = function()
   ligand_target_matrix <- readRDS(url("https://zenodo.org/record/3260758/files/ligand_target_matrix.rds"))
   
   # gene set of interest
-  geneset_oi <- read_tsv(url("https://zenodo.org/record/3260758/files/pemt_signature.txt"), col_types = cols(), col_names = "gene") %>%
+  geneset_oi <- read_tsv(url("https://zenodo.org/record/3260758/files/pemt_signature.txt"), 
+                         col_types = cols(), col_names = "gene") %>%
     pull(gene) %>%
     .[. %in% rownames(ligand_target_matrix)]
   

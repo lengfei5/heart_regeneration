@@ -56,6 +56,7 @@ for(n in 1:nrow(design))
   #aa <- SCTransform(aa, assay = "Spatial",  method = "glmGamPoi", verbose = FALSE)
   aa <- SCTransform(aa, assay = "Spatial", verbose = FALSE, variable.features.n = 3000, return.only.var.genes = FALSE)
   
+  
   test.clustering.each.condtiion = FALSE
   if(test.clustering.each.condtiion){
     aa <- RunPCA(aa, verbose = FALSE, weight.by.var = TRUE)
@@ -90,6 +91,7 @@ for(n in 1:nrow(design))
 ##########################################
 
 load(file = paste0(RdataDir, 'seuratObject_design_variableGenes_', species, '.Rdata'))
+# saveRDS(st, file = paste0(RdataDir, 'seuratObject_visium_UMIcounts_Image_', species, '_2share.rds'))
 
 ##########################################
 # gene and cell filtering (to add later)
@@ -111,7 +113,6 @@ if(Filtering.cells.genes){
 
 
 #st = SCTransform(st, assay = "Spatial", verbose = FALSE)
-
 DefaultAssay(st) <- "SCT"
 VariableFeatures(st) <- varibleGenes
 
@@ -120,7 +121,6 @@ ElbowPlot(st)
 
 st <- FindNeighbors(st, dims = 1:20)
 st <- FindClusters(st, verbose = FALSE, resolution = 0.5)
-
 st <- RunUMAP(st, dims = 1:20, n.neighbors = 30, min.dist = 0.05)
 
 DimPlot(st, reduction = "umap", group.by = c("ident", "condition")) 
@@ -130,7 +130,6 @@ ggsave(filename = paste0(resDir, '/UMAP_all.timepoints_', species, '.pdf'), widt
 FeaturePlot(st, features = c("Myh6", 'Nppa'))
 
 SpatialFeaturePlot(st, features = 'Myh6', image.alpha = 0.5)
-
 SpatialFeaturePlot(st, features = 'Agrn', image.alpha = 0.6)
 
 save(design, varibleGenes, st, 
@@ -158,7 +157,9 @@ if(QCs.with.marker.genes){
   
   markers = markers[!is.na(match(markers, rownames(st)))]
   
-  pdfname = paste0(resDir, "/check_detected_celltypes_using_AdditionalMarkerGenes_", species, '_', colnames(aa)[1],   ".pdf")
+  markers = c('F13a1', 'Apoe', 'Igfbp4', 'C1qa', 'Vldlr', 'Lrp5', 'Lrp6', 'Itga9', 'Cspg4', 'Cr1l')
+  
+  pdfname = paste0(resDir, "/Visium_AdditionalMarkerGenes_", species, ".pdf")
   pdf(pdfname, width = 16, height = 8)
   par(cex = 1.0, las = 1, mgp = c(2,0.2,0), mar = c(3,2,2,0.2), tcl = -0.3)
   
@@ -171,6 +172,7 @@ if(QCs.with.marker.genes){
   }
   
   dev.off()
+  
   
 }
 
@@ -222,6 +224,8 @@ run_cell_proximity_analysis(aa)
 ##########################################
 source('functions_Visium.R')
 run_LIANA()
+
+run_NicheNet()
 
 ########################################################
 ########################################################

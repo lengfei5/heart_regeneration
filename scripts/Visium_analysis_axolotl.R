@@ -10,8 +10,8 @@
 rm(list = ls())
 
 species = 'axolotl'
-version.analysis = '_R12830_2020118'
-dataDir = '../R12830_visium/nf_out'
+version.analysis = '_R12830_resequenced_20220308'
+dataDir = '../R12830_visium_reseqenced/nf_out'
 resDir = paste0("../results/visium_axolotl", version.analysis)
 RdataDir = paste0('../results/Rdata/')
 
@@ -33,11 +33,11 @@ mem_used()
 design = data.frame(sampleID = seq(183623, 183626), 
                     condition = c(paste0('Amex_d', c(1, 4, 7, 14))), stringsAsFactors = FALSE)
 varibleGenes = c()
-check.QC.each.condtiion = TRUE
+check.QC.each.condition = TRUE
 
 for(n in 1:nrow(design))
 {
-  # n = 1
+  # n = 3
   cat('-----------', design$condition[n], '-------------\n')
   # load nf output and process
   source('functions_Visium.R')
@@ -53,9 +53,9 @@ for(n in 1:nrow(design))
   aa = subset(aa, subset = nCount_Spatial > 10) # 10 umi from the umi rank
   aa <- SCTransform(aa, assay = "Spatial", verbose = FALSE, variable.features.n = 3000, return.only.var.genes = FALSE)
   
-  if(check.QC.each.condtiion){
+  if(check.QC.each.condition){
     
-    pdfname = paste0(resDir, '/QCs_gene_marker_check_', design$condition[n], '.pdf')
+    pdfname = paste0(resDir, '/QCs_gene_marker_check_', design$condition[n], version.analysis,  '.pdf')
     pdf(pdfname, width=16, height = 8)
     
     # Cell QC metrics: percentage of Mt, nb of counts, nb of genes 
@@ -100,9 +100,16 @@ for(n in 1:nrow(design))
     
     DimPlot(aa, reduction = "umap", group.by = c("ident"))
     
+    features = rownames(aa)[grep('MYH6|NPPA|CLU-AMEX60DD032706', rownames(aa))]
+    #FeaturePlot(aa, features = features)
+    
+    SpatialFeaturePlot(aa, features = features[2])
+    
+    
     dev.off()
     
-    saveRDS(aa, file = paste0(RdataDir, 'seuratObject_design_st_', design$condition[n], '.rds'))
+    
+    saveRDS(aa, file = paste0(RdataDir, 'seuratObject_design_st_', design$condition[n], version.analysis, '.rds'))
     
   }
   
@@ -120,13 +127,17 @@ for(n in 1:nrow(design))
   
 }
 
-save(design, varibleGenes, st, file = paste0(RdataDir, 'seuratObject_design_variableGenes_', species, '.Rdata'))
 
-##########################################
-# cell and gene filtering
-##########################################
-load(file = paste0(RdataDir, 'seuratObject_design_variableGenes_', species, '.Rdata'))
+save(design, varibleGenes, st, 
+     file = paste0(RdataDir, 'seuratObject_design_variableGenes_', species, version.analysis, '.Rdata'))
 
+########################################################
+########################################################
+# Section : QC and marker gene checking
+# 
+########################################################
+########################################################
+load(file = paste0(RdataDir, 'seuratObject_design_variableGenes_', species, version.analysis, '.Rdata'))
 
 ##########################################
 # gene and cell filtering (to add later)
@@ -135,14 +146,41 @@ Filtering.cells.genes = FALSE
 if(Filtering.cells.genes){
   #st[["percent.mt"]] <- PercentageFeatureSet(st, pattern = "^Mt-")
   # Visualize QC metrics as a violin plot
-  VlnPlot(st, features = c("nCount_Spatial", "nFeature_Spatial"), ncol = 2)
-  
   Idents(st) = st$condition
+  
+  VlnPlot(st, features = c("nCount_Spatial")) + 
+    geom_hline( yintercept = c(2500, 5000)) + 
+    scale_y_continuous(limits = c(0, 30000))
+  ggsave(paste0(resDir, '/QCs_reseq_nUMI.counts.pdf'), width = 12, height = 8)
+  
+  VlnPlot(st, features = c("nFeature_Spatial")) + 
+    geom_hline( yintercept = c(500, 1000)) + 
+    scale_y_continuous(limits = c(0, 3000))
+  ggsave(paste0(resDir, '/QCs_reseq_nFeatures_Spatial.pdf'), width = 12, height = 8)
+  
   FeatureScatter(st, feature1 = "nCount_Spatial", feature2 = "nFeature_Spatial")
+  
+  FeatureScatter(st, feature1 = "nCount_Spatial", feature2 = "nCount_SCT")
+  
+  VlnPlot(st, features = c("nCount_SCT"))  
+    #geom_hline( yintercept = c(2500, 5000)) + 
+    #scale_y_continuous(limits = c(0, 30000))
+  ggsave(paste0(resDir, '/QCs_reseq_nCounts_SCT.pdf'), width = 12, height = 8)
+  
+  VlnPlot(st, features = c("nFeature_SCT"))  
+  #geom_hline( yintercept = c(2500, 5000)) + 
+  #scale_y_continuous(limits = c(0, 30000))
+  ggsave(paste0(resDir, '/QCs_reseq_nCounts_SCT.pdf'), width = 12, height = 8)
   
   #plot1 <- VlnPlot(st, features = "nCount_Spatial", pt.size = 0.1) + NoLegend()
   #plot2 <- SpatialFeaturePlot(aa, features = "nCount_Spatial") + theme(legend.position = "right")
   #wrap_plots(plot1, plot2)
+  
+  features = rownames(st)[grep('MYH6|NPPA|CLU-AMEX60DD032706', rownames(st))]
+  #FeaturePlot(aa, features = features)
+  
+  SpatialFeaturePlot(st, features = features[2])
+  #SpatialFeaturePlot(st, features = features[3])
   
 }
 
@@ -169,9 +207,13 @@ FeaturePlot(st, features = features)
 
 SpatialFeaturePlot(st, features = features[2])
 
-save(design, varibleGenes, st, file = paste0(RdataDir, 'seuratObject_design_variableGenes_umap.clustered', species, '.Rdata'))
+save(design, varibleGenes, st, 
+     file = paste0(RdataDir, 'seuratObject_design_variableGenes_umap.clustered', species, version.analysis,'.Rdata'))
 
-load(file = paste0(RdataDir, 'seuratObject_design_variableGenes_umap.clustered', species, '.Rdata'))
+##########################################
+# QCs with marker genes
+##########################################
+load(file = paste0(RdataDir, 'seuratObject_design_variableGenes_umap.clustered', species, version.analysis,'.Rdata'))
 
 QCs.with.marker.genes = FALSE
 if(QCs.with.marker.genes){
@@ -187,7 +229,7 @@ if(QCs.with.marker.genes){
   {
     markers = c(markers, aa[!is.na(aa[,n]), n])
   }
-  markers = unique(c(markers, c('hmgb2', 'top2a')))
+  markers = unique(c(markers, c('hmgb2', 'top2a', 'AGRN')))
   
   markers = markers[which(markers != '')]
   markers = firstup(tolower(unique(markers)))
@@ -202,8 +244,8 @@ if(QCs.with.marker.genes){
   xx = unique(xx)
   markers = xx
   
-  xx = rownames(st)[grep('AGRN', rownames(st))]
-  SpatialFeaturePlot(st, features = xx, image.alpha = 0.5)
+  #xx = rownames(st)[grep('AGRN', rownames(st))]
+  #SpatialFeaturePlot(st, features = xx, image.alpha = 0.5)
   
   #markers[is.na(match(markers, rownames(st)))]
   #markers = markers[!is.na(match(markers, rownames(st)))]
@@ -229,10 +271,15 @@ if(QCs.with.marker.genes){
   
 }
 
+#features = rownames(st)[grep('COL2A1|COL3A1|AMEX60DD013528|CIRBP', rownames(st))]
+features = rownames(st)[grep('AMEX60DD028911|AMEX60DD002594|TGFBI|AMEX60DD029613', rownames(st))]
+
+SpatialFeaturePlot(st, features = features[1], image.alpha = 0.5)
 
 ########################################################
 ########################################################
-# Section : analyze the axolotl visium per condition
+# Section : start the analysis 
+# analyze the axolotl visium per condition
 # To identify the boarder zone
 ########################################################
 ########################################################

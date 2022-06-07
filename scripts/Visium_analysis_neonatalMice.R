@@ -200,6 +200,7 @@ for(n in 1:nrow(design))
 species = 'mouse_neonadal'
 
 load(file = paste0(RdataDir, 'seuratObject_design_variableGenes_', species, '.Rdata'))
+# saveRDS(st, file = paste0(RdataDir, 'seuratObject_visium_UMIcounts_Image_neonatal.mouse_2share.rds'))
 
 DefaultAssay(st) <- "SCT"
 VariableFeatures(st) <- varibleGenes
@@ -214,7 +215,6 @@ st <- RunUMAP(st, dims = 1:10, n.neighbors = 20, min.dist = 0.1)
 DimPlot(st, reduction = "umap", group.by = c("ident", "condition"))
 
 SpatialFeaturePlot(st, features = 'Cd24a', image.alpha = 0.5)
-
 SpatialFeaturePlot(st, features = 'Agrn', image.alpha = 0.5)
 
 # import marker genes
@@ -237,12 +237,12 @@ markers = gsub(' ', '', markers)
 markers[is.na(match(markers, rownames(st)))]
 
 markers = markers[!is.na(match(markers, rownames(st)))]
-
 #markers = unique(c(markers, rownames(st)[grep('Ly6g', rownames(st))]))
-
 #markers = c('Timp1', 'Timp2', 'Timp3', 'Timp4')
 
-pdfname = paste0(resDir, "/check_detected_celltypes_using_AdditionalMarkerGenes_", species, '_', colnames(aa)[1],   ".pdf")
+markers = c('F13a1', 'Apoe', 'Igfbp4', 'C1qa', 'Vldlr', 'Lrp5', 'Lrp6', 'Itga9', 'Cspg4', 'Cr1l')
+
+pdfname = paste0(resDir, "/Visium_AdditionalMarkerGenes_EladConference_", species, ".pdf")
 pdf(pdfname, width = 16, height = 8)
 par(cex = 1.0, las = 1, mgp = c(2,0.2,0), mar = c(3,2,2,0.2), tcl = -0.3)
 
