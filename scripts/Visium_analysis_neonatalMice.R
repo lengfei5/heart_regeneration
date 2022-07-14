@@ -242,23 +242,23 @@ markers = markers[!is.na(match(markers, rownames(st)))]
 
 markers = c('F13a1', 'Apoe', 'Igfbp4', 'C1qa', 'Vldlr', 'Lrp5', 'Lrp6', 'Itga9', 'Cspg4', 'Cr1l')
 
-pdfname = paste0(resDir, "/Visium_AdditionalMarkerGenes_EladConference_", species, ".pdf")
+markers = c("Ntn1", "Mfap5", "Ubb", "Spon2", "Sparc", "Comp", "Ncanb", "Cthrc1", "Gpr42", "Ffr2")
+mm = match(markers, rownames(st))
+markers[is.na(mm)]
+
+pdfname = paste0(resDir, "/Visium_AdditionalMarkerGenes_Bern_", species, ".pdf")
 pdf(pdfname, width = 16, height = 8)
 par(cex = 1.0, las = 1, mgp = c(2,0.2,0), mar = c(3,2,2,0.2), tcl = -0.3)
 
-# p1 = DimPlot(st, reduction = "umap", group.by = c("ident", "condition"))
-# plot(p1)
-# p2 = SpatialDimPlot(st)
-# plot(p2)
-
 for(n in 1:length(markers))
 {
-  cat(markers[n], '\n')
-  p3 = SpatialFeaturePlot(st, features = markers[n], image.alpha = 0.5)
-  
-  plot(p3)
+  if(length(which(rownames(st) == markers[n]))==1){
+    cat(markers[n], '\n')
+    p3 = SpatialFeaturePlot(st, features = markers[n], image.alpha = 0.5)
+    plot(p3)
+  }else{
+    cat(markers[n], ' NOT FOUND\n')
+  }
 }
 
 dev.off()
-
-

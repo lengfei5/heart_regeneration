@@ -135,6 +135,9 @@ SpatialFeaturePlot(st, features = 'Agrn', image.alpha = 0.6)
 save(design, varibleGenes, st, 
      file = paste0(RdataDir, 'seuratObject_design_variableGenes_', species, '_umap.clustered.Rdata'))
 
+## reload the seurat object
+load(file = paste0(RdataDir, 'seuratObject_design_variableGenes_', species, '_umap.clustered.Rdata'))
+
 QCs.with.marker.genes = FALSE
 if(QCs.with.marker.genes){
   # import marker genes
@@ -159,20 +162,26 @@ if(QCs.with.marker.genes){
   
   markers = c('F13a1', 'Apoe', 'Igfbp4', 'C1qa', 'Vldlr', 'Lrp5', 'Lrp6', 'Itga9', 'Cspg4', 'Cr1l')
   
-  pdfname = paste0(resDir, "/Visium_AdditionalMarkerGenes_", species, ".pdf")
+  markers = c("Ntn1", "Mfap5", "Ubb", "Spon2", "Sparc", "Comp", "Ncanb", "Cthrc1", "Gpr42", "Ffr2")
+  mm = match(markers, rownames(st))
+  markers[is.na(mm)]
+  
+  pdfname = paste0(resDir, "/Visium_AdditionalMarkerGenes_Bern_", species, ".pdf")
   pdf(pdfname, width = 16, height = 8)
   par(cex = 1.0, las = 1, mgp = c(2,0.2,0), mar = c(3,2,2,0.2), tcl = -0.3)
   
   for(n in 1:length(markers))
   {
-    cat(markers[n], '\n')
-    p3 = SpatialFeaturePlot(st, features = markers[n], image.alpha = 0.5)
-    
-    plot(p3)
+    if(length(which(rownames(st) == markers[n]))==1){
+      cat(markers[n], '\n')
+      p3 = SpatialFeaturePlot(st, features = markers[n], image.alpha = 0.5)
+      plot(p3)
+    }else{
+      cat(markers[n], ' NOT FOUND\n')
+    }
   }
   
   dev.off()
-  
   
 }
 
