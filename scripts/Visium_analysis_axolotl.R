@@ -231,6 +231,7 @@ if(QCs.with.marker.genes){
   }
   markers = unique(c(markers, c('hmgb2', 'top2a', 'AGRN')))
   
+  markers = c("Ntn1", "Mfap5", "Ubb", "Spon2", "Sparc", "Comp", "Ncanb", "Cthrc1", "Gpr42", "Ffr2")
   markers = markers[which(markers != '')]
   markers = firstup(tolower(unique(markers)))
   markers = gsub(' ', '', markers)
@@ -238,7 +239,7 @@ if(QCs.with.marker.genes){
   xx = c()
   for(n in 1:length(markers))
   {
-    xx = c(xx, rownames(st)[grep(toupper(markers[n]), rownames(st))])
+    xx = c(xx, rownames(st)[grep(paste0('^', toupper(markers[n])), rownames(st))])
   }
   
   xx = unique(xx)
@@ -254,7 +255,7 @@ if(QCs.with.marker.genes){
   p1 = SpatialDimPlot(st, image.alpha = 0.5)
   plot(wrap_plots(p0, p1, nrow = 2))
   
-  pdfname = paste0(resDir, "/check_detected_celltypes_using_AdditionalMarkerGenes_", species, ".pdf")
+  pdfname = paste0(resDir, "/check_detected_celltypes_using_AdditionalMarkerGenes_Bern_", species, ".pdf")
   pdf(pdfname, width = 16, height = 8)
   par(cex = 1.0, las = 1, mgp = c(2,0.2,0), mar = c(3,2,2,0.2), tcl = -0.3)
   
