@@ -19,12 +19,13 @@ if(!dir.exists(RdataDir)) dir.create(RdataDir)
 
 dataDir = '../R13591_axolotl_multiome'
 
+source('functions_scRNAseq.R')
 source('functions_Visium.R')
 library(pryr) # monitor the memory usage
 require(ggplot2)
 mem_used()
 
-species = 'axloltl'
+species = 'axloltl_scRNAseq'
 
 ########################################################
 ########################################################
@@ -45,92 +46,153 @@ for(n in 1:nrow(design))
   # load nf output and process
   source('functions_Visium.R')
   
-  aa = make_SeuratObj_visium(topdir = paste0(dataDir, '/', design$condition[n], '/'), 
+  aa = make_SeuratObj_scRNAseq(topdir = paste0(dataDir, '/', design$condition[n], '/'), 
                              saveDir = paste0(resDir, '/', design$condition[n], '_', design$sampleID[n], '/'), 
                              keyname = design$condition[n], 
+                             changeGeneName.axolotl = TRUE, 
                              QC.umi = TRUE)
-  
   aa$condition = design$condition[n]
   
-  #aa <- SCTransform(aa, assay = "Spatial",  method = "glmGamPoi", verbose = FALSE)
-  
-  aa = subset(aa, subset = nCount_Spatial > 10) # 10 umi from the umi rank
-  aa <- SCTransform(aa, assay = "Spatial", verbose = FALSE, variable.features.n = 3000, return.only.var.genes = FALSE)
-  
-  if(check.QC.each.condition){
-    
-    pdfname = paste0(resDir, '/QCs_gene_marker_check_', design$condition[n], version.analysis,  '.pdf')
-    pdf(pdfname, width=16, height = 8)
-    
-    # Cell QC metrics: percentage of Mt, nb of counts, nb of genes 
-    # get MT% (genes curated from NCBI chrMT genes)
-    mtgenes = c("COX1", "COX2", "COX3", "ATP6", "ND1", "ND5", "CYTB", "ND2", "ND4", "ATP8", "MT-CO1", "COI", "LOC9829747")
-    mtgenes = c(mtgenes, paste0("MT", mtgenes), paste0("MT-", mtgenes))
-    
-    ggs = sapply(rownames(aa), function(x) unlist(strsplit(as.character(x), '-'))[1])
-    mtgenes = rownames(aa)[!is.na(match(ggs, mtgenes))]
-    # mtgenes = mtgenes[mtgenes %in% g[,1]]
-    # srat = PercentageFeatureSet(srat, col.name = "percent.mt", assay = "Spatial",
-    #                             features = mtgenes)
-    xx = PercentageFeatureSet(aa, col.name = "percent.mt", assay = "SCT", features = mtgenes)
-    aa[['percent.mt']] = xx$percent.mt
-    
-    Idents(aa) = design$condition[n]
-    
-    p1 = VlnPlot(aa, features = c("nCount_Spatial", "nFeature_Spatial", "percent.mt"), ncol = 3, pt.size = 1.0)
-    plot(p1)
-    
-    p1 = FeatureScatter(aa, feature1 = "nCount_Spatial", feature2 = "nFeature_Spatial")
-    p2 = FeatureScatter(aa, feature1 = "nCount_Spatial", feature2 = "percent.mt")
-    p3 = FeatureScatter(aa, feature1 = "nFeature_Spatial", feature2 = "percent.mt")
-    plot(wrap_plots(p1, p2, p3))
-    
-    plot1 <- SpatialFeaturePlot(aa, features = "nCount_Spatial") + theme(legend.position = "bottom")
-    plot2 <- SpatialFeaturePlot(aa, features = "nFeature_Spatial") + theme(legend.position = "bottom")
-    plot3 <- SpatialFeaturePlot(aa, features = "percent.mt") + theme(legend.position = "bottom")
-    plot(wrap_plots(plot1, plot2, plot3))
-    
-    #if(design$species[n] == 'neonatal'){ pct.mt.cutoff = 0.6; }
-    #if(design$species[n] == 'adult') { pct.mt.cutoff = 1 }
-    #aa = aa[, which(aa$percent.mt < pct.mt.cutoff)]
-    #cat(ncol(aa), ' spots left after spot filtering \n')
-    
-    aa <- RunPCA(aa, verbose = FALSE, weight.by.var = TRUE)
-    ElbowPlot(aa)
-    
-    aa <- FindNeighbors(aa, dims = 1:10)
-    aa <- FindClusters(aa, verbose = FALSE, algorithm = 3, resolution = 0.7)
-    aa <- RunUMAP(aa, dims = 1:10, n.neighbors = 30, min.dist = 0.05)
-    
-    DimPlot(aa, reduction = "umap", group.by = c("ident"))
-    
-    features = rownames(aa)[grep('MYH6|NPPA|CLU-AMEX60DD032706', rownames(aa))]
-    #FeaturePlot(aa, features = features)
-    
-    SpatialFeaturePlot(aa, features = features[2])
-    
-    
-    dev.off()
-    
-    
-    saveRDS(aa, file = paste0(RdataDir, 'seuratObject_design_st_', design$condition[n], version.analysis, '.rds'))
-    
-  }
-  
-  varibleGenes = unique(c(varibleGenes, VariableFeatures(aa)))
-  cat(design$condition[n], ' : ',  ncol(aa), ' spot found \n')
-  
-  # merge slices from different time points and 
   if(n == 1) {
-    st = aa
+    scn = aa
   }else{
-    st = merge(st, aa)
+    scn = merge(scn, aa)
   }
-  
-  remove(aa)
   
 }
 
+rm(aa)
+
+save(design, scn, 
+     file = paste0(RdataDir, 'seuratObject_design_variableGenes_', species, version.analysis, '.Rdata'))
+
+
+##########################################
+# General QCs and gene filtering
+# 
+##########################################
+load(file = paste0(RdataDir, 'seuratObject_design_variableGenes_', species, version.analysis, '.Rdata'))
+
+## filter genes here 
+aa = CreateSeuratObject(counts = scn@assays$RNA@counts,
+                   meta.data = scn@meta.data, 
+                   assay = 'RNA',
+                   min.cells = 20, 
+                   min.features = 50)
+
+rm(scn)
+
+# Cell QC metrics: percentage of Mt, nb of counts, nb of genes 
+# get MT% (genes curated from NCBI chrMT genes)
+mtgenes = c("COX1", "COX2", "COX3", "ATP6", "ND1", "ND5", "CYTB", "ND2", "ND4", "ATP8", "MT-CO1", "COI", "LOC9829747")
+mtgenes = c(mtgenes, paste0("MT", mtgenes), paste0("MT-", mtgenes))
+
+ggs = sapply(rownames(aa), function(x) unlist(strsplit(as.character(x), '-'))[1])
+mtgenes = rownames(aa)[!is.na(match(ggs, mtgenes))]
+# mtgenes = mtgenes[mtgenes %in% g[,1]]
+# srat = PercentageFeatureSet(srat, col.name = "percent.mt", assay = "Spatial",
+#                             features = mtgenes)
+xx = PercentageFeatureSet(aa, col.name = "percent.mt", assay = "RNA", features = mtgenes)
+aa[['percent.mt']] = xx$percent.mt
+
+Idents(aa) = aa$condition
+
+pdfname = paste0(resDir, '/QCs_gene_marker_check_', design$condition[n], version.analysis,  '.pdf')
+pdf(pdfname, width=16, height = 8)
+
+
+VlnPlot(aa, features = 'nFeature_RNA', y.max = 500)
+VlnPlot(aa, features = 'nCount_RNA', y.max = 10000)
+VlnPlot(aa, features = 'percent.mt', y.max = 100)
+
+FeatureScatter(aa, feature1 = "nCount_RNA", feature2 = "nFeature_RNA")
+FeatureScatter(aa, feature1 = "nCount_RNA", feature2 = "percent.mt")
+
+##########################################
+## filter cells again
+##########################################
+aa <- subset(aa, subset = nFeature_RNA > 100 & nFeature_RNA < 3000 & percent.mt < 60)
+
+Normalize_with_sctransform = FALSE
+##########################################
+### normalization and quick clustering
+##########################################
+if(Normalize_with_sctransform){
+  aa <- SCTransform(aa, assay = "RNA", verbose = FALSE, 
+                    variable.features.n = 3000, return.only.var.genes = FALSE)
+  aa <- RunPCA(aa, verbose = FALSE, weight.by.var = TRUE)
+  
+}else{
+  # aa <- NormalizeData(aa, normalization.method = "LogNormalize", scale.factor = 10000)
+  
+  aa = Normalize_with_scran(aa)
+  
+  aa <- FindVariableFeatures(aa, selection.method = "vst", nfeatures = 3000)
+  all.genes <- rownames(aa)
+  aa <- ScaleData(aa, features = all.genes)
+  aa <- RunPCA(aa, features = VariableFeatures(object = aa), verbose = FALSE)
+   
+}
+
+
+
+ElbowPlot(aa, ndims = 30)
+
+aa <- FindNeighbors(aa, dims = 1:10)
+aa <- FindClusters(aa, verbose = FALSE, algorithm = 3, resolution = 0.7)
+
+aa <- RunUMAP(aa, dims = 1:10, n.neighbors = 30, min.dist = 0.05)
+DimPlot(aa, label = TRUE, repel = TRUE) + ggtitle("Unsupervised clustering")
+
+#DimPlot(aa, reduction = "umap", label = TRUE, repel = TRUE, group.by = "condition") +
+#  NoLegend()
+
+features = rownames(aa)[grep('VIM|COL1A2|FSTL1|POSTN', rownames(aa))]
+FeaturePlot(aa, features = features, cols = c('gray', 'red'))
+
+features = rownames(aa)[grep('MYH6|ACTN2|NPPA|TNNT2|GATA4', rownames(aa))]
+FeaturePlot(aa, features = features, cols = c('gray', 'red'))
+
+features = rownames(aa)[grep('CD68|CD8A|CD74|CSF1R|ITGAM', rownames(aa))]
+FeaturePlot(aa, features = features, cols = c('gray', 'red'))
+
+features = rownames(aa)[grep('MKI67|CCNB2|PCNA-|CDK1-', rownames(aa))]
+FeaturePlot(aa, features = features, cols = c('gray', 'red'))
+
+dev.off()
+
+FeaturePlot(aa, )
+
+DimPlot(aa, reduction = "umap", label = TRUE, repel = TRUE, group.by = "nCount_RNA") +
+  NoLegend()
+
+########################################################
+########################################################
+# Section : normalization and quick clustering
+# 
+########################################################
+########################################################
+DefaultAssay(st) <- "SCT"
+VariableFeatures(st) <- varibleGenes
+
+st <- RunPCA(st, verbose = FALSE)
+ElbowPlot(st)
+
+st <- FindNeighbors(st, dims = 1:10)
+st <- FindClusters(st, verbose = FALSE, resolution = 1.0)
+
+st <- RunUMAP(st, dims = 1:20, n.neighbors = 20, min.dist = 0.05)
+SpatialDimPlot(st, image.alpha = 0.5)
+
+DimPlot(st, reduction = "umap", group.by = c("ident", "condition")) 
+
+ggsave(filename = paste0(resDir, '/UMAP_all.timepoints_', species, '.pdf'), width = 16, height = 8)
+
+features = rownames(st)[grep('MYH6|NPPA|CLU-AMEX60DD032706', rownames(st))]
+FeaturePlot(st, features = features)
+
+SpatialFeaturePlot(st, features = features[2])
 
 save(design, varibleGenes, st, 
-     file = paste0(RdataDir, 'seuratObject_design_variableGenes_', species, version.analysis, '.Rdata'))
+     file = paste0(RdataDir, 'seuratObject_design_variableGenes_umap.clustered', species, version.analysis,'.Rdata'))
+

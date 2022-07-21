@@ -38,8 +38,11 @@ get_geneID = function(xx)
 # orignal code from Tomas' code
 ########################################################
 ########################################################
-make_SeuratObj_scRNAseq(topdir = './', saveDir = './results', changeGeneName = TRUE, keyname = 'Amex_scRNA_d0',
-                        QC.umi = TRUE)
+make_SeuratObj_scRNAseq = function(topdir = './', 
+                                   saveDir = './results', 
+                                   changeGeneName.axolotl = TRUE, 
+                                   keyname = 'Amex_scRNA_d0',  
+                                   QC.umi = TRUE)
 {
   library(Seurat)
   library(DropletUtils)
@@ -53,7 +56,7 @@ make_SeuratObj_scRNAseq(topdir = './', saveDir = './results', changeGeneName = T
   bc = read.csv(paste0(topdir, "/genecounts.barcodes.txt"), header = F, stringsAsFactors = F)
   g = read.csv(paste0(topdir, "/genecounts.genes.txt"), header = F, stringsAsFactors = F)
   
-  if(changeGeneName){
+  if(changeGeneName.axolotl){
     cat('change gene names \n')
     # change the gene names before making Seurat object
     annot = readRDS(paste0('/groups/tanaka/People/current/jiwang/Genomes/axolotl/annotations/', 
@@ -66,28 +69,30 @@ make_SeuratObj_scRNAseq(topdir = './', saveDir = './results', changeGeneName = T
     
   }
   
-  dimnames(exp) = list(paste0(bc$V1,"-1"),g$V1) # number added because of seurat format for barcodes
+  dimnames(exp) = list(paste0(bc$V1,"-1"), g$V1) # number added because of seurat format for barcodes
   count.data = Matrix::t(exp)
   
   #dimnames(exp) = list(paste0(bc\$V1,"-1"),g\$V1) # number added because of seurat format for barcodes
   #count.data = Matrix::t(exp)
   if(QC.umi){
     # plot rankings for number of UMI
-    cat('plot UMI rank \n')
+    cat('get empty drops with UMI rank \n')
     
     # get emptyDrops and default cutoff cell estimates
-    iscell_dd = defaultDrops(count.data, expected = 5000)
+    iscell_dd = defaultDrops(count.data, expected = 8000) # default cell estimate, similar to 10x cellranger
     eout = emptyDrops(count.data, lower = 100)
     eout$FDR[is.na(eout$FDR)] = 1
     
     iscell_ed = eout$FDR<=0.01
+    # sum(iscell_ed, na.rm=TRUE)
+    
     meta = data.frame(row.names = paste0(bc$V1,"-1"),
                       iscell_dd = iscell_dd, iscell_ed = iscell_ed)
     
     # plot rankings for number of UMI
     br.out <- barcodeRanks(count.data)
     
-    pdf(paste0(saveDir, "UMIrank.pdf"), height = 8, width = 8, useDingbats = FALSE)
+    pdf(paste0(saveDir, "UMIrank.pdf"), height = 6, width =10, useDingbats = FALSE)
     
     plot(br.out$rank, br.out$total, log="xy", xlab="Rank", ylab="Total")
     
@@ -95,6 +100,9 @@ make_SeuratObj_scRNAseq(topdir = './', saveDir = './results', changeGeneName = T
     lines(br.out$rank[o], br.out$fitted[o], col="red")
     abline(h=metadata(br.out)$knee, col="dodgerblue", lty=2)
     abline(h=metadata(br.out)$inflection, col="forestgreen", lty=2)
+    abline(v = sum(iscell_ed), col = 'darkgreen', lwd = 2.0)
+    abline(v = c(2000, 5000), col = 'gray')
+    text(x = c(2000, 5000), y =10000, labels = c(2000, 5000), col = 'red')
     legend("bottomleft", lty=2, col=c("dodgerblue", "forestgreen"),
            legend=c("knee", "inflection"))
     
@@ -132,13 +140,11 @@ make_SeuratObj_scRNAseq(topdir = './', saveDir = './results', changeGeneName = T
       counts.umi = c(counts.umi, length(which(umi$counts == i))/nrow(umi))
     }
     
-    
     pdf(paste0(saveDir, "UMIduplication.pdf"), height = 6, width = 12, useDingbats = F)
     
     par(mfrow = c(1,1))
     plot(1:100, counts.umi, ylim = c(0, 1), col = 'gray30', 
          ylab = '% of umi', xlab = 'duplication nb of umi', pch = 20)
-    
     
     par(mfrow = c(1,2))
     

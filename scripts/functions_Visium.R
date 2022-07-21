@@ -169,7 +169,7 @@ Normalize_with_scran = function(aa)
   library(scran)
   library(scuttle)
   
-  sce <- as.SingleCellExperiment(aa, assay = 'Spatial')
+  sce <- as.SingleCellExperiment(aa)
   
   clusters <- quickCluster(sce)
   sce <- computeSumFactors(sce, clusters=clusters)
