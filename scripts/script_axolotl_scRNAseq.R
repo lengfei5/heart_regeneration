@@ -95,6 +95,8 @@ mtgenes = rownames(aa)[!is.na(match(ggs, mtgenes))]
 xx = PercentageFeatureSet(aa, col.name = "percent.mt", assay = "RNA", features = mtgenes)
 aa[['percent.mt']] = xx$percent.mt
 
+rm(xx)
+
 Idents(aa) = aa$condition
 
 pdfname = paste0(resDir, '/QCs_gene_marker_check_', design$condition[n], version.analysis,  '.pdf')
@@ -127,25 +129,22 @@ if(Normalize_with_sctransform){
   
   aa = Normalize_with_scran(aa)
   
-  aa <- FindVariableFeatures(aa, selection.method = "vst", nfeatures = 3000)
+  aa <- FindVariableFeatures(aa, selection.method = "vst", nfeatures = 5000)
   all.genes <- rownames(aa)
   aa <- ScaleData(aa, features = all.genes)
   aa <- RunPCA(aa, features = VariableFeatures(object = aa), verbose = FALSE)
    
 }
 
-
-
 ElbowPlot(aa, ndims = 30)
 
 aa <- FindNeighbors(aa, dims = 1:10)
 aa <- FindClusters(aa, verbose = FALSE, algorithm = 3, resolution = 0.7)
 
-aa <- RunUMAP(aa, dims = 1:10, n.neighbors = 30, min.dist = 0.05)
+aa <- RunUMAP(aa, dims = 1:10, n.neighbors = 30, min.dist = 0.01)
 DimPlot(aa, label = TRUE, repel = TRUE) + ggtitle("Unsupervised clustering")
 
-#DimPlot(aa, reduction = "umap", label = TRUE, repel = TRUE, group.by = "condition") +
-#  NoLegend()
+saveRDS(aa, file = paste0(RdataDir, 'seuratObject_', species, version.analysis, '_normamlized_clustered_umap.Rdata'))
 
 features = rownames(aa)[grep('VIM|COL1A2|FSTL1|POSTN', rownames(aa))]
 FeaturePlot(aa, features = features, cols = c('gray', 'red'))
