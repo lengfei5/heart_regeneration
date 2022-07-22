@@ -82,7 +82,9 @@ make_SeuratObj_scRNAseq = function(topdir = './',
   eout$FDR[is.na(eout$FDR)] = 1
   
   iscell_ed = eout$FDR<=0.01
-  # sum(iscell_ed, na.rm=TRUE)
+  
+  cat(sum(iscell_dd, na.rm=TRUE), ' cell identified with default cellRanger method \n')
+  cat(sum(iscell_ed, na.rm=TRUE), ' cell identified with emptyDrops \n')
   
   meta = data.frame(row.names = paste0(bc$V1,"-1"),
                     iscell_dd = iscell_dd, iscell_ed = iscell_ed)
@@ -93,20 +95,18 @@ make_SeuratObj_scRNAseq = function(topdir = './',
   pdf(paste0(saveDir, "UMIrank.pdf"), height = 6, width =10, useDingbats = FALSE)
   
   plot(br.out$rank, br.out$total, log="xy", xlab="Rank", ylab="Total")
-  
   o <- order(br.out$rank)
   lines(br.out$rank[o], br.out$fitted[o], col="red")
   abline(h=metadata(br.out)$knee, col="dodgerblue", lty=2)
   abline(h=metadata(br.out)$inflection, col="forestgreen", lty=2)
   abline(v = sum(iscell_ed), col = 'darkgreen', lwd = 2.0)
   abline(v = sum(iscell_dd), col = 'darkblue', lwd = 2.0)
-  abline(v = c(2000, 5000), col = 'gray')
-  text(x = c(2000, 5000), y =10000, labels = c(2000, 5000), col = 'red')
+  abline(v = c(3000, 5000, 8000, 10000, 12000), col = 'gray')
+  text(x = c(3000, 5000, 8000, 10000, 12000), y =10000, labels = c(3000, 5000, 8000, 10000, 12000), col = 'red')
   legend("bottomleft", lty=2, col=c("dodgerblue", "forestgreen"),
          legend=c("knee", "inflection"))
   
   dev.off()
-  
   
   if(QC.umi){
     # plot rankings for number of UMI

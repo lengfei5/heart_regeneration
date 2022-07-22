@@ -39,7 +39,7 @@ species = 'axloltl_scRNAseq'
 design = data.frame(sampleID = seq(197249, 197253), 
                     condition = c(paste0('Amex_scRNA_d', c(0, 1, 4, 7, 14))), stringsAsFactors = FALSE)
 
-check.QC.each.condition = TRUE
+source('functions_scRNAseq.R')
 
 for(n in 1:nrow(design))
 {
@@ -52,8 +52,7 @@ for(n in 1:nrow(design))
   aa = make_SeuratObj_scRNAseq(topdir = topdir,
                              saveDir = paste0(resDir, '/', design$condition[n], '_', design$sampleID[n], '/'), 
                              keyname = design$condition[n], 
-                             changeGeneName.axolotl = FALSE, 
-                             QC.umi = TRUE)
+                             changeGeneName.axolotl = TRUE)
   
   aa$condition = design$condition[n]
   
@@ -78,9 +77,10 @@ save(design, scn,
 load(file = paste0(RdataDir, 'seuratObject_design_variableGenes_', species, version.analysis, '.Rdata'))
 
 # scn = aa
+
 ## filter genes here 
-aa = CreateSeuratObject(counts = scn@assays$RNA@counts[, aa$iscell_dd],
-                   meta.data = scn@meta.data[aa$iscell_dd, ], 
+aa = CreateSeuratObject(counts = scn@assays$RNA@counts[, scn$iscell_dd],
+                   meta.data = scn@meta.data[scn$iscell_dd, ], 
                    assay = 'RNA',
                    min.cells = 20, 
                    min.features = 50)
@@ -107,8 +107,8 @@ Idents(aa) = aa$condition
 pdfname = paste0(resDir, '/QCs_gene_marker_check_', design$condition[n], version.analysis,  '.pdf')
 pdf(pdfname, width=16, height = 8)
 
-VlnPlot(aa, features = 'nFeature_RNA', y.max = 5000)
-VlnPlot(aa, features = 'nCount_RNA', y.max = 10000)
+VlnPlot(aa, features = 'nFeature_RNA', y.max = 6000)
+VlnPlot(aa, features = 'nCount_RNA', y.max = 20000)
 VlnPlot(aa, features = 'percent.mt', y.max = 100)
 
 FeatureScatter(aa, feature1 = "nCount_RNA", feature2 = "nFeature_RNA")
@@ -117,7 +117,7 @@ FeatureScatter(aa, feature1 = "nCount_RNA", feature2 = "percent.mt")
 ##########################################
 ## filter cells again
 ##########################################
-aa <- subset(aa, subset = nFeature_RNA > 100 & nFeature_RNA < 3000 & percent.mt < 60)
+aa <- subset(aa, subset = nFeature_RNA > 200 & nFeature_RNA < 5000 & percent.mt < 60)
 
 Normalize_with_sctransform = FALSE
 
@@ -131,30 +131,36 @@ Normalize_with_sctransform = FALSE
 if(Normalize_with_sctransform){
   aa <- SCTransform(aa, assay = "RNA", verbose = FALSE, 
                     variable.features.n = 3000, return.only.var.genes = FALSE)
+  
   aa <- RunPCA(aa, verbose = FALSE, weight.by.var = TRUE)
+  
+  saveRDS(aa, file = paste0(RdataDir, 'seuratObject_', species, version.analysis, '_SCTnormamlized_pca.Rdata'))
+  
   
 }else{
   # aa <- NormalizeData(aa, normalization.method = "LogNormalize", scale.factor = 10000)
   
-  aa = Normalize_with_scran(aa)
+  # aa = Normalize_with_scran(aa)
   
-  aa <- FindVariableFeatures(aa, selection.method = "vst", nfeatures = 5000)
+  aa <- FindVariableFeatures(aa, selection.method = "vst", nfeatures = 3000)
   all.genes <- rownames(aa)
   aa <- ScaleData(aa, features = all.genes)
   aa <- RunPCA(aa, features = VariableFeatures(object = aa), verbose = FALSE)
-   
+  
+  saveRDS(aa, file = paste0(RdataDir, 'seuratObject_', species, version.analysis, '_lognormamlized_pca.Rdata')) 
+  
 }
+
 
 ElbowPlot(aa, ndims = 30)
 
-aa <- FindNeighbors(aa, dims = 1:10)
+aa <- FindNeighbors(aa, dims = 1:20)
 aa <- FindClusters(aa, verbose = FALSE, algorithm = 3, resolution = 0.7)
 
-aa <- RunUMAP(aa, dims = 1:10, n.neighbors = 30, min.dist = 0.01)
+aa <- RunUMAP(aa, dims = 1:20, n.neighbors = 30, min.dist = 0.05)
+
 DimPlot(aa, label = TRUE, repel = TRUE) + ggtitle("Unsupervised clustering")
-
 ggsave(filename = paste0(resDir, '/first_test_umap.pdf'), width = 8, height = 6)
-
 
 saveRDS(aa, file = paste0(RdataDir, 'seuratObject_', species, version.analysis, '_normamlized_clustered_umap.Rdata'))
 
@@ -172,11 +178,11 @@ FeaturePlot(aa, features = features, cols = c('gray', 'red'))
 
 dev.off()
 
-FeaturePlot(aa, )
-
 DimPlot(aa, reduction = "umap", label = TRUE, repel = TRUE, group.by = "nCount_RNA") +
   NoLegend()
 
+
+### cluster markers
 markers = FindAllMarkers(aa, only.pos = TRUE, min.pct = 0.25, logfc.threshold = 0.25)
 
 markers %>%
