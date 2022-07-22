@@ -23,6 +23,9 @@ source('functions_scRNAseq.R')
 source('functions_Visium.R')
 library(pryr) # monitor the memory usage
 require(ggplot2)
+require(dplyr)
+require(stringr)
+require(tidyr)
 mem_used()
 
 species = 'axloltl_scRNAseq'
@@ -35,7 +38,7 @@ species = 'axloltl_scRNAseq'
 ########################################################
 design = data.frame(sampleID = seq(197249, 197253), 
                     condition = c(paste0('Amex_scRNA_d', c(0, 1, 4, 7, 14))), stringsAsFactors = FALSE)
-varibleGenes = c()
+
 check.QC.each.condition = TRUE
 
 for(n in 1:nrow(design))
@@ -44,13 +47,14 @@ for(n in 1:nrow(design))
   cat('-----------', design$condition[n], '-------------\n')
   
   # load nf output and process
-  source('functions_Visium.R')
+  topdir = paste0(dataDir, '/', design$condition[n], '/')
   
-  aa = make_SeuratObj_scRNAseq(topdir = paste0(dataDir, '/', design$condition[n], '/'), 
+  aa = make_SeuratObj_scRNAseq(topdir = topdir,
                              saveDir = paste0(resDir, '/', design$condition[n], '_', design$sampleID[n], '/'), 
                              keyname = design$condition[n], 
-                             changeGeneName.axolotl = TRUE, 
+                             changeGeneName.axolotl = FALSE, 
                              QC.umi = TRUE)
+  
   aa$condition = design$condition[n]
   
   if(n == 1) {
@@ -73,9 +77,10 @@ save(design, scn,
 ##########################################
 load(file = paste0(RdataDir, 'seuratObject_design_variableGenes_', species, version.analysis, '.Rdata'))
 
+# scn = aa
 ## filter genes here 
-aa = CreateSeuratObject(counts = scn@assays$RNA@counts,
-                   meta.data = scn@meta.data, 
+aa = CreateSeuratObject(counts = scn@assays$RNA@counts[, aa$iscell_dd],
+                   meta.data = scn@meta.data[aa$iscell_dd, ], 
                    assay = 'RNA',
                    min.cells = 20, 
                    min.features = 50)
@@ -102,8 +107,7 @@ Idents(aa) = aa$condition
 pdfname = paste0(resDir, '/QCs_gene_marker_check_', design$condition[n], version.analysis,  '.pdf')
 pdf(pdfname, width=16, height = 8)
 
-
-VlnPlot(aa, features = 'nFeature_RNA', y.max = 500)
+VlnPlot(aa, features = 'nFeature_RNA', y.max = 5000)
 VlnPlot(aa, features = 'nCount_RNA', y.max = 10000)
 VlnPlot(aa, features = 'percent.mt', y.max = 100)
 
@@ -116,9 +120,14 @@ FeatureScatter(aa, feature1 = "nCount_RNA", feature2 = "percent.mt")
 aa <- subset(aa, subset = nFeature_RNA > 100 & nFeature_RNA < 3000 & percent.mt < 60)
 
 Normalize_with_sctransform = FALSE
-##########################################
-### normalization and quick clustering
-##########################################
+
+########################################################
+########################################################
+# Section : normalization and quick clustering
+# 
+########################################################
+########################################################
+
 if(Normalize_with_sctransform){
   aa <- SCTransform(aa, assay = "RNA", verbose = FALSE, 
                     variable.features.n = 3000, return.only.var.genes = FALSE)
@@ -144,6 +153,9 @@ aa <- FindClusters(aa, verbose = FALSE, algorithm = 3, resolution = 0.7)
 aa <- RunUMAP(aa, dims = 1:10, n.neighbors = 30, min.dist = 0.01)
 DimPlot(aa, label = TRUE, repel = TRUE) + ggtitle("Unsupervised clustering")
 
+ggsave(filename = paste0(resDir, '/first_test_umap.pdf'), width = 8, height = 6)
+
+
 saveRDS(aa, file = paste0(RdataDir, 'seuratObject_', species, version.analysis, '_normamlized_clustered_umap.Rdata'))
 
 features = rownames(aa)[grep('VIM|COL1A2|FSTL1|POSTN', rownames(aa))]
@@ -165,33 +177,14 @@ FeaturePlot(aa, )
 DimPlot(aa, reduction = "umap", label = TRUE, repel = TRUE, group.by = "nCount_RNA") +
   NoLegend()
 
-########################################################
-########################################################
-# Section : normalization and quick clustering
-# 
-########################################################
-########################################################
-DefaultAssay(st) <- "SCT"
-VariableFeatures(st) <- varibleGenes
+markers = FindAllMarkers(aa, only.pos = TRUE, min.pct = 0.25, logfc.threshold = 0.25)
 
-st <- RunPCA(st, verbose = FALSE)
-ElbowPlot(st)
+markers %>%
+  filter(!str_detect(gene, '^(AMEX|LOC)')) %>%
+  group_by(cluster) %>%
+  slice_max(n = 20, order_by = avg_log2FC) -> top10
 
-st <- FindNeighbors(st, dims = 1:10)
-st <- FindClusters(st, verbose = FALSE, resolution = 1.0)
 
-st <- RunUMAP(st, dims = 1:20, n.neighbors = 20, min.dist = 0.05)
-SpatialDimPlot(st, image.alpha = 0.5)
+DoHeatmap(aa, features = top10$gene) + NoLegend()
 
-DimPlot(st, reduction = "umap", group.by = c("ident", "condition")) 
-
-ggsave(filename = paste0(resDir, '/UMAP_all.timepoints_', species, '.pdf'), width = 16, height = 8)
-
-features = rownames(st)[grep('MYH6|NPPA|CLU-AMEX60DD032706', rownames(st))]
-FeaturePlot(st, features = features)
-
-SpatialFeaturePlot(st, features = features[2])
-
-save(design, varibleGenes, st, 
-     file = paste0(RdataDir, 'seuratObject_design_variableGenes_umap.clustered', species, version.analysis,'.Rdata'))
-
+ggsave(filename = paste0(resDir, '/first_test_clusterMarkers.pdf'), width = 6, height = 12)

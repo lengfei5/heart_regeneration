@@ -42,7 +42,7 @@ make_SeuratObj_scRNAseq = function(topdir = './',
                                    saveDir = './results', 
                                    changeGeneName.axolotl = TRUE, 
                                    keyname = 'Amex_scRNA_d0',  
-                                   QC.umi = TRUE)
+                                   QC.umi = FALSE)
 {
   library(Seurat)
   library(DropletUtils)
@@ -74,40 +74,43 @@ make_SeuratObj_scRNAseq = function(topdir = './',
   
   #dimnames(exp) = list(paste0(bc\$V1,"-1"),g\$V1) # number added because of seurat format for barcodes
   #count.data = Matrix::t(exp)
+  cat('get empty drops with UMI rank \n')
+  
+  # get emptyDrops and default cutoff cell estimates
+  iscell_dd = defaultDrops(count.data, expected = 8000) # default cell estimate, similar to 10x cellranger
+  eout = emptyDrops(count.data, lower = 100)
+  eout$FDR[is.na(eout$FDR)] = 1
+  
+  iscell_ed = eout$FDR<=0.01
+  # sum(iscell_ed, na.rm=TRUE)
+  
+  meta = data.frame(row.names = paste0(bc$V1,"-1"),
+                    iscell_dd = iscell_dd, iscell_ed = iscell_ed)
+  
+  # plot rankings for number of UMI
+  br.out <- barcodeRanks(count.data)
+  
+  pdf(paste0(saveDir, "UMIrank.pdf"), height = 6, width =10, useDingbats = FALSE)
+  
+  plot(br.out$rank, br.out$total, log="xy", xlab="Rank", ylab="Total")
+  
+  o <- order(br.out$rank)
+  lines(br.out$rank[o], br.out$fitted[o], col="red")
+  abline(h=metadata(br.out)$knee, col="dodgerblue", lty=2)
+  abline(h=metadata(br.out)$inflection, col="forestgreen", lty=2)
+  abline(v = sum(iscell_ed), col = 'darkgreen', lwd = 2.0)
+  abline(v = sum(iscell_dd), col = 'darkblue', lwd = 2.0)
+  abline(v = c(2000, 5000), col = 'gray')
+  text(x = c(2000, 5000), y =10000, labels = c(2000, 5000), col = 'red')
+  legend("bottomleft", lty=2, col=c("dodgerblue", "forestgreen"),
+         legend=c("knee", "inflection"))
+  
+  dev.off()
+  
+  
   if(QC.umi){
     # plot rankings for number of UMI
-    cat('get empty drops with UMI rank \n')
-    
-    # get emptyDrops and default cutoff cell estimates
-    iscell_dd = defaultDrops(count.data, expected = 8000) # default cell estimate, similar to 10x cellranger
-    eout = emptyDrops(count.data, lower = 100)
-    eout$FDR[is.na(eout$FDR)] = 1
-    
-    iscell_ed = eout$FDR<=0.01
-    # sum(iscell_ed, na.rm=TRUE)
-    
-    meta = data.frame(row.names = paste0(bc$V1,"-1"),
-                      iscell_dd = iscell_dd, iscell_ed = iscell_ed)
-    
-    # plot rankings for number of UMI
-    br.out <- barcodeRanks(count.data)
-    
-    pdf(paste0(saveDir, "UMIrank.pdf"), height = 6, width =10, useDingbats = FALSE)
-    
-    plot(br.out$rank, br.out$total, log="xy", xlab="Rank", ylab="Total")
-    
-    o <- order(br.out$rank)
-    lines(br.out$rank[o], br.out$fitted[o], col="red")
-    abline(h=metadata(br.out)$knee, col="dodgerblue", lty=2)
-    abline(h=metadata(br.out)$inflection, col="forestgreen", lty=2)
-    abline(v = sum(iscell_ed), col = 'darkgreen', lwd = 2.0)
-    abline(v = c(2000, 5000), col = 'gray')
-    text(x = c(2000, 5000), y =10000, labels = c(2000, 5000), col = 'red')
-    legend("bottomleft", lty=2, col=c("dodgerblue", "forestgreen"),
-           legend=c("knee", "inflection"))
-    
-    dev.off()
-    
+   
     # UMI duplication
     # umi = read.table("${umic}", sep = "\t", header = F, stringsAsFactors = F)
     # sumUMI = c()
@@ -116,7 +119,6 @@ make_SeuratObj_scRNAseq = function(topdir = './',
     cat('umi duplication check \n')
     umi = read.table(paste0(topdir, "umicount.txt"), sep = "\t", header = F, stringsAsFactors = F)
     colnames(umi) = c('cell.bc', 'umi', 'kallisto.seqIndex', 'counts')
-    
     
     # for(i in 0:250){ sumUMI = c(sumUMI, sum(umi\$V4[umi\$V4>i])/sumi) }
     # pdf("${params.samplename}_UMIduplication.pdf", height = 3.5, width = 7, useDingbats = F)
@@ -162,7 +164,9 @@ make_SeuratObj_scRNAseq = function(topdir = './',
   # create Seurat object
   ## we're only keeping what might potentially be a cell (by DD or ED)
   srat = CreateSeuratObject(counts = count.data[,iscell_dd | iscell_ed],
-                            meta.data = meta[iscell_dd | iscell_ed,])
+                            meta.data = meta[iscell_dd | iscell_ed,], 
+                            min.cells = 20, 
+                            min.features = 50)
   
   amb_prop = estimateAmbience(count.data)[rownames(srat@assays$RNA@meta.features)]
   srat@assays$RNA@meta.features = data.frame(row.names = rownames(srat@assays$RNA@meta.features),
@@ -180,5 +184,6 @@ make_SeuratObj_scRNAseq = function(topdir = './',
   saveRDS(srat, file = paste0(saveDir, "srat.RDS"))
   
   return(srat)
+  
   
 }
