@@ -161,9 +161,11 @@ if(Normalize_with_sctransform){
   
   
 }else{
-  # aa <- NormalizeData(aa, normalization.method = "LogNormalize", scale.factor = 10000)
+  aa <- NormalizeData(aa, normalization.method = "LogNormalize", scale.factor = 10000)
   
+  # tic()
   # aa = Normalize_with_scran(aa)
+  # toc()
   
   aa <- FindVariableFeatures(aa, selection.method = "vst", nfeatures = 3000)
   all.genes <- rownames(aa)
@@ -181,13 +183,19 @@ ElbowPlot(aa, ndims = 30)
 aa <- FindNeighbors(aa, dims = 1:20)
 aa <- FindClusters(aa, verbose = FALSE, algorithm = 3, resolution = 0.7)
 
-aa <- RunUMAP(aa, dims = 1:20, n.neighbors = 30, min.dist = 0.05)
-
-
+aa <- RunUMAP(aa, dims = 1:20, n.neighbors = 30, min.dist = 0.1)
 DimPlot(aa, label = TRUE, repel = TRUE) + ggtitle("Unsupervised clustering")
-ggsave(filename = paste0(resDir, '/first_test_umap_v2.pdf'), width = 8, height = 6)
 
-saveRDS(aa, file = paste0(RdataDir, 'seuratObject_', species, version.analysis, '_lognormamlized_pca_umap.rds'))
+ggsave(filename = paste0(resDir, '/first_test_umap_v3.pdf'), width = 8, height = 6)
+
+saveRDS(aa, file = paste0(RdataDir, 'seuratObject_', species, version.analysis, '_lognormamlized_pca_umap_v2.rds'))
+
+
+features = rownames(aa)[grep('LY6', rownames(aa))]
+FeaturePlot(aa, features = features, cols = c('gray', 'red'))
+
+features = rownames(aa)[grep('PTPRC', rownames(aa))]
+FeaturePlot(aa, features = features, cols = c('gray', 'red'))
 
 features = rownames(aa)[grep('VIM|COL1A2|FSTL1|POSTN', rownames(aa))]
 FeaturePlot(aa, features = features, cols = c('gray', 'red'))
