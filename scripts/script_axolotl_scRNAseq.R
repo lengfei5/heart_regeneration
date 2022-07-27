@@ -191,11 +191,19 @@ ggsave(filename = paste0(resDir, '/first_test_umap_v3.pdf'), width = 8, height =
 saveRDS(aa, file = paste0(RdataDir, 'seuratObject_', species, version.analysis, '_lognormamlized_pca_umap_v2.rds'))
 
 
+##########################################
+# cell type annotation  
+##########################################
+aa = readRDS(file = paste0(RdataDir, 'seuratObject_', species, version.analysis, '_lognormamlized_pca_umap.rds'))
+
+DimPlot(aa, label = TRUE, repel = TRUE) + ggtitle("scNuc (multiome)")
+
 features = rownames(aa)[grep('LY6', rownames(aa))]
 FeaturePlot(aa, features = features, cols = c('gray', 'red'))
 
 features = rownames(aa)[grep('PTPRC', rownames(aa))]
 FeaturePlot(aa, features = features, cols = c('gray', 'red'))
+ggsave(filename = paste0(resDir, '/FeaturePlot_CD45.pdf'), width = 8, height = 6)
 
 features = rownames(aa)[grep('VIM|COL1A2|FSTL1|POSTN', rownames(aa))]
 FeaturePlot(aa, features = features, cols = c('gray', 'red'))
