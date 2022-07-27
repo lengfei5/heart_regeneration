@@ -21,11 +21,14 @@ dataDir = '../R13591_axolotl_multiome'
 
 source('functions_scRNAseq.R')
 source('functions_Visium.R')
+require(Seurat)
+#require(sctransform)
 library(pryr) # monitor the memory usage
 require(ggplot2)
 require(dplyr)
 require(stringr)
 require(tidyr)
+require(tictoc)
 mem_used()
 
 species = 'axloltl_scRNAseq'
@@ -94,18 +97,30 @@ mtgenes = c(mtgenes, paste0("MT", mtgenes), paste0("MT-", mtgenes))
 
 ggs = sapply(rownames(aa), function(x) unlist(strsplit(as.character(x), '-'))[1])
 mtgenes = rownames(aa)[!is.na(match(ggs, mtgenes))]
-# mtgenes = mtgenes[mtgenes %in% g[,1]]
-# srat = PercentageFeatureSet(srat, col.name = "percent.mt", assay = "Spatial",
-#                             features = mtgenes)
+
 xx = PercentageFeatureSet(aa, col.name = "percent.mt", assay = "RNA", features = mtgenes)
 aa[['percent.mt']] = xx$percent.mt
-
 rm(xx)
 
 Idents(aa) = aa$condition
 
-pdfname = paste0(resDir, '/QCs_gene_marker_check_', design$condition[n], version.analysis,  '.pdf')
-pdf(pdfname, width=16, height = 8)
+
+pdfname = paste0(resDir, '/QCs_nFeatures_nCounts_percentMT',  version.analysis,  '_v2.pdf')
+pdf(pdfname, width=12, height = 8)
+
+levels = design$condition
+
+table(aa$condition) %>%
+  as.data.frame() %>%
+  as_tibble() %>%
+  mutate(condition = factor(Var1, levels=levels)) %>%
+  #mutate(cellNbs = integer(Freq))
+  ggplot(aes(x=condition, y=Freq, fill = condition)) +
+  geom_bar(stat="identity", width=0.5) +
+  theme_classic() + 
+  scale_fill_brewer(palette="Dark2")+
+  labs( x = '', y = 'detected cell # from cellRanger barcodes' )  +
+  theme(axis.text.x = element_text(angle = 0, size = 10))
 
 VlnPlot(aa, features = 'nFeature_RNA', y.max = 6000)
 VlnPlot(aa, features = 'nCount_RNA', y.max = 20000)
@@ -114,12 +129,13 @@ VlnPlot(aa, features = 'percent.mt', y.max = 100)
 FeatureScatter(aa, feature1 = "nCount_RNA", feature2 = "nFeature_RNA")
 FeatureScatter(aa, feature1 = "nCount_RNA", feature2 = "percent.mt")
 
-##########################################
-## filter cells again
-##########################################
+dev.off()
+
+
+## second time cell filtering 
 aa <- subset(aa, subset = nFeature_RNA > 200 & nFeature_RNA < 5000 & percent.mt < 60)
 
-Normalize_with_sctransform = FALSE
+saveRDS(aa, file = paste0(RdataDir, 'seuratObject_', species, version.analysis, '_QCs_cellFiltered.rds')) 
 
 ########################################################
 ########################################################
@@ -127,14 +143,21 @@ Normalize_with_sctransform = FALSE
 # 
 ########################################################
 ########################################################
+aa = readRDS(file = paste0(RdataDir, 'seuratObject_', species, version.analysis, '_QCs_cellFiltered.rds')) 
+
+Normalize_with_sctransform = FALSE
 
 if(Normalize_with_sctransform){
-  aa <- SCTransform(aa, assay = "RNA", verbose = FALSE, 
-                    variable.features.n = 3000, return.only.var.genes = FALSE)
+  tic()
+  
+  test <- SCTransform(aa, ncells = 3000, assay = "RNA", verbose = FALSE, 
+                    variable.features.n = 3000, return.only.var.genes = TRUE, vst.flavor = "v2")
+  
+  toc()
+  
+  saveRDS(aa, file = paste0(RdataDir, 'seuratObject_', species, version.analysis, '_SCTnormamlized.Rdata'))
   
   aa <- RunPCA(aa, verbose = FALSE, weight.by.var = TRUE)
-  
-  saveRDS(aa, file = paste0(RdataDir, 'seuratObject_', species, version.analysis, '_SCTnormamlized_pca.Rdata'))
   
   
 }else{
@@ -147,10 +170,11 @@ if(Normalize_with_sctransform){
   aa <- ScaleData(aa, features = all.genes)
   aa <- RunPCA(aa, features = VariableFeatures(object = aa), verbose = FALSE)
   
-  saveRDS(aa, file = paste0(RdataDir, 'seuratObject_', species, version.analysis, '_lognormamlized_pca.Rdata')) 
+  saveRDS(aa, file = paste0(RdataDir, 'seuratObject_', species, version.analysis, '_lognormamlized_pca.rds')) 
   
 }
 
+aa = readRDS(file = paste0(RdataDir, 'seuratObject_', species, version.analysis, '_lognormamlized_pca.rds')) 
 
 ElbowPlot(aa, ndims = 30)
 
@@ -159,10 +183,11 @@ aa <- FindClusters(aa, verbose = FALSE, algorithm = 3, resolution = 0.7)
 
 aa <- RunUMAP(aa, dims = 1:20, n.neighbors = 30, min.dist = 0.05)
 
-DimPlot(aa, label = TRUE, repel = TRUE) + ggtitle("Unsupervised clustering")
-ggsave(filename = paste0(resDir, '/first_test_umap.pdf'), width = 8, height = 6)
 
-saveRDS(aa, file = paste0(RdataDir, 'seuratObject_', species, version.analysis, '_normamlized_clustered_umap.Rdata'))
+DimPlot(aa, label = TRUE, repel = TRUE) + ggtitle("Unsupervised clustering")
+ggsave(filename = paste0(resDir, '/first_test_umap_v2.pdf'), width = 8, height = 6)
+
+saveRDS(aa, file = paste0(RdataDir, 'seuratObject_', species, version.analysis, '_lognormamlized_pca_umap.rds'))
 
 features = rownames(aa)[grep('VIM|COL1A2|FSTL1|POSTN', rownames(aa))]
 FeaturePlot(aa, features = features, cols = c('gray', 'red'))
@@ -176,21 +201,20 @@ FeaturePlot(aa, features = features, cols = c('gray', 'red'))
 features = rownames(aa)[grep('MKI67|CCNB2|PCNA-|CDK1-', rownames(aa))]
 FeaturePlot(aa, features = features, cols = c('gray', 'red'))
 
-dev.off()
-
-DimPlot(aa, reduction = "umap", label = TRUE, repel = TRUE, group.by = "nCount_RNA") +
-  NoLegend()
-
+#DimPlot(aa, reduction = "umap", label = TRUE, repel = TRUE, group.by = "nCount_RNA") +
+#  NoLegend()
 
 ### cluster markers
-markers = FindAllMarkers(aa, only.pos = TRUE, min.pct = 0.25, logfc.threshold = 0.25)
+# markers = FindAllMarkers(aa, only.pos = TRUE, min.pct = 0.25, logfc.threshold = 0.25)
+# saveRDS(markers, file = paste0(RdataDir, 'seuratObject_', species, version.analysis, '_markers_v2.rds')) 
+markers = readRDS(file = paste0(RdataDir, 'seuratObject_', species, version.analysis, '_markers_v2.rds')) 
 
 markers %>%
   filter(!str_detect(gene, '^(AMEX|LOC)')) %>%
   group_by(cluster) %>%
-  slice_max(n = 20, order_by = avg_log2FC) -> top10
+  slice_max(n = 10, order_by = avg_log2FC) -> top10
 
+xx = subset(aa, downsample = 500)
 
-DoHeatmap(aa, features = top10$gene) + NoLegend()
-
-ggsave(filename = paste0(resDir, '/first_test_clusterMarkers.pdf'), width = 6, height = 12)
+DoHeatmap(xx, features = top10$gene) + NoLegend()
+ggsave(filename = paste0(resDir, '/first_test_clusterMarkers_v2.pdf'), width = 10, height = 30)
