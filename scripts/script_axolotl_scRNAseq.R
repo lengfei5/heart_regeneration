@@ -190,10 +190,12 @@ ggsave(filename = paste0(resDir, '/first_test_umap_v3.pdf'), width = 8, height =
 
 saveRDS(aa, file = paste0(RdataDir, 'seuratObject_', species, version.analysis, '_lognormamlized_pca_umap_v2.rds'))
 
-
-##########################################
-# cell type annotation  
-##########################################
+########################################################
+########################################################
+# Section :  cell type annotation  
+# 
+########################################################
+########################################################
 aa = readRDS(file = paste0(RdataDir, 'seuratObject_', species, version.analysis, '_lognormamlized_pca_umap.rds'))
 
 DimPlot(aa, label = TRUE, repel = TRUE) + ggtitle("scNuc (multiome)")
@@ -234,3 +236,7 @@ xx = subset(aa, downsample = 500)
 
 DoHeatmap(xx, features = top10$gene) + NoLegend()
 ggsave(filename = paste0(resDir, '/first_test_clusterMarkers_v2.pdf'), width = 10, height = 30)
+
+
+
+

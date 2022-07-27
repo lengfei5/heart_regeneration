@@ -193,5 +193,32 @@ make_SeuratObj_scRNAseq = function(topdir = './',
 # 
 ########################################################
 ########################################################
-
-
+subclustering_manual.annotation = function(aa)
+{
+  # coarse annotation
+  aa$celltypes = NA
+  aa$celltypes[which(aa$seurat_clusters == 0)] = 'Endo'
+  aa$celltypes[which(aa$seurat_clusters == 1|
+                       aa$seurat_clusters == 13|
+                       aa$seurat_clusters == 14|
+                       aa$seurat_clusters == 15|
+                       aa$seurat_clusters == 2|
+                       aa$seurat_clusters == 3|
+                       aa$seurat_clusters == 6)] = 'CM'
+  
+  
+  aa$celltypes[which(aa$seurat_clusters == 4)] = 'FB'
+  aa$celltypes[which(aa$seurat_clusters == 5)] = 'Macrophage'
+  aa$celltypes[which(aa$seurat_clusters == 7)] = 'immune'
+  aa$celltypes[which(aa$seurat_clusters == 8)] = 'blood'
+  aa$celltypes[which(aa$seurat_clusters == 9)] = 'proliferating'
+  aa$celltypes[which(aa$seurat_clusters == 10|
+                       aa$seurat_clusters == 11)] = 'FB'
+  aa$celltypes[which(aa$seurat_clusters == 12)] = 'B'
+  
+  aa$celltypes[which(aa$seurat_clusters == 16)] = 'c16'
+  aa$celltypes[which(aa$seurat_clusters == 17)] = 'c17'
+  
+  
+  
+}
