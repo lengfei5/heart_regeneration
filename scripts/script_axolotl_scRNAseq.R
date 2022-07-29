@@ -122,8 +122,10 @@ table(aa$condition) %>%
   labs( x = '', y = 'detected cell # from cellRanger barcodes' )  +
   theme(axis.text.x = element_text(angle = 0, size = 10))
 
-VlnPlot(aa, features = 'nFeature_RNA', y.max = 6000)
-VlnPlot(aa, features = 'nCount_RNA', y.max = 20000)
+VlnPlot(aa, features = 'nFeature_RNA', y.max = 10000) +
+  geom_hline(yintercept = c(500, 2500, 3000))
+
+VlnPlot(aa, features = 'nCount_RNA', y.max = 50000)
 VlnPlot(aa, features = 'percent.mt', y.max = 100)
 
 FeatureScatter(aa, feature1 = "nCount_RNA", feature2 = "nFeature_RNA")
@@ -131,9 +133,8 @@ FeatureScatter(aa, feature1 = "nCount_RNA", feature2 = "percent.mt")
 
 dev.off()
 
-
 ## second time cell filtering 
-aa <- subset(aa, subset = nFeature_RNA > 200 & nFeature_RNA < 5000 & percent.mt < 60)
+aa <- subset(aa, subset = nFeature_RNA > 200 & nFeature_RNA < 10000 & percent.mt < 60)
 
 saveRDS(aa, file = paste0(RdataDir, 'seuratObject_', species, version.analysis, '_QCs_cellFiltered.rds')) 
 
@@ -160,7 +161,7 @@ if(!Normalize_with_sctransform){
   aa <- ScaleData(aa, features = all.genes)
   aa <- RunPCA(aa, features = VariableFeatures(object = aa), verbose = FALSE)
   
-  saveRDS(aa, file = paste0(RdataDir, 'seuratObject_', species, version.analysis, '_lognormamlized_pca.rds')) 
+  # saveRDS(aa, file = paste0(RdataDir, 'seuratObject_', species, version.analysis, '_lognormamlized_pca.rds')) 
   
 }else{
   
@@ -174,17 +175,17 @@ if(!Normalize_with_sctransform){
   aa <- RunPCA(aa, verbose = FALSE, weight.by.var = TRUE)
 }
 
-aa = readRDS(file = paste0(RdataDir, 'seuratObject_', species, version.analysis, '_lognormamlized_pca.rds')) 
+# aa = readRDS(file = paste0(RdataDir, 'seuratObject_', species, version.analysis, '_lognormamlized_pca.rds')) 
 
 ElbowPlot(aa, ndims = 30)
 
-aa <- FindNeighbors(aa, dims = 1:20)
+aa <- FindNeighbors(aa, dims = 1:30)
 aa <- FindClusters(aa, verbose = FALSE, algorithm = 3, resolution = 0.7)
 
-aa <- RunUMAP(aa, dims = 1:20, n.neighbors = 30, min.dist = 0.1)
+aa <- RunUMAP(aa, dims = 1:30, n.neighbors = 30, min.dist = 0.3)
 DimPlot(aa, label = TRUE, repel = TRUE) + ggtitle("Unsupervised clustering")
 
-ggsave(filename = paste0(resDir, '/first_test_umap_v3.pdf'), width = 8, height = 6)
+ggsave(filename = paste0(resDir, '/first_test_umap_v1.pdf'), width = 8, height = 6)
 
 saveRDS(aa, file = paste0(RdataDir, 'seuratObject_', species, version.analysis, '_lognormamlized_pca_umap_v2.rds'))
 
@@ -194,7 +195,7 @@ saveRDS(aa, file = paste0(RdataDir, 'seuratObject_', species, version.analysis, 
 # 
 ########################################################
 ########################################################
-aa = readRDS(file = paste0(RdataDir, 'seuratObject_', species, version.analysis, '_lognormamlized_pca_umap.rds'))
+aa = readRDS(file = paste0(RdataDir, 'seuratObject_', species, version.analysis, '_lognormamlized_pca_umap_v2.rds'))
 
 DimPlot(aa, label = TRUE, repel = TRUE) + ggtitle("scNuc (multiome)")
 
@@ -236,7 +237,4 @@ xx = subset(aa, downsample = 500)
 
 DoHeatmap(xx, features = top10$gene) + NoLegend()
 ggsave(filename = paste0(resDir, '/first_test_clusterMarkers_v2.pdf'), width = 10, height = 30)
-
-
-
 
