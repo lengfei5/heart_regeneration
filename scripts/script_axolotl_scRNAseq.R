@@ -9,10 +9,10 @@
 ##########################################################################
 rm(list = ls())
 
-version.analysis = '_R13591_20220720'
+version.analysis = '_R13591_intron.exon.20220729'
 
 resDir = paste0("../results/sc_multiome", version.analysis)
-RdataDir = paste0('../results/Rdata/')
+RdataDir = paste0(resDir, '/Rdata/')
 
 if(!dir.exists(resDir)) dir.create(resDir)
 if(!dir.exists(RdataDir)) dir.create(RdataDir)
@@ -50,12 +50,12 @@ for(n in 1:nrow(design))
   cat('-----------', design$condition[n], '-------------\n')
   
   # load nf output and process
-  topdir = paste0(dataDir, '/', design$condition[n], '/')
+  topdir = paste0(dataDir, '/', design$condition[n], '/', design$condition[n], '/')
   
   aa = make_SeuratObj_scRNAseq(topdir = topdir,
                              saveDir = paste0(resDir, '/', design$condition[n], '_', design$sampleID[n], '/'), 
-                             keyname = design$condition[n], 
-                             changeGeneName.axolotl = TRUE)
+                             changeGeneName.axolotl = TRUE, 
+                             defaultDrops.only = TRUE)
   
   aa$condition = design$condition[n]
   
@@ -147,20 +147,8 @@ aa = readRDS(file = paste0(RdataDir, 'seuratObject_', species, version.analysis,
 
 Normalize_with_sctransform = FALSE
 
-if(Normalize_with_sctransform){
-  tic()
+if(!Normalize_with_sctransform){
   
-  test <- SCTransform(aa, ncells = 3000, assay = "RNA", verbose = FALSE, 
-                    variable.features.n = 3000, return.only.var.genes = TRUE, vst.flavor = "v2")
-  
-  toc()
-  
-  saveRDS(aa, file = paste0(RdataDir, 'seuratObject_', species, version.analysis, '_SCTnormamlized.Rdata'))
-  
-  aa <- RunPCA(aa, verbose = FALSE, weight.by.var = TRUE)
-  
-  
-}else{
   aa <- NormalizeData(aa, normalization.method = "LogNormalize", scale.factor = 10000)
   
   # tic()
@@ -174,6 +162,16 @@ if(Normalize_with_sctransform){
   
   saveRDS(aa, file = paste0(RdataDir, 'seuratObject_', species, version.analysis, '_lognormamlized_pca.rds')) 
   
+}else{
+  
+  tic()
+  test <- SCTransform(aa, ncells = 3000, assay = "RNA", verbose = FALSE, 
+                      variable.features.n = 3000, return.only.var.genes = TRUE, vst.flavor = "v2")
+  toc()
+  
+  saveRDS(aa, file = paste0(RdataDir, 'seuratObject_', species, version.analysis, '_SCTnormamlized.Rdata'))
+  
+  aa <- RunPCA(aa, verbose = FALSE, weight.by.var = TRUE)
 }
 
 aa = readRDS(file = paste0(RdataDir, 'seuratObject_', species, version.analysis, '_lognormamlized_pca.rds')) 
@@ -231,6 +229,8 @@ markers %>%
   filter(!str_detect(gene, '^(AMEX|LOC)')) %>%
   group_by(cluster) %>%
   slice_max(n = 10, order_by = avg_log2FC) -> top10
+
+saveRDS(top10, file = paste0(RdataDir, 'top10_markerGenes_coarseCluster.rds'))
 
 xx = subset(aa, downsample = 500)
 

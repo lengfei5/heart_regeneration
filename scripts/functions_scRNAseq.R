@@ -41,12 +41,14 @@ get_geneID = function(xx)
 make_SeuratObj_scRNAseq = function(topdir = './', 
                                    saveDir = './results', 
                                    changeGeneName.axolotl = TRUE, 
+                                   defaultDrops.only = FALSE,
                                    keyname = 'Amex_scRNA_d0',  
                                    QC.umi = FALSE)
 {
   library(Seurat)
   library(DropletUtils)
   library(edgeR)
+  library(BiocParallel)
   
   if(!dir.exists(saveDir)) dir.create(saveDir)
   
@@ -60,8 +62,7 @@ make_SeuratObj_scRNAseq = function(topdir = './',
     cat('change gene names \n')
     # change the gene names before making Seurat object
     annot = readRDS(paste0('/groups/tanaka/People/current/jiwang/Genomes/axolotl/annotations/', 
-                           'geneAnnotation_geneSymbols_cleaning_synteny_sameSymbols.hs.nr_curated.geneSymbol.toUse_manual_v1.rds'))
-    
+                           'geneAnnotation_geneSymbols_cleaning_synteny_sameSymbols.hs.nr_curated.geneSymbol.toUse.rds'))
     
     mm = match(g$V1, annot$geneID)
     ggs = paste0(annot$gene.symbol.toUse[mm], '_',  annot$geneID[mm])
@@ -74,17 +75,21 @@ make_SeuratObj_scRNAseq = function(topdir = './',
   
   #dimnames(exp) = list(paste0(bc\$V1,"-1"),g\$V1) # number added because of seurat format for barcodes
   #count.data = Matrix::t(exp)
-  cat('get empty drops with UMI rank \n')
+  cat('-- filtering empty drops with UMI rank --  \n')
   
   # get emptyDrops and default cutoff cell estimates
   iscell_dd = defaultDrops(count.data, expected = 8000) # default cell estimate, similar to 10x cellranger
-  eout = emptyDrops(count.data, lower = 100)
-  eout$FDR[is.na(eout$FDR)] = 1
-  
-  iscell_ed = eout$FDR<=0.01
-  
   cat(sum(iscell_dd, na.rm=TRUE), ' cell identified with default cellRanger method \n')
-  cat(sum(iscell_ed, na.rm=TRUE), ' cell identified with emptyDrops \n')
+  
+  if(!defaultDrops.only){
+    eout = emptyDrops(count.data, lower = 100, BPPARAM = SerialParam())
+    eout$FDR[is.na(eout$FDR)] = 1
+    iscell_ed = eout$FDR<=0.01
+    cat(sum(iscell_ed, na.rm=TRUE), ' cell identified with emptyDrops \n')
+   
+  }else{
+    iscell_ed = rep(NA, length(iscell_dd))
+  }
   
   meta = data.frame(row.names = paste0(bc$V1,"-1"),
                     iscell_dd = iscell_dd, iscell_ed = iscell_ed)
@@ -99,7 +104,7 @@ make_SeuratObj_scRNAseq = function(topdir = './',
   lines(br.out$rank[o], br.out$fitted[o], col="red")
   abline(h=metadata(br.out)$knee, col="dodgerblue", lty=2)
   abline(h=metadata(br.out)$inflection, col="forestgreen", lty=2)
-  abline(v = sum(iscell_ed), col = 'darkgreen', lwd = 2.0)
+  if(!defaultDrops.only) {abline(v = sum(iscell_ed), col = 'darkgreen', lwd = 2.0)}
   abline(v = sum(iscell_dd), col = 'darkblue', lwd = 2.0)
   abline(v = c(3000, 5000, 8000, 10000, 12000), col = 'gray')
   text(x = c(3000, 5000, 8000, 10000, 12000), y =10000, labels = c(3000, 5000, 8000, 10000, 12000), col = 'red')
@@ -163,23 +168,31 @@ make_SeuratObj_scRNAseq = function(topdir = './',
   
   # create Seurat object
   ## we're only keeping what might potentially be a cell (by DD or ED)
-  srat = CreateSeuratObject(counts = count.data[,iscell_dd | iscell_ed],
-                            meta.data = meta[iscell_dd | iscell_ed,], 
-                            min.cells = 20, 
-                            min.features = 50)
+  if(defaultDrops.only){
+    srat = CreateSeuratObject(counts = count.data[, iscell_dd],
+                              meta.data = meta[iscell_dd,], 
+                              min.cells = 10, 
+                              min.features = 50)
+  }else{
+    srat = CreateSeuratObject(counts = count.data[,iscell_dd | iscell_ed],
+                              meta.data = meta[iscell_dd | iscell_ed,], 
+                              min.cells = 10, 
+                              min.features = 50)
+    
+  }
   
   amb_prop = estimateAmbience(count.data)[rownames(srat@assays$RNA@meta.features)]
   srat@assays$RNA@meta.features = data.frame(row.names = rownames(srat@assays$RNA@meta.features),
                                               "ambient_prop" = amb_prop)
   
   # get MT% (genes curated from NCBI chrMT genes)
-  mtgenes = c("COX1", "COX2", "COX3", "ATP6", "ND1", "ND5", "CYTB", "ND2", "ND4",
-             "ATP8", "MT-CO1", "COI", "LOC9829747")
-  mtgenes = c(mtgenes, paste0("MT", mtgenes), paste0("MT-", mtgenes))
-  
-  mt_features = rownames(srat)[get_geneName(g[,1]) %in% mtgenes]
-  srat = PercentageFeatureSet(srat, col.name = "percent.mt", assay = "RNA",
-                             features = mt_features)
+  # mtgenes = c("COX1", "COX2", "COX3", "ATP6", "ND1", "ND5", "CYTB", "ND2", "ND4",
+  #            "ATP8", "MT-CO1", "COI", "LOC9829747")
+  # mtgenes = c(mtgenes, paste0("MT", mtgenes), paste0("MT-", mtgenes))
+  # 
+  # mt_features = rownames(srat)[get_geneName(g[,1]) %in% mtgenes]
+  # srat = PercentageFeatureSet(srat, col.name = "percent.mt", assay = "RNA",
+  #                            features = mt_features)
   
   saveRDS(srat, file = paste0(saveDir, "srat.RDS"))
   
@@ -195,7 +208,7 @@ make_SeuratObj_scRNAseq = function(topdir = './',
 ########################################################
 subclustering_manual.annotation = function(aa)
 {
-  # coarse annotation
+  # coarse annotation for all cells
   aa$celltypes = NA
   aa$celltypes[which(aa$seurat_clusters == 0)] = 'Endo'
   aa$celltypes[which(aa$seurat_clusters == 1|
@@ -218,6 +231,245 @@ subclustering_manual.annotation = function(aa)
   
   aa$celltypes[which(aa$seurat_clusters == 16)] = 'c16'
   aa$celltypes[which(aa$seurat_clusters == 17)] = 'c17'
+  
+  Idents(aa) = aa$celltypes
+  
+  DimPlot(aa, label = TRUE, repel = TRUE) + ggtitle("first manual annotation")
+  ggsave(filename = paste0(resDir, '/first_test_umap_v2_manualAnnot.pdf'), width = 8, height = 6)
+  
+  aa$condition = factor(aa$condition, levels = paste0('Amex_scRNA_d', c(0, 1, 4, 7, 14)))
+  
+  DimPlot(aa, label = TRUE, repel = TRUE, split.by = 'condition', label.box = FALSE) + 
+    ggtitle("first manual annotation")
+  ggsave(filename = paste0(resDir, '/first_test_umap_v2_manualAnnot_byCondition.pdf'), width = 24, height = 6)
+  
+  
+  ##########################################
+  # ## subclustering CMs
+  ##########################################
+  aa$subtypes = NA
+  aa$clusters = aa$seurat_clusters
+  markers.coarse = readRDS(file = paste0(RdataDir, 'top10_markerGenes_coarseCluster.rds'))
+  
+  celltype.sels = 'CM'
+  sub.obj = subset(aa, cells = colnames(aa)[!is.na(match(aa$celltypes, celltype.sels))])
+  
+  #sub.obj = SCTransform(aa, ncells = 3000, assay = "RNA", verbose = FALSE, 
+  #            variable.features.n = 3000, return.only.var.genes = TRUE, vst.flavor = "v2")
+  sub.obj <- FindVariableFeatures(sub.obj, selection.method = "vst", nfeatures = 1000)
+  
+  sub.obj = ScaleData(sub.obj, features = rownames(sub.obj))
+  sub.obj <- RunPCA(object = sub.obj, features = VariableFeatures(sub.obj), verbose = FALSE)
+  ElbowPlot(sub.obj, ndims = 30)
+  
+  nb.pcs = 20 # nb of pcs depends on the considered clusters or ids
+  n.neighbors = 20; min.dist = 0.05;
+  sub.obj <- RunUMAP(object = sub.obj, reduction = 'pca', reduction.name = "umap", dims = 1:nb.pcs, 
+                     n.neighbors = n.neighbors,
+                     min.dist = min.dist)
+  
+  
+  # sub.obj$clusters = sub.obj$seurat_clusters
+  p1 = DimPlot(sub.obj, group.by = 'clusters', reduction = 'umap', label = TRUE, label.size = 5) +
+    ggtitle(celltype.sels)
+  
+  features = rownames(aa)[grep('MYH6|ACTN2|NPPA|TNN|GATA4', rownames(aa))]
+  FeaturePlot(aa, features = features, cols = c('gray', 'red'))
+  
+  sub.obj <- FindNeighbors(sub.obj, dims = 1:20)
+  sub.obj <- FindClusters(sub.obj, verbose = FALSE, algorithm = 3, resolution = 0.7)
+  
+  p2 = DimPlot(sub.obj, reduction = 'umap', label = TRUE, label.size = 5) +
+    ggtitle(paste0(celltype.sels, ' -- subclusters'))
+  
+ 
+  
+  markers = FindAllMarkers(sub.obj, only.pos = TRUE, min.pct = 0.25, logfc.threshold = 0.3)
+  
+  markers %>%
+    filter(!str_detect(gene, '^(AMEX|LOC|N/A)')) %>%
+    group_by(cluster) %>%
+    slice_max(n = 10, order_by = avg_log2FC) -> top10
+  
+  xx = subset(sub.obj, downsample = 500)
+  #tops.common = c(markers.coarse$gene[!is.na(match(markers.coarse$cluster, c(1, 2, 3, 6, 13, 14, 15)))])
+  
+  p3 = DoHeatmap(xx, features = top10$gene) + NoLegend()
+  p3
+  #ggsave(filename = paste0(resDir, '/first_test_clusterMarkers_v2.pdf'), width = 10, height = 30)
+  
+  pdfname = paste0(resDir, '/subclustering_associatedMarkerGenes_', celltype.sels, '_v2.pdf')
+  pdf(pdfname, width=16, height = 16)
+  
+  p1
+  p2
+  p3 
+  dev.off()
+  
+  ##########################################
+  # subclustering FBs
+  ##########################################
+  
+  celltype.sels = 'FB'
+  sub.obj = subset(aa, cells = colnames(aa)[!is.na(match(aa$celltypes, celltype.sels))])
+  
+  sub.obj <- FindVariableFeatures(sub.obj, selection.method = "vst", nfeatures = 1000)
+  
+  sub.obj = ScaleData(sub.obj, features = rownames(sub.obj))
+  sub.obj <- RunPCA(object = sub.obj, features = VariableFeatures(sub.obj), verbose = FALSE)
+  ElbowPlot(sub.obj, ndims = 30)
+  
+  nb.pcs = 20 # nb of pcs depends on the considered clusters or ids
+  n.neighbors = 20; min.dist = 0.05;
+  sub.obj <- RunUMAP(object = sub.obj, reduction = 'pca', reduction.name = "umap", dims = 1:nb.pcs, 
+                     n.neighbors = n.neighbors,
+                     min.dist = min.dist)
+  
+  
+  # sub.obj$clusters = sub.obj$seurat_clusters
+  p1 = DimPlot(sub.obj, group.by = 'clusters', reduction = 'umap', label = TRUE, label.size = 5) +
+    ggtitle(celltype.sels)
+  
+  features = rownames(aa)[grep('VIM|COL1A2|FSTL1|POSTN', rownames(aa))]
+  FeaturePlot(aa, features = features, cols = c('gray', 'red'))
+  
+  
+  sub.obj <- FindNeighbors(sub.obj, dims = 1:20)
+  sub.obj <- FindClusters(sub.obj, verbose = FALSE, algorithm = 3, resolution = 0.7)
+  
+  p2 = DimPlot(sub.obj, reduction = 'umap', label = TRUE, label.size = 5) +
+    ggtitle(paste0(celltype.sels, ' -- subclusters'))
+  
+  p1 + p2
+  
+  markers = FindAllMarkers(sub.obj, only.pos = TRUE, min.pct = 0.25, logfc.threshold = 0.3)
+  
+  markers %>%
+    filter(!str_detect(gene, '^(AMEX|LOC|N/A)')) %>%
+    group_by(cluster) %>%
+    slice_max(n = 10, order_by = avg_log2FC) -> top10
+  
+  xx = subset(sub.obj, downsample = 500)
+  #tops.common = c(markers.coarse$gene[!is.na(match(markers.coarse$cluster, c(1, 2, 3, 6, 13, 14, 15)))])
+  
+  p3 = DoHeatmap(xx, features = top10$gene) + NoLegend()
+  p3
+  
+  pdfname = paste0(resDir, '/subclustering_associatedMarkerGenes_', celltype.sels, '_v2.pdf')
+  pdf(pdfname, width=18, height = 16)
+  
+  p1
+  p2
+  p3 
+  dev.off()
+  
+  ##########################################
+  # subclustering immune cells 
+  ##########################################
+  celltype.sels = c('immune', 'blood', 'Macrophage', 'B')
+  sub.obj = subset(aa, cells = colnames(aa)[!is.na(match(aa$celltypes, celltype.sels))])
+  
+  sub.obj <- FindVariableFeatures(sub.obj, selection.method = "vst", nfeatures = 1000)
+  
+  sub.obj = ScaleData(sub.obj, features = rownames(sub.obj))
+  sub.obj <- RunPCA(object = sub.obj, features = VariableFeatures(sub.obj), verbose = FALSE)
+  ElbowPlot(sub.obj, ndims = 30)
+  
+  nb.pcs = 20 # nb of pcs depends on the considered clusters or ids
+  n.neighbors = 20; min.dist = 0.05;
+  sub.obj <- RunUMAP(object = sub.obj, reduction = 'pca', reduction.name = "umap", dims = 1:nb.pcs, 
+                     n.neighbors = n.neighbors,
+                     min.dist = min.dist)
+  
+  # sub.obj$clusters = sub.obj$seurat_clusters
+  p1 = DimPlot(sub.obj, group.by = 'clusters', reduction = 'umap', label = TRUE, label.size = 5) +
+    ggtitle(celltype.sels)
+  
+  features = rownames(sub.obj)[grep('PTPRC|CD68|CD8A|CD74|CSF1R|ITGAM', rownames(sub.obj))]
+  FeaturePlot(sub.obj, features = features, cols = c('gray', 'red'))
+  
+  sub.obj <- FindNeighbors(sub.obj, dims = 1:20)
+  sub.obj <- FindClusters(sub.obj, verbose = FALSE, algorithm = 3, resolution = 0.7)
+  
+  p2 = DimPlot(sub.obj, reduction = 'umap', label = TRUE, label.size = 5) +
+    ggtitle(paste0(celltype.sels, ' -- subclusters'))
+  
+  p1 + p2
+  
+  markers = FindAllMarkers(sub.obj, only.pos = TRUE, min.pct = 0.25, logfc.threshold = 0.3)
+  
+  markers %>%
+    filter(!str_detect(gene, '^(AMEX|LOC|N/A)')) %>%
+    group_by(cluster) %>%
+    slice_max(n = 10, order_by = avg_log2FC) -> top10
+  
+  xx = subset(sub.obj, downsample = 500)
+  #tops.common = c(markers.coarse$gene[!is.na(match(markers.coarse$cluster, c(1, 2, 3, 6, 13, 14, 15)))])
+  
+  p3 = DoHeatmap(xx, features = top10$gene) + NoLegend()
+  p3
+  
+  pdfname = paste0(resDir, '/subclustering_associatedMarkerGenes_', celltype.sels, '_v2.pdf')
+  pdf(pdfname, width=18, height = 16)
+  
+  p1
+  p2
+  p3 
+  dev.off()
+  
+  ##########################################
+  # subclustering Endo
+  ##########################################
+  celltype.sels = c('Endo')
+  sub.obj = subset(aa, cells = colnames(aa)[!is.na(match(aa$celltypes, celltype.sels))])
+  
+  sub.obj <- FindVariableFeatures(sub.obj, selection.method = "vst", nfeatures = 1000)
+  
+  sub.obj = ScaleData(sub.obj, features = rownames(sub.obj))
+  sub.obj <- RunPCA(object = sub.obj, features = VariableFeatures(sub.obj), verbose = FALSE)
+  ElbowPlot(sub.obj, ndims = 30)
+  
+  nb.pcs = 20 # nb of pcs depends on the considered clusters or ids
+  n.neighbors = 20; min.dist = 0.05;
+  sub.obj <- RunUMAP(object = sub.obj, reduction = 'pca', reduction.name = "umap", dims = 1:nb.pcs, 
+                     n.neighbors = n.neighbors,
+                     min.dist = min.dist)
+  
+  # sub.obj$clusters = sub.obj$seurat_clusters
+  p1 = DimPlot(sub.obj, group.by = 'clusters', reduction = 'umap', label = TRUE, label.size = 5) +
+    ggtitle(celltype.sels)
+  
+  #features = rownames(sub.obj)[grep('PTPRC|CD68|CD8A|CD74|CSF1R|ITGAM', rownames(sub.obj))]
+  #FeaturePlot(sub.obj, features = features, cols = c('gray', 'red'))
+  
+  sub.obj <- FindNeighbors(sub.obj, dims = 1:10)
+  sub.obj <- FindClusters(sub.obj, verbose = FALSE, algorithm = 3, resolution = 0.5)
+  
+  p2 = DimPlot(sub.obj, reduction = 'umap', label = TRUE, label.size = 5) +
+    ggtitle(paste0(celltype.sels, ' -- subclusters'))
+  
+  p1 + p2
+  
+  markers = FindAllMarkers(sub.obj, only.pos = TRUE, min.pct = 0.1, logfc.threshold = 0.25)
+  
+  markers %>%
+    filter(!str_detect(gene, '^(AMEX|LOC|N/A)')) %>%
+    group_by(cluster) %>%
+    slice_max(n = 10, order_by = avg_log2FC) -> top10
+  
+  xx = subset(sub.obj, downsample = 500)
+  #tops.common = c(markers.coarse$gene[!is.na(match(markers.coarse$cluster, c(1, 2, 3, 6, 13, 14, 15)))])
+  
+  p3 = DoHeatmap(xx, features = top10$gene) + NoLegend()
+  p3
+  
+  pdfname = paste0(resDir, '/subclustering_associatedMarkerGenes_', celltype.sels, '_v2.pdf')
+  pdf(pdfname, width=18, height = 16)
+  
+  p1
+  p2
+  p3 
+  dev.off()
   
   
   
