@@ -156,7 +156,7 @@ if(!Normalize_with_sctransform){
   # aa = Normalize_with_scran(aa)
   # toc()
   
-  aa <- FindVariableFeatures(aa, selection.method = "vst", nfeatures = 3000)
+  aa <- FindVariableFeatures(aa, selection.method = "vst", nfeatures = 8000)
   all.genes <- rownames(aa)
   aa <- ScaleData(aa, features = all.genes)
   aa <- RunPCA(aa, features = VariableFeatures(object = aa), verbose = FALSE)
@@ -180,7 +180,7 @@ if(!Normalize_with_sctransform){
 ElbowPlot(aa, ndims = 30)
 
 aa <- FindNeighbors(aa, dims = 1:30)
-aa <- FindClusters(aa, verbose = FALSE, algorithm = 3, resolution = 0.7)
+aa <- FindClusters(aa, verbose = FALSE, algorithm = 3, resolution = 0.5)
 
 aa <- RunUMAP(aa, dims = 1:30, n.neighbors = 30, min.dist = 0.3)
 DimPlot(aa, label = TRUE, repel = TRUE) + ggtitle("Unsupervised clustering")
@@ -191,15 +191,19 @@ saveRDS(aa, file = paste0(RdataDir, 'seuratObject_', species, version.analysis, 
 
 ########################################################
 ########################################################
-# Section :  cell type annotation  
+# Section : cell type annotation  
 # 
 ########################################################
 ########################################################
-aa = readRDS(file = paste0(RdataDir, 'seuratObject_', species, version.analysis, '_lognormamlized_pca_umap_v2.rds'))
+RdataDir = '/groups/tanaka/People/current/jiwang/projects/heart_regeneration/results/Rdata/'
+resDir = '/groups/tanaka/People/current/jiwang/projects/heart_regeneration/results/sc_multiome_R13591_20220720'
+
+aa = readRDS(file = paste0(RdataDir, 'seuratObject_axloltl_scRNAseq_R13591_20220720_lognormamlized_pca_umap.rds'))
 
 DimPlot(aa, label = TRUE, repel = TRUE) + ggtitle("scNuc (multiome)")
 
 features = rownames(aa)[grep('LY6', rownames(aa))]
+
 FeaturePlot(aa, features = features, cols = c('gray', 'red'))
 
 features = rownames(aa)[grep('PTPRC', rownames(aa))]
