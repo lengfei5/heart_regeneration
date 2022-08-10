@@ -21,6 +21,7 @@ dataDir = '../R13591_axolotl_multiome'
 
 source('functions_scRNAseq.R')
 source('functions_Visium.R')
+
 require(Seurat)
 #require(sctransform)
 library(pryr) # monitor the memory usage
@@ -165,29 +166,50 @@ if(!Normalize_with_sctransform){
   
 }else{
   
+  ## after testing SCTransform with downsampled data, the UMAP looks not better than the logNorm normalization
+  xx = subset(aa, downsample = 3000)
   tic()
-  test <- SCTransform(aa, ncells = 3000, assay = "RNA", verbose = FALSE, 
-                      variable.features.n = 3000, return.only.var.genes = TRUE, vst.flavor = "v2")
+  test <- SCTransform(xx, ncells = 3000, assay = "RNA", verbose = FALSE, 
+                      variable.features.n = 8000, return.only.var.genes = TRUE, vst.flavor = "v2")
   toc()
+  
+  
+  test <- RunPCA(test, verbose = FALSE, weight.by.var = TRUE)
+  ElbowPlot(test, ndims = 30)
+  
+  test <- FindNeighbors(test, dims = 1:30)
+  test <- FindClusters(test, verbose = FALSE, algorithm = 3, resolution = 0.5)
+  
+  test <- RunUMAP(test, dims = 1:30, n.neighbors = 30, min.dist = 0.3)
+  DimPlot(test, label = TRUE, repel = TRUE) + ggtitle("Unsupervised clustering")
   
   saveRDS(aa, file = paste0(RdataDir, 'seuratObject_', species, version.analysis, '_SCTnormamlized.Rdata'))
   
-  aa <- RunPCA(aa, verbose = FALSE, weight.by.var = TRUE)
 }
-
-# aa = readRDS(file = paste0(RdataDir, 'seuratObject_', species, version.analysis, '_lognormamlized_pca.rds')) 
 
 ElbowPlot(aa, ndims = 30)
 
-aa <- FindNeighbors(aa, dims = 1:30)
-aa <- FindClusters(aa, verbose = FALSE, algorithm = 3, resolution = 0.5)
+aa <- FindNeighbors(aa, dims = 1:20)
+aa <- FindClusters(aa, verbose = FALSE, algorithm = 3, resolution = 0.7)
 
-aa <- RunUMAP(aa, dims = 1:30, n.neighbors = 30, min.dist = 0.3)
-DimPlot(aa, label = TRUE, repel = TRUE) + ggtitle("Unsupervised clustering")
+aa <- RunUMAP(aa, dims = 1:20, n.neighbors = 30, min.dist = 0.1)
+DimPlot(aa, label = TRUE, repel = TRUE) + ggtitle("Unsupervised clustering and umap with good param combination")
 
-ggsave(filename = paste0(resDir, '/first_test_umap_v1.pdf'), width = 8, height = 6)
+ggsave(filename = paste0(resDir, '/first_test_umap_v2.pdf'), width = 10, height = 8)
 
-saveRDS(aa, file = paste0(RdataDir, 'seuratObject_', species, version.analysis, '_lognormamlized_pca_umap_v2.rds'))
+## explore the umap parameter combinations;
+## the optimal parameters: nfeature = 8000; npc=20, n.neighbors = 30; min.dist = 0.1
+Explore.umap.parameters = FALSE
+if(Explore.umap.parameters){
+  source('functions_scRNAseq.R')
+  explore.umap.params.combination(sub.obj = aa, resDir = resDir, 
+                                  pdfname = 'axolotl_spliced_unspliced_umap_test.pdf',
+                                  use.parallelization = TRUE) 
+  
+}
+
+
+saveRDS(aa, file = paste0(RdataDir, 'seuratObject_', species, version.analysis, '_lognormamlized_pca_umap_v3.rds'))
 
 ########################################################
 ########################################################
@@ -195,39 +217,140 @@ saveRDS(aa, file = paste0(RdataDir, 'seuratObject_', species, version.analysis, 
 # 
 ########################################################
 ########################################################
-RdataDir = '/groups/tanaka/People/current/jiwang/projects/heart_regeneration/results/Rdata/'
-resDir = '/groups/tanaka/People/current/jiwang/projects/heart_regeneration/results/sc_multiome_R13591_20220720'
+#RdataDir = '/groups/tanaka/People/current/jiwang/projects/heart_regeneration/results/Rdata/'
+#resDir = '/groups/tanaka/People/current/jiwang/projects/heart_regeneration/results/sc_multiome_R13591_20220720'
+#aa = readRDS(file = paste0(RdataDir, 'seuratObject_axloltl_scRNAseq_R13591_20220720_lognormamlized_pca_umap.rds'))
 
-aa = readRDS(file = paste0(RdataDir, 'seuratObject_axloltl_scRNAseq_R13591_20220720_lognormamlized_pca_umap.rds'))
+aa = readRDS(file = paste0(RdataDir, 'seuratObject_', species, version.analysis, '_lognormamlized_pca_umap_v3.rds'))
+DimPlot(aa, label = TRUE, repel = TRUE) + ggtitle("snRNAseq (multiome)")
 
-DimPlot(aa, label = TRUE, repel = TRUE) + ggtitle("scNuc (multiome)")
+# features = rownames(aa)[grep('LY6', rownames(aa))]
+#FeaturePlot(aa, features = features, cols = c('gray', 'red'))
 
-features = rownames(aa)[grep('LY6', rownames(aa))]
+# features = rownames(aa)[grep('PTPRC', rownames(aa))]
+# FeaturePlot(aa, features = features, cols = c('gray', 'red'))
+# ggsave(filename = paste0(resDir, '/FeaturePlot_CD45.pdf'), width = 8, height = 6)
 
-FeaturePlot(aa, features = features, cols = c('gray', 'red'))
+##########################################
+# check the known canonical marker genes
+##########################################
+## canonical makers of FB
+markers = c('VIM', 'COL1A2', 'FSTL1', 'POSTN', 'DDR2', 'ACTA2','TCF21', 'PDGFRA', 'COL3A1', 
+'COL1A1','GSN','FBLN2', 'SPARC', 'MMP2', 'MSLN', 'RSPO1','LUM','COL8A1')
+features = rownames(aa)[which(!is.na(match(get_geneName(rownames(aa)), markers)))]
 
-features = rownames(aa)[grep('PTPRC', rownames(aa))]
-FeaturePlot(aa, features = features, cols = c('gray', 'red'))
-ggsave(filename = paste0(resDir, '/FeaturePlot_CD45.pdf'), width = 8, height = 6)
+pdfname = paste0(resDir, '/QCs_canonialMarkers_FB_v3.pdf')
+pdf(pdfname, width=10, height = 14)
 
-features = rownames(aa)[grep('VIM|COL1A2|FSTL1|POSTN', rownames(aa))]
-FeaturePlot(aa, features = features, cols = c('gray', 'red'))
+for(n in 1:length(features)){
+  # n = 1
+  cat(n, ' -- ', features[n], '\n')
+  p1 = FeaturePlot(aa, features = features[n], cols = c('gray', 'red'))
+  p2 = VlnPlot(aa, features = features[n])
+  
+  pp = p1 + p2
+  plot(pp)
+  
+}
 
-features = rownames(aa)[grep('MYH6|ACTN2|NPPA|TNNT2|GATA4', rownames(aa))]
-FeaturePlot(aa, features = features, cols = c('gray', 'red'))
+dev.off()
 
-features = rownames(aa)[grep('CD68|CD8A|CD74|CSF1R|ITGAM', rownames(aa))]
-FeaturePlot(aa, features = features, cols = c('gray', 'red'))
+## canonical markers of CM
+markers = toupper(c('MYH6', "Tnnc1", "Tnni3", "Tnnt2", "Actn2", "Gata4", "Nkx2-5", "GJA1", "Myl2", "Tpm1", 
+            "Ryr2", "Atp2a2", "Nppa", "Acta1"))
+features = rownames(aa)[which(!is.na(match(get_geneName(rownames(aa)), markers)))]
 
-features = rownames(aa)[grep('MKI67|CCNB2|PCNA-|CDK1-', rownames(aa))]
-FeaturePlot(aa, features = features, cols = c('gray', 'red'))
+pdfname = paste0(resDir, '/QCs_canonialMarkers_CM_v1.pdf')
+pdf(pdfname, width=10, height = 14)
+
+for(n in 1:length(features)){
+  # n = 1
+  cat(n, ' -- ', features[n], '\n')
+  p1 = FeaturePlot(aa, features = features[n], cols = c('gray', 'red'))
+  p2 = VlnPlot(aa, features = features[n])
+  
+  pp = p1 + p2
+  plot(pp)
+  
+}
+
+dev.off()
+
+
+## canonical markers of immune cells
+markers = toupper(c("PTPRC", "cd68", 
+                    "cd74", "cd163", "Itgam", "Ly6g", "cd8a", "cd14", "Adgre1", "cd3g", "ms4a1", "Lyz1", "ADGRE1", 
+                    "CSF1R", "pdgfb", "pdgfc", "mrc1"))
+features = rownames(aa)[which(!is.na(match(get_geneName(rownames(aa)), markers)))]
+
+pdfname = paste0(resDir, '/QCs_canonialMarkers_ImmuneCells_v1.pdf')
+pdf(pdfname, width=10, height = 14)
+
+for(n in 1:length(features)){
+  # n = 1
+  cat(n, ' -- ', features[n], '\n')
+  p1 = FeaturePlot(aa, features = features[n], cols = c('gray', 'red'))
+  p2 = VlnPlot(aa, features = features[n])
+  
+  pp = p1 + p2
+  plot(pp)
+  
+}
+
+dev.off()
+
+## canonical markers of endotheliel cells
+markers = toupper(c("Tek", "PECAM1", "Emcn", "Cdh5", "KDR", "Vwf", "Fabp4", "Tie1", "Flt1", "Epas1", "Ednrb",
+                    "Ets1", "Gpihbp1", "npr3"))
+features = rownames(aa)[which(!is.na(match(get_geneName(rownames(aa)), markers)))]
+
+pdfname = paste0(resDir, '/QCs_canonialMarkers_Endo_v1.pdf')
+pdf(pdfname, width=10, height = 14)
+
+for(n in 1:length(features)){
+  # n = 1
+  cat(n, ' -- ', features[n], '\n')
+  p1 = FeaturePlot(aa, features = features[n], cols = c('gray', 'red'))
+  p2 = VlnPlot(aa, features = features[n])
+  
+  pp = p1 + p2
+  plot(pp)
+  
+}
+
+dev.off()
+
+### canonical markers of cell cycles
+markers = toupper(c("mki67", "ccnb2", "cdk1", "foxm1", "ccna2", "cdk4", "pcna", "birc5"))
+features = rownames(aa)[which(!is.na(match(get_geneName(rownames(aa)), markers)))]
+
+pdfname = paste0(resDir, '/QCs_canonialMarkers_cellCycle_v1.pdf')
+pdf(pdfname, width=10, height = 14)
+
+for(n in 1:length(features)){
+  # n = 1
+  cat(n, ' -- ', features[n], '\n')
+  p1 = FeaturePlot(aa, features = features[n], cols = c('gray', 'red'))
+  p2 = VlnPlot(aa, features = features[n])
+  
+  pp = p1 + p2
+  plot(pp)
+  
+}
+
+dev.off()
+
 
 #DimPlot(aa, reduction = "umap", label = TRUE, repel = TRUE, group.by = "nCount_RNA") +
 #  NoLegend()
 
+##########################################
+# check the cluster-specific markers
+##########################################
 ### cluster markers
-# markers = FindAllMarkers(aa, only.pos = TRUE, min.pct = 0.25, logfc.threshold = 0.25)
-# saveRDS(markers, file = paste0(RdataDir, 'seuratObject_', species, version.analysis, '_markers_v2.rds')) 
+markers = FindAllMarkers(aa, only.pos = TRUE, min.pct = 0.25, logfc.threshold = 0.25)
+saveRDS(markers, file = paste0(RdataDir, 'seuratObject_', species, version.analysis, '_markers_v2.rds')) 
+
 markers = readRDS(file = paste0(RdataDir, 'seuratObject_', species, version.analysis, '_markers_v2.rds')) 
 
 markers %>%

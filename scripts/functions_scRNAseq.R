@@ -23,12 +23,13 @@ firstup <- function(x) {
 
 get_geneName = function(xx)
 {
-  return(sapply(xx, function(x) unlist(strsplit(as.character(x), '_'))[1]))
+  return(sapply(xx, function(x) {test = unlist(strsplit(as.character(x), '-')); test = test[-length(test)]; 
+  paste0(test, collapse = '-')}))
 }
 
 get_geneID = function(xx)
 {
-  return(sapply(xx, function(x) {test = unlist(strsplit(as.character(x), '_')); return(test[length(test)])}))
+  return(sapply(xx, function(x) {test = unlist(strsplit(as.character(x), '-')); return(test[length(test)])}))
   
 }
 
@@ -199,6 +200,106 @@ make_SeuratObj_scRNAseq = function(topdir = './',
   return(srat)
   
 }
+
+##########################################
+# explore the umap parameter combination 
+##########################################
+explore.umap.params.combination = function(sub.obj,
+                                           resDir = './',
+                                          pdfname = 'UMAP_explore_parameterCombinations.pdf',
+                                          group.by = 'seurat_clusters', 
+                                          with_legend = TRUE,
+                                          weight.by.var = TRUE,
+                                          nfeatures.sampling = c(5000, 8000, 10000),
+                                          nb.pcs.sampling = c(20, 30, 50), 
+                                          n.neighbors.sampling = c(30, 50),
+                                          min.dist.sampling = c(0.1, 0.3), 
+                                          spread.sampling = 1,
+                                          use.parallelization = FALSE
+)
+{
+  options(future.globals.maxSize = 20000 * 1024^2)
+  # 
+  if(use.parallelization){
+    cat('use future package to paralle \n')
+    library(future)
+    plan()
+    # change the current plan to access parallelization
+    plan("multicore", workers = 16)
+    plan()
+    
+  }
+  
+  if (length(dev.list()!=0)) {dev.off()}
+  
+  pdfname = paste0(resDir,'/', pdfname); while (!is.null(dev.list()))  dev.off();
+  
+  pdf(pdfname, width=12, height = 10)
+  par(cex =0.7, mar = c(3,3,2,0.8)+0.1, mgp = c(1.6,0.5,0),las = 0, tcl = -0.3)
+  
+  for(nfeatures in nfeatures.sampling)
+  {
+    # nfeatures = nfeatures.sampling[1]
+    cat('------------- nfeatures - ', nfeatures, '\n')
+    sub.obj <- FindVariableFeatures(sub.obj, selection.method = "vst", nfeatures = nfeatures, verbose = FALSE)
+    sub.obj = ScaleData(sub.obj, verbose = FALSE)
+    sub.obj <- RunPCA(object = sub.obj, features = VariableFeatures(sub.obj), verbose = FALSE, 
+                      npcs = max(50, nb.pcs.sampling), 
+                      weight.by.var = weight.by.var)
+    
+    for(nb.pcs in nb.pcs.sampling)
+    {
+      for(n.neighbors in n.neighbors.sampling)
+      {
+        for(min.dist in min.dist.sampling)
+        {
+          for(spread in spread.sampling){
+            cat('--- nb.pcs - ', nb.pcs, ', n.neighbors - ', n.neighbors, 
+                ', min.dist - ', min.dist, ', spread - ', spread,  '\n')
+            # nfeatures = 5000;
+            # nb.pcs = 50 # nb of pcs depends on the considered clusters or ids 
+            # n.neighbors = 50;
+            # min.dist = 0.05; spread = 1;
+            sub.obj <- RunUMAP(object = sub.obj, reduction = 'pca', reduction.name = "umap", dims = 1:nb.pcs, 
+                               spread = spread, n.neighbors = n.neighbors, 
+                               min.dist = min.dist, verbose = FALSE)
+            
+            if(with_legend){
+              pp = DimPlot(sub.obj, group.by = group.by, reduction = 'umap', label = TRUE, label.size = 6, 
+                           pt.size = 2, repel = TRUE) + 
+                ggtitle(paste0('nfeatures - ', nfeatures,  ', nb.pcs - ', nb.pcs, ', n.neighbors - ', n.neighbors, 
+                               ', min.dist - ', min.dist, ', spread - ', spread))
+            }else{
+              pp = DimPlot(sub.obj, group.by = group.by, reduction = 'umap', label = TRUE, label.size = 6, 
+                           pt.size = 2, repel = TRUE) + 
+                NoLegend() + 
+                ggtitle(paste0('nfeatures - ', nfeatures,  ', nb.pcs - ', nb.pcs, ', n.neighbors - ', n.neighbors, 
+                               ', min.dist - ', min.dist, ', spread - ', spread))
+            }
+            
+            plot(pp)
+          }
+        }
+      }
+      
+    }
+    
+  }
+  
+  dev.off()
+  
+  ## change back to single core
+  if(use.parallelization){
+    library(future)
+    plan()
+    # change the current plan to access parallelization
+    plan("multicore", workers = 1)
+    plan()
+    
+  }
+  
+}
+
 
 ########################################################
 ########################################################
