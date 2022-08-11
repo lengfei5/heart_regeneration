@@ -217,10 +217,6 @@ saveRDS(aa, file = paste0(RdataDir, 'seuratObject_', species, version.analysis, 
 # 
 ########################################################
 ########################################################
-#RdataDir = '/groups/tanaka/People/current/jiwang/projects/heart_regeneration/results/Rdata/'
-#resDir = '/groups/tanaka/People/current/jiwang/projects/heart_regeneration/results/sc_multiome_R13591_20220720'
-#aa = readRDS(file = paste0(RdataDir, 'seuratObject_axloltl_scRNAseq_R13591_20220720_lognormamlized_pca_umap.rds'))
-
 aa = readRDS(file = paste0(RdataDir, 'seuratObject_', species, version.analysis, '_lognormamlized_pca_umap_v3.rds'))
 DimPlot(aa, label = TRUE, repel = TRUE) + ggtitle("snRNAseq (multiome)")
 

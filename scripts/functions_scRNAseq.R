@@ -309,6 +309,19 @@ explore.umap.params.combination = function(sub.obj,
 ########################################################
 subclustering_manual.annotation = function(aa)
 {
+  ##########################################
+  # annotation of spliced version of data 
+  ##########################################
+  RdataDir_spliced = '/groups/tanaka/People/current/jiwang/projects/heart_regeneration/results/Rdata/'
+  resDir = '/groups/tanaka/People/current/jiwang/projects/heart_regeneration/results/sc_multiome_R13591_20220720'
+  aa = readRDS(file = paste0(RdataDir_spliced, 'seuratObject_axloltl_scRNAseq_R13591_20220720_lognormamlized_pca_umap.rds'))
+  
+  DimPlot(aa, label = TRUE, repel = TRUE) + ggtitle("snRNAseq (multiome)")
+  p1 = FeaturePlot(aa, features = 'nFeature_RNA')
+  p2 = FeaturePlot(aa, features = 'percent.mt')
+  
+  p1 | p2
+  
   # coarse annotation for all cells
   aa$celltypes = NA
   aa$celltypes[which(aa$seurat_clusters == 0)] = 'Endo'
@@ -336,30 +349,31 @@ subclustering_manual.annotation = function(aa)
   Idents(aa) = aa$celltypes
   
   DimPlot(aa, label = TRUE, repel = TRUE) + ggtitle("first manual annotation")
-  ggsave(filename = paste0(resDir, '/first_test_umap_v2_manualAnnot.pdf'), width = 8, height = 6)
+  # ggsave(filename = paste0(resDir, '/first_test_umap_v2_manualAnnot.pdf'), width = 8, height = 6)
   
   aa$condition = factor(aa$condition, levels = paste0('Amex_scRNA_d', c(0, 1, 4, 7, 14)))
   
   DimPlot(aa, label = TRUE, repel = TRUE, split.by = 'condition', label.box = FALSE) + 
     ggtitle("first manual annotation")
-  ggsave(filename = paste0(resDir, '/first_test_umap_v2_manualAnnot_byCondition.pdf'), width = 24, height = 6)
+  
+  #ggsave(filename = paste0(resDir, '/first_test_umap_v2_manualAnnot_byCondition.pdf'), width = 24, height = 6)
+  
+  aa$subtypes = aa$celltypes
+  
+  aa$clusters = aa$seurat_clusters
+  markers.coarse = readRDS(file = paste0(RdataDir_spliced, 'top10_markerGenes_coarseCluster.rds'))
   
   
   ##########################################
   # ## subclustering CMs
   ##########################################
-  aa$subtypes = NA
-  aa$clusters = aa$seurat_clusters
-  markers.coarse = readRDS(file = paste0(RdataDir, 'top10_markerGenes_coarseCluster.rds'))
-  
   celltype.sels = 'CM'
   sub.obj = subset(aa, cells = colnames(aa)[!is.na(match(aa$celltypes, celltype.sels))])
   
   #sub.obj = SCTransform(aa, ncells = 3000, assay = "RNA", verbose = FALSE, 
   #            variable.features.n = 3000, return.only.var.genes = TRUE, vst.flavor = "v2")
   sub.obj <- FindVariableFeatures(sub.obj, selection.method = "vst", nfeatures = 1000)
-  
-  sub.obj = ScaleData(sub.obj, features = rownames(sub.obj))
+  sub.obj = ScaleData(sub.obj)
   sub.obj <- RunPCA(object = sub.obj, features = VariableFeatures(sub.obj), verbose = FALSE)
   ElbowPlot(sub.obj, ndims = 30)
   
@@ -368,7 +382,6 @@ subclustering_manual.annotation = function(aa)
   sub.obj <- RunUMAP(object = sub.obj, reduction = 'pca', reduction.name = "umap", dims = 1:nb.pcs, 
                      n.neighbors = n.neighbors,
                      min.dist = min.dist)
-  
   
   # sub.obj$clusters = sub.obj$seurat_clusters
   p1 = DimPlot(sub.obj, group.by = 'clusters', reduction = 'umap', label = TRUE, label.size = 5) +
@@ -380,10 +393,8 @@ subclustering_manual.annotation = function(aa)
   sub.obj <- FindNeighbors(sub.obj, dims = 1:20)
   sub.obj <- FindClusters(sub.obj, verbose = FALSE, algorithm = 3, resolution = 0.7)
   
-  p2 = DimPlot(sub.obj, reduction = 'umap', label = TRUE, label.size = 5) +
+  p2 = DimPlot(sub.obj, reduction = 'umap', label = TRUE, label.size = 6) +
     ggtitle(paste0(celltype.sels, ' -- subclusters'))
-  
- 
   
   markers = FindAllMarkers(sub.obj, only.pos = TRUE, min.pct = 0.25, logfc.threshold = 0.3)
   
@@ -407,10 +418,20 @@ subclustering_manual.annotation = function(aa)
   p3 
   dev.off()
   
+  ## save the subclustering labels 
+  cell.sels = colnames(sub.obj)[which(sub.obj$seurat_clusters == 2)]
+  mm = which(!is.na(match(colnames(aa), cell.sels)))
+  cat(length(cell.sels), '--', length(mm), '\n')
+  aa$subtypes[mm] = "CM.Endo.doublet"
+  
+  cell.sels = colnames(sub.obj)[which(sub.obj$seurat_clusters != 2)]
+  mm = which(!is.na(match(colnames(aa), cell.sels)))
+  cat(length(cell.sels), '--', length(mm), '\n')
+  
+  
   ##########################################
   # subclustering FBs
   ##########################################
-  
   celltype.sels = 'FB'
   sub.obj = subset(aa, cells = colnames(aa)[!is.na(match(aa$celltypes, celltype.sels))])
   
@@ -464,6 +485,28 @@ subclustering_manual.annotation = function(aa)
   p3 
   dev.off()
   
+  ## save the subclustering labels 
+  cell.sels = colnames(sub.obj)[which(sub.obj$seurat_clusters == 0)]
+  mm = which(!is.na(match(colnames(aa), cell.sels)))
+  cat(length(cell.sels), '--', length(mm), '\n')
+  aa$subtypes[mm] = "Macrophage"
+  
+  cell.sels = rownames(sub.obj)[which(sub.obj$seurat_clusters != 1 & sub.obj$seurat_clusters != 8)]
+  mm = match(rownames(aa), cell.sels)
+  cat(length(cell.sels), '--', length(which(!is.na(mm))), '\n')
+  aa$subtypes[mm] = "FB"
+  
+  cell.sels = rownames(sub.obj)[which(sub.obj$seurat_clusters == 1)]
+  mm = match(rownames(aa), cell.sels)
+  cat(length(cell.sels), '--', length(which(!is.na(mm))), '\n')
+  aa$subtypes[mm] = 'FB.or.Endo'
+  
+  cell.sels = rownames(sub.obj)[which(sub.obj$seurat_clusters == 8)]
+  mm = match(rownames(aa), cell.sels)
+  cat(length(cell.sels), '--', length(which(!is.na(mm))), '\n')
+  aa$subtypes[mm] = 'FB.CM.doublet'
+  
+  
   ##########################################
   # subclustering immune cells 
   ##########################################
@@ -492,7 +535,7 @@ subclustering_manual.annotation = function(aa)
   sub.obj <- FindNeighbors(sub.obj, dims = 1:20)
   sub.obj <- FindClusters(sub.obj, verbose = FALSE, algorithm = 3, resolution = 0.7)
   
-  p2 = DimPlot(sub.obj, reduction = 'umap', label = TRUE, label.size = 5) +
+  p2 = DimPlot(sub.obj, reduction = 'umap', label = TRUE, label.size = 6) +
     ggtitle(paste0(celltype.sels, ' -- subclusters'))
   
   p1 + p2
@@ -517,6 +560,48 @@ subclustering_manual.annotation = function(aa)
   p2
   p3 
   dev.off()
+  
+  ## save the subclustering labels 
+  cell.sels = colnames(sub.obj)[which(sub.obj$seurat_clusters == 0)]
+  mm = which(!is.na(match(colnames(aa), cell.sels)))
+  cat(length(cell.sels), '--', length(mm), '\n')
+  aa$subtypes[mm] = "Macrophage"
+  
+  cell.sels = colnames(sub.obj)[which(sub.obj$seurat_clusters == 1)]
+  mm = which(!is.na(match(colnames(aa), cell.sels)))
+  cat(length(cell.sels), '--', length(mm), '\n')
+  aa$subtypes[mm] = 'blood'
+  
+  cell.sels = colnames(sub.obj)[which(sub.obj$seurat_clusters == 2)]
+  mm = which(!is.na(match(colnames(aa), cell.sels)))
+  cat(length(cell.sels), '--', length(mm), '\n')
+  aa$subtypes[mm] = 'Thrombocytes/Megakaryocytes'
+  
+  cell.sels = colnames(sub.obj)[which(sub.obj$seurat_clusters == 3)]
+  mm = which(!is.na(match(colnames(aa), cell.sels)))
+  cat(length(cell.sels), '--', length(mm), '\n')
+  aa$subtypes[mm] = 'Bcell'
+  
+  cell.sels = colnames(sub.obj)[which(sub.obj$seurat_clusters == 4)]
+  mm = which(!is.na(match(colnames(aa), cell.sels)))
+  cat(length(cell.sels), '--', length(mm), '\n')
+  aa$subtypes[mm] = 'notSure.immune.CM.doublet'
+  
+  
+  cell.sels = colnames(sub.obj)[which(sub.obj$seurat_clusters == 5)]
+  mm = which(!is.na(match(colnames(aa), cell.sels)))
+  cat(length(cell.sels), '--', length(mm), '\n')
+  aa$subtypes[mm] = 'immune/MF'
+  
+  cell.sels = colnames(sub.obj)[which(sub.obj$seurat_clusters == 6)]
+  mm = which(!is.na(match(colnames(aa), cell.sels)))
+  cat(length(cell.sels), '--', length(mm), '\n')
+  aa$subtypes[mm] = 'blood/neutrophil'
+  
+  cell.sels = colnames(sub.obj)[which(sub.obj$seurat_clusters == 7)]
+  mm = which(!is.na(match(colnames(aa), cell.sels)))
+  cat(length(cell.sels), '--', length(mm), '\n')
+  aa$subtypes[mm] = 'Tcell'
   
   ##########################################
   # subclustering Endo
@@ -571,7 +656,5 @@ subclustering_manual.annotation = function(aa)
   p2
   p3 
   dev.off()
-  
-  
   
 }
