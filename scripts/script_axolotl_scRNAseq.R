@@ -340,28 +340,31 @@ for(n in 1:length(features)){
 
 dev.off()
 
-
-#DimPlot(aa, reduction = "umap", label = TRUE, repel = TRUE, group.by = "nCount_RNA") +
+# DimPlot(aa, reduction = "umap", label = TRUE, repel = TRUE, group.by = "nCount_RNA") +
 #  NoLegend()
 
 ##########################################
 # check the cluster-specific markers
 ##########################################
 ### cluster markers
-markers = FindAllMarkers(aa, only.pos = TRUE, min.pct = 0.25, logfc.threshold = 0.25)
-saveRDS(markers, file = paste0(RdataDir, 'seuratObject_', species, version.analysis, '_markers_v2.rds')) 
+Run_FindAllMarkers = FALSE
+if(Run_FindAllMarkers){
+  markers = FindAllMarkers(aa, only.pos = TRUE, min.pct = 0.25, logfc.threshold = 0.25)
+  saveRDS(markers, file = paste0(RdataDir, 'seuratObject_', species, version.analysis, '_markers_v2.rds')) 
+}
+
 
 markers = readRDS(file = paste0(RdataDir, 'seuratObject_', species, version.analysis, '_markers_v2.rds')) 
 
 markers %>%
   filter(!str_detect(gene, '^(AMEX|LOC)')) %>%
   group_by(cluster) %>%
-  slice_max(n = 10, order_by = avg_log2FC) -> top10
+  slice_max(n = 20, order_by = avg_log2FC) -> top10
 
-saveRDS(top10, file = paste0(RdataDir, 'top10_markerGenes_coarseCluster.rds'))
+#saveRDS(top10, file = paste0(RdataDir, 'top10_markerGenes_coarseCluster.rds'))
 
 xx = subset(aa, downsample = 500)
-
 DoHeatmap(xx, features = top10$gene) + NoLegend()
-ggsave(filename = paste0(resDir, '/first_test_clusterMarkers_v2.pdf'), width = 10, height = 30)
+
+ggsave(filename = paste0(resDir, '/first_test_clusterMarkers_v2.pdf'), width = 45, height = 40)
 
