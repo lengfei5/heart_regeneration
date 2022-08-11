@@ -486,27 +486,17 @@ subclustering_manual.annotation = function(aa)
   dev.off()
   
   ## save the subclustering labels 
-  cell.sels = colnames(sub.obj)[which(sub.obj$seurat_clusters == 0)]
+  cell.sels = colnames(sub.obj)[which(sub.obj$seurat_clusters == 1)]
   mm = which(!is.na(match(colnames(aa), cell.sels)))
   cat(length(cell.sels), '--', length(mm), '\n')
-  aa$subtypes[mm] = "Macrophage"
+  aa$subtypes[mm] = "FB/Endo"
   
-  cell.sels = rownames(sub.obj)[which(sub.obj$seurat_clusters != 1 & sub.obj$seurat_clusters != 8)]
-  mm = match(rownames(aa), cell.sels)
-  cat(length(cell.sels), '--', length(which(!is.na(mm))), '\n')
-  aa$subtypes[mm] = "FB"
+  cell.sels = colnames(sub.obj)[which(sub.obj$seurat_clusters == 8)]
+  mm = which(!is.na(match(colnames(aa), cell.sels)))
+  cat(length(cell.sels), '--', length(mm), '\n')
+  aa$subtypes[mm] = "FB.CM.doublet"
   
-  cell.sels = rownames(sub.obj)[which(sub.obj$seurat_clusters == 1)]
-  mm = match(rownames(aa), cell.sels)
-  cat(length(cell.sels), '--', length(which(!is.na(mm))), '\n')
-  aa$subtypes[mm] = 'FB.or.Endo'
-  
-  cell.sels = rownames(sub.obj)[which(sub.obj$seurat_clusters == 8)]
-  mm = match(rownames(aa), cell.sels)
-  cat(length(cell.sels), '--', length(which(!is.na(mm))), '\n')
-  aa$subtypes[mm] = 'FB.CM.doublet'
-  
-  
+    
   ##########################################
   # subclustering immune cells 
   ##########################################
@@ -656,5 +646,8 @@ subclustering_manual.annotation = function(aa)
   p2
   p3 
   dev.off()
+  
+  saveRDS(aa, file = paste0(RdataDir_spliced, 'seuratObject_axloltl_scRNAseq_splicedOnly_manualAnnotation.rds'))
+  
   
 }
