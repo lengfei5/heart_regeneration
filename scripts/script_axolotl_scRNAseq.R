@@ -14,6 +14,8 @@ version.analysis = '_R13591_intron.exon.20220729'
 resDir = paste0("../results/sc_multiome", version.analysis)
 RdataDir = paste0(resDir, '/Rdata/')
 
+
+
 if(!dir.exists(resDir)) dir.create(resDir)
 if(!dir.exists(RdataDir)) dir.create(RdataDir)
 
@@ -30,6 +32,8 @@ require(dplyr)
 require(stringr)
 require(tidyr)
 require(tictoc)
+options(future.globals.maxSize = 64000 * 1024^2)
+
 mem_used()
 
 species = 'axloltl_scRNAseq'

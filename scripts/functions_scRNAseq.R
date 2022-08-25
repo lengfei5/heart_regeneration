@@ -202,6 +202,96 @@ make_SeuratObj_scRNAseq = function(topdir = './',
 }
 
 ##########################################
+# doublet detection with DoubletFinder
+# the old version of function is from 
+# https://github.com/lengfei5/scRNAseq_MS_lineage_dev/blob/development/scripts/scATAC_functions.R
+##########################################
+detect_doubletCell= function(seurat.cistopic)
+{
+  ##########################################
+  # check the distribution of fragment for cluster 7
+  ##########################################
+  #source.my.script('scATAC_functions.R')
+  filtered_mtx_dir = paste0("../output_cellranger.ce11_scATACpro/filtered_matrix_peaks_barcodes")
+  tenx.bmat = load_tenx_atac(paste0(filtered_mtx_dir, '/matrix.mtx'), 
+                             paste0(filtered_mtx_dir, '/peaks.bed'), 
+                             paste0(filtered_mtx_dir, '/barcodes.tsv'))
+  
+  pdfname = paste0(resDir, "/detect_doublet/distribution_counts_each_clusters.pdf")
+  pdf(pdfname, width=12, height = 8)
+  par(cex =1.0, mar = c(3,3,2,0.8)+0.1, mgp = c(1.6,0.5,0),las = 0, tcl = -0.3)
+  
+  par(mfrow=c(4,4))
+  for(n in c(1:16)){
+    # n = 1
+    cat('cluster -- ', n, '\n')
+    mm = match(colnames(seurat.cistopic)[which(seurat.cistopic$peaks_snn_res.0.8 == n)], 
+               colnames(tenx.bmat))
+    bmat.cluster = as.numeric(tenx.bmat[, mm])
+    xx = bmat.cluster[which(bmat.cluster<=5)]
+    hist(xx, main = paste0('histogrma of cluster ', n))
+    #abline(v = log2(1+2)+1, col = 'red')
+  }
+  
+  dev.off()
+  
+  ##########################################
+  # detect doublets using published methods 
+  ##########################################
+  library(DoubletFinder)
+  DefaultAssay(seurat.cistopic) = 'RNA'
+  
+  seu_kidney <- ScaleData(seurat.cistopic)
+  seu_kidney <- FindVariableFeatures(seu_kidney, selection.method = "vst", nfeatures = 2000)
+  seu_kidney <- RunPCA(seu_kidney, verbose = TRUE)
+  seu_kidney <- RunUMAP(seu_kidney, dims = 1:10)
+  
+  sweep.res.list_kidney <- paramSweep_v3(seu_kidney, PCs = 1:10, sct = FALSE)
+  sweep.stats_kidney <- summarizeSweep(sweep.res.list_kidney, GT = FALSE)
+  bcmvn_kidney <- find.pK(sweep.stats_kidney)
+  
+  ## Homotypic Doublet Proportion Estimate -------------------------------------------------------------------------------------
+  annotations <- seu_kidney@meta.data$peaks_snn_res.0.8
+  homotypic.prop <- modelHomotypic(annotations)           ## ex: annotations <- seu_kidney@meta.data$ClusteringResults
+  nExp_poi <- round(0.075*length(seu_kidney$peaks_snn_res.0.8))  ## Assuming 7.5% doublet formation rate - tailor for your dataset
+  nExp_poi.adj <- round(nExp_poi*(1-homotypic.prop))
+  
+  ## Run DoubletFinder with varying classification stringencies ----------------------------------------------------------------
+  seu_kidney <- doubletFinder_v3(seu_kidney, PCs = 1:10, pN = 0.25, pK = 0.09, nExp = nExp_poi, reuse.pANN = FALSE, 
+                                 sct = FALSE)
+  
+  seu_kidney <- doubletFinder_v3(seu_kidney, PCs = 1:10, pN = 0.25, pK = 0.09, 
+                                 nExp = nExp_poi.adj, reuse.pANN = "pANN_0.25_0.09_816", sct = FALSE)
+  
+  xx = data.frame(seu_kidney$peaks_snn_res.0.8, seu_kidney$DF.classifications_0.25_0.09_770)
+  colnames(xx) = c('cluster', 'doublet')
+  yy = table(xx$cluster)
+  yy = rbind(yy, table(xx$cluster[which(xx$doublet=='Singlet')]))
+  yy = rbind(yy, table(xx$cluster[which(xx$doublet=='Doublet')]))
+  rownames(yy) = c('total', 'singlet', 'doublet')
+  
+  barplot(yy[c(1,3),], main="nb of total and doublet",
+          xlab="cluster index", col=c("darkblue","red"),
+          legend = rownames(yy)[c(1,3)], beside=TRUE)
+  
+  xx = seurat.cistopic
+  xx$Singlet = seu_kidney$DF.classifications_0.25_0.09_770
+  #xx = subset(seurat.cistopic, cells = which(seu_kidney$DF.classifications_0.25_0.09_770 == 'Singlet') )
+  
+  nb.pcs = 80;
+  n.neighbors = 50; min.dist = 0.1;
+  
+  xx <- RunUMAP(object = xx, reduction = 'pca', 
+                dims = 1:nb.pcs, 
+                n.neighbors = n.neighbors, min.dist = min.dist)
+  
+  DimPlot(xx, label = TRUE, pt.size = 1.5, label.size = 5,  repel = TRUE, split.by = 'Singlet') + 
+    NoLegend()
+  
+  
+}
+
+##########################################
 # explore the umap parameter combination 
 ##########################################
 explore.umap.params.combination = function(sub.obj,
@@ -310,11 +400,27 @@ explore.umap.params.combination = function(sub.obj,
 subclustering_manual.annotation = function(aa)
 {
   ##########################################
-  # annotation of spliced version of data 
+  # transfer the cell labels from spliced data
   ##########################################
-  RdataDir_spliced = '/groups/tanaka/People/current/jiwang/projects/heart_regeneration/results/Rdata/'
-  resDir = '/groups/tanaka/People/current/jiwang/projects/heart_regeneration/results/sc_multiome_R13591_20220720'
-  aa = readRDS(file = paste0(RdataDir_spliced, 'seuratObject_axloltl_scRNAseq_R13591_20220720_lognormamlized_pca_umap.rds'))
+  Transferring_cellLabels_splicedData = FALSE
+  if(Transferring_cellLabels_splicedData){
+    RdataDir_spliced = '/groups/tanaka/People/current/jiwang/projects/heart_regeneration/results/Rdata/'
+    bb = readRDS(file = paste0(RdataDir_spliced, 'seuratObject_axloltl_scRNAseq_splicedOnly_manualAnnotation.rds'))
+    mm = match(colnames(aa), colnames(bb))
+    aa$celltypes = bb$celltypes[mm]
+    aa$subtypes = bb$subtypes[mm]
+    
+    rm(bb)
+    
+    aa$clusters = aa$seurat_clusters
+    
+    saveRDS(aa, file = paste0(RdataDir, 'seuratObject_', species, version.analysis, '_lognormamlized_pca_umap_manualAnnot.rds'))
+    
+    ##########################################
+    # some cleaning for each cluster ??
+    ##########################################
+    
+  }
   
   DimPlot(aa, label = TRUE, repel = TRUE) + ggtitle("snRNAseq (multiome)")
   p1 = FeaturePlot(aa, features = 'nFeature_RNA')
@@ -322,47 +428,25 @@ subclustering_manual.annotation = function(aa)
   
   p1 | p2
   
-  # coarse annotation for all cells
-  aa$celltypes = NA
-  aa$celltypes[which(aa$seurat_clusters == 0)] = 'Endo'
-  aa$celltypes[which(aa$seurat_clusters == 1|
-                       aa$seurat_clusters == 13|
-                       aa$seurat_clusters == 14|
-                       aa$seurat_clusters == 15|
-                       aa$seurat_clusters == 2|
-                       aa$seurat_clusters == 3|
-                       aa$seurat_clusters == 6)] = 'CM'
+  ggsave(filename = paste0(resDir, '/FeaturesPlot_nFeatures_pertMT.pdf'), width = 14, height = 6)
   
+  # annotation for all cells
+  Idents(aa) = aa$subtypes
   
-  aa$celltypes[which(aa$seurat_clusters == 4)] = 'FB'
-  aa$celltypes[which(aa$seurat_clusters == 5)] = 'Macrophage'
-  aa$celltypes[which(aa$seurat_clusters == 7)] = 'immune'
-  aa$celltypes[which(aa$seurat_clusters == 8)] = 'blood'
-  aa$celltypes[which(aa$seurat_clusters == 9)] = 'proliferating'
-  aa$celltypes[which(aa$seurat_clusters == 10|
-                       aa$seurat_clusters == 11)] = 'FB'
-  aa$celltypes[which(aa$seurat_clusters == 12)] = 'B'
-  
-  aa$celltypes[which(aa$seurat_clusters == 16)] = 'c16'
-  aa$celltypes[which(aa$seurat_clusters == 17)] = 'c17'
-  
-  Idents(aa) = aa$celltypes
-  
-  DimPlot(aa, label = TRUE, repel = TRUE) + ggtitle("first manual annotation")
-  # ggsave(filename = paste0(resDir, '/first_test_umap_v2_manualAnnot.pdf'), width = 8, height = 6)
+  DimPlot(aa, label = TRUE, group.by = 'subtypes', repel = TRUE) + ggtitle("first manual annotation")
+  ggsave(filename = paste0(resDir, '/first_test_umap_v2_manualAnnot.pdf'), width = 10, height = 8)
   
   aa$condition = factor(aa$condition, levels = paste0('Amex_scRNA_d', c(0, 1, 4, 7, 14)))
+  aa$subtypes[which(is.na(aa$subtypes))] = 'unknow'
   
-  DimPlot(aa, label = TRUE, repel = TRUE, split.by = 'condition', label.box = FALSE) + 
+  DimPlot(aa, label = TRUE, repel = TRUE, split.by = 'condition') + NoLegend() +  
     ggtitle("first manual annotation")
   
-  #ggsave(filename = paste0(resDir, '/first_test_umap_v2_manualAnnot_byCondition.pdf'), width = 24, height = 6)
+  ggsave(filename = paste0(resDir, '/first_test_umap_v2_manualAnnot_byCondition.pdf'), width = 25, height = 8)
   
-  aa$subtypes = aa$celltypes
-  
-  aa$clusters = aa$seurat_clusters
-  markers.coarse = readRDS(file = paste0(RdataDir_spliced, 'top10_markerGenes_coarseCluster.rds'))
-  
+  # aa$subtypes = aa$celltypes
+  # aa$clusters = aa$seurat_clusters
+  # markers.coarse = readRDS(file = paste0(RdataDir_spliced, 'top10_markerGenes_coarseCluster.rds'))
   
   ##########################################
   # ## subclustering CMs
@@ -500,33 +584,36 @@ subclustering_manual.annotation = function(aa)
   ##########################################
   # subclustering immune cells 
   ##########################################
-  celltype.sels = c('immune', 'blood', 'Macrophage', 'B')
-  sub.obj = subset(aa, cells = colnames(aa)[!is.na(match(aa$celltypes, celltype.sels))])
+  #celltype.sels = c('immune', 'blood', 'Macrophage', 'B')
+  cluster.sels = c(24, 22, 18, 17, 9, 11, 20, 21, 13)
+  sub.obj = subset(aa, cells = colnames(aa)[!is.na(match(aa$clusters, cluster.sels))])
   
-  sub.obj <- FindVariableFeatures(sub.obj, selection.method = "vst", nfeatures = 1000)
-  
-  sub.obj = ScaleData(sub.obj, features = rownames(sub.obj))
+  sub.obj <- FindVariableFeatures(sub.obj, selection.method = "vst", nfeatures = 5000)
+  sub.obj = ScaleData(sub.obj)
   sub.obj <- RunPCA(object = sub.obj, features = VariableFeatures(sub.obj), verbose = FALSE)
   ElbowPlot(sub.obj, ndims = 30)
   
   nb.pcs = 20 # nb of pcs depends on the considered clusters or ids
-  n.neighbors = 20; min.dist = 0.05;
+  n.neighbors = 20; min.dist = 0.1;
   sub.obj <- RunUMAP(object = sub.obj, reduction = 'pca', reduction.name = "umap", dims = 1:nb.pcs, 
                      n.neighbors = n.neighbors,
                      min.dist = min.dist)
   
   # sub.obj$clusters = sub.obj$seurat_clusters
-  p1 = DimPlot(sub.obj, group.by = 'clusters', reduction = 'umap', label = TRUE, label.size = 5) +
-    ggtitle(celltype.sels)
+  p1 = DimPlot(sub.obj, group.by = 'clusters', reduction = 'umap', label = TRUE, label.size = 5)
+  p11 = DimPlot(sub.obj, group.by = 'subtypes', reduction = 'umap', label = TRUE, repel = TRUE, label.size = 5) + 
+    NoLegend()
+  
+  p1
+  p11
   
   features = rownames(sub.obj)[grep('PTPRC|CD68|CD8A|CD74|CSF1R|ITGAM', rownames(sub.obj))]
   FeaturePlot(sub.obj, features = features, cols = c('gray', 'red'))
   
   sub.obj <- FindNeighbors(sub.obj, dims = 1:20)
-  sub.obj <- FindClusters(sub.obj, verbose = FALSE, algorithm = 3, resolution = 0.7)
+  sub.obj <- FindClusters(sub.obj, verbose = FALSE, algorithm = 3, resolution = 0.3)
   
-  p2 = DimPlot(sub.obj, reduction = 'umap', label = TRUE, label.size = 6) +
-    ggtitle(paste0(celltype.sels, ' -- subclusters'))
+  p2 = DimPlot(sub.obj, reduction = 'umap', label = TRUE, label.size = 5)
   
   p1 + p2
   
@@ -547,51 +634,56 @@ subclustering_manual.annotation = function(aa)
   pdf(pdfname, width=18, height = 16)
   
   p1
+  p11
   p2
   p3 
   dev.off()
   
-  ## save the subclustering labels 
-  cell.sels = colnames(sub.obj)[which(sub.obj$seurat_clusters == 0)]
-  mm = which(!is.na(match(colnames(aa), cell.sels)))
-  cat(length(cell.sels), '--', length(mm), '\n')
-  aa$subtypes[mm] = "Macrophage"
-  
-  cell.sels = colnames(sub.obj)[which(sub.obj$seurat_clusters == 1)]
-  mm = which(!is.na(match(colnames(aa), cell.sels)))
-  cat(length(cell.sels), '--', length(mm), '\n')
-  aa$subtypes[mm] = 'blood'
-  
-  cell.sels = colnames(sub.obj)[which(sub.obj$seurat_clusters == 2)]
-  mm = which(!is.na(match(colnames(aa), cell.sels)))
-  cat(length(cell.sels), '--', length(mm), '\n')
-  aa$subtypes[mm] = 'Thrombocytes/Megakaryocytes'
-  
-  cell.sels = colnames(sub.obj)[which(sub.obj$seurat_clusters == 3)]
-  mm = which(!is.na(match(colnames(aa), cell.sels)))
-  cat(length(cell.sels), '--', length(mm), '\n')
-  aa$subtypes[mm] = 'Bcell'
-  
-  cell.sels = colnames(sub.obj)[which(sub.obj$seurat_clusters == 4)]
-  mm = which(!is.na(match(colnames(aa), cell.sels)))
-  cat(length(cell.sels), '--', length(mm), '\n')
-  aa$subtypes[mm] = 'notSure.immune.CM.doublet'
-  
-  
-  cell.sels = colnames(sub.obj)[which(sub.obj$seurat_clusters == 5)]
-  mm = which(!is.na(match(colnames(aa), cell.sels)))
-  cat(length(cell.sels), '--', length(mm), '\n')
-  aa$subtypes[mm] = 'immune/MF'
-  
-  cell.sels = colnames(sub.obj)[which(sub.obj$seurat_clusters == 6)]
-  mm = which(!is.na(match(colnames(aa), cell.sels)))
-  cat(length(cell.sels), '--', length(mm), '\n')
-  aa$subtypes[mm] = 'blood/neutrophil'
-  
-  cell.sels = colnames(sub.obj)[which(sub.obj$seurat_clusters == 7)]
-  mm = which(!is.na(match(colnames(aa), cell.sels)))
-  cat(length(cell.sels), '--', length(mm), '\n')
-  aa$subtypes[mm] = 'Tcell'
+  ## save the subclustering labels
+  Save.subtype.Annot = FALSE
+  if(Save.subtype.Annot){
+    cell.sels = colnames(sub.obj)[which(sub.obj$seurat_clusters == 0)]
+    mm = which(!is.na(match(colnames(aa), cell.sels)))
+    cat(length(cell.sels), '--', length(mm), '\n')
+    aa$subtypes[mm] = "Macrophage"
+    
+    cell.sels = colnames(sub.obj)[which(sub.obj$seurat_clusters == 1)]
+    mm = which(!is.na(match(colnames(aa), cell.sels)))
+    cat(length(cell.sels), '--', length(mm), '\n')
+    aa$subtypes[mm] = 'blood'
+    
+    cell.sels = colnames(sub.obj)[which(sub.obj$seurat_clusters == 2)]
+    mm = which(!is.na(match(colnames(aa), cell.sels)))
+    cat(length(cell.sels), '--', length(mm), '\n')
+    aa$subtypes[mm] = 'Thrombocytes/Megakaryocytes'
+    
+    cell.sels = colnames(sub.obj)[which(sub.obj$seurat_clusters == 3)]
+    mm = which(!is.na(match(colnames(aa), cell.sels)))
+    cat(length(cell.sels), '--', length(mm), '\n')
+    aa$subtypes[mm] = 'Bcell'
+    
+    cell.sels = colnames(sub.obj)[which(sub.obj$seurat_clusters == 4)]
+    mm = which(!is.na(match(colnames(aa), cell.sels)))
+    cat(length(cell.sels), '--', length(mm), '\n')
+    aa$subtypes[mm] = 'notSure.immune.CM.doublet'
+    
+    
+    cell.sels = colnames(sub.obj)[which(sub.obj$seurat_clusters == 5)]
+    mm = which(!is.na(match(colnames(aa), cell.sels)))
+    cat(length(cell.sels), '--', length(mm), '\n')
+    aa$subtypes[mm] = 'immune/MF'
+    
+    cell.sels = colnames(sub.obj)[which(sub.obj$seurat_clusters == 6)]
+    mm = which(!is.na(match(colnames(aa), cell.sels)))
+    cat(length(cell.sels), '--', length(mm), '\n')
+    aa$subtypes[mm] = 'blood/neutrophil'
+    
+    cell.sels = colnames(sub.obj)[which(sub.obj$seurat_clusters == 7)]
+    mm = which(!is.na(match(colnames(aa), cell.sels)))
+    cat(length(cell.sels), '--', length(mm), '\n')
+    aa$subtypes[mm] = 'Tcell'
+    
+  }
   
   ##########################################
   # subclustering Endo
@@ -646,8 +738,6 @@ subclustering_manual.annotation = function(aa)
   p2
   p3 
   dev.off()
-  
-  saveRDS(aa, file = paste0(RdataDir_spliced, 'seuratObject_axloltl_scRNAseq_splicedOnly_manualAnnotation.rds'))
   
   
 }
