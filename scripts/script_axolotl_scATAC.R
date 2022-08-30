@@ -68,7 +68,6 @@ granges_axolotl$gene_biotype = "protein_coding"
 # newgenenames = gene_name_match[granges_axolotl$gene_id,2]
 # granges_axolotl$gene_name = newgenenames
 
-
 species = 'axloltl_scATAC'
 
 ########################################################
@@ -84,9 +83,10 @@ design$timepoint = gsub('Amex_scATAC_', '', design$condition)
 
 source('functions_scRNAseq.R')
 
+
 for(n in 1:nrow(design))
 {
-  # n = 1
+  # n = 3
   cat('-----------', design$condition[n], '-------------\n')
   
   # load nf output and process
@@ -100,14 +100,13 @@ for(n in 1:nrow(design))
     row.names = 1
   )
   
-  
   chrom_assay <- CreateChromatinAssay(
     counts = counts$Peaks,
     sep = c(":", "-"),
     fragments = fragpath,
     annotation = granges_axolotl,
     min.cells = 10,
-    min.features = 50
+    min.features = 20
   )
   
   bb <- CreateSeuratObject(
@@ -118,28 +117,32 @@ for(n in 1:nrow(design))
   rm(chrom_assay)
   
   bb$condition = design$condition[n]
+  
   mm = match(colnames(bb), metadata$gex_barcode)
-  bb$atac_barcode = metadata$atac_barcode[mm]
-  bb$total_fragments = metadata$atac_fragments[mm]
-  bb$peak_region_fragments = metadata$atac_peak_region_fragments[mm]
-  bb$pct_reads_in_peaks <- bb$peak_region_fragments / bb$total_fragments * 100
+  metadata = metadata[, c(1,2, 3, 21:30)]
+  
+  bb = AddMetaData(bb, metadata = metadata)
+  
+  bb$pct_reads_in_peaks <- bb$atac_peak_region_fragments / bb$atac_fragments * 100
+  bb$pct_usable_fragments = bb$atac_fragments/bb$atac_raw_reads
   
   DefaultAssay(bb) <- "ATAC"
   
   bb <- NucleosomeSignal(bb)
   bb <- TSSEnrichment(bb, fast = FALSE)
   
+  Idents(bb) = bb$condition
   bb$high.tss <- ifelse(bb$TSS.enrichment > 5, 'High', 'Low')
   TSSPlot(bb, group.by = 'high.tss') + NoLegend()
   
-  Idents(bb) = bb$condition
-  VlnPlot(bb, 
-          features = c("nCount_ATAC", "total_fragments", "peak_region_fragments"), 
-          ncol = 3) 
-  
+  VlnPlot(bb, features = "nCount_ATAC", ncol = 1, y.max = 2000) +
   geom_hline(yintercept = c(500, 1000))
   
-  VlnPlot(bb, features = 'TSS.enrichment', y.max = 6)
+  VlnPlot(bb, 
+          features = c("nCount_ATAC", "atac_fragments", "pct_reads_in_peaks"), 
+          ncol = 3)
+  
+  cat(median(bb$nCount_ATAC), '--', median(bb$atac_fragments), ' -- ', median(bb$pct_reads_in_peaks), ' \n')
   
   VlnPlot(
     object = bb,
@@ -147,6 +150,66 @@ for(n in 1:nrow(design))
     ncol = 2,
     pt.size = 0
   )
+  
+  # quick filtering 
+  bb <- subset(
+    x = bb,
+    subset = nCount_ATAC > 200 &
+      nCount_ATAC < 20000 &
+      #pct_reads_in_peaks > 15 &
+      #blacklist_ratio < 0.05 &
+      nucleosome_signal < 4 &
+      TSS.enrichment > 1
+  )
+  
+  print(n)
+  
+  bb = RunTFIDF(bb)
+  bb = FindTopFeatures(bb, min.cutoff = 5)
+  bb = RunSVD(bb)
+  
+  DepthCor(bb, n = 30)
+  #cordat = DepthCor(bb, n = 30)$data
+  dims_use = c(2:30)
+  print(dims_use)
+  
+  bb = FindNeighbors(object = bb, reduction = 'lsi', dims = dims_use, 
+                                   force.recalc = T, graph.name = "thegraph")
+  bb = FindClusters(object = bb, verbose = FALSE, algorithm = 3, 
+                                  graph.name = "thegraph", resolution = 1)
+  bb <- RunUMAP(object = bb, reduction = 'lsi', dims = dims_use)
+  DimPlot(object = bb, label = TRUE) + NoLegend()
+  
+  table(bb$thegraph_res.1)
+  
+  macs = CallPeaks(object = bb, 
+                    group.by = "thegraph_res.1",
+                    #macs2.path = "/software/2020/software/macs2/2.2.5-foss-2018b-python-3.6.6/bin/macs2",
+                    macs2.path = "/groups/tanaka/People/current/jiwang/local/anaconda3/envs/macs3/bin/macs3",
+                    effective.genome.size = 2.0e+10, verbose = TRUE)
+  
+  saveRDS(macs, file = paste0(RdataDir, 'macs2_peaks_', design$condition[n], '.rds'))
+  
+  combined_macs = macs
+  
+  peakwidths = width(combined_macs)
+  combined_macs = combined_macs[peakwidths > 12]
+  
+  # there is a problem with coordinates starting at 0 for some reason...
+  combined_macs = restrict(combined_macs, start = 1)
+  combined_macs
+  
+  
+  feat = FeatureMatrix(fragments = frags_l[[s]], features = combined_macs, 
+                       cells = colnames(counts_l[[s]]$Peaks))
+  ass = CreateChromatinAssay(feat, fragments = frags_l[[s]], sep = c(":", "-"), min.cells = 0,
+                             min.features = 100, annotation = granges_axolotl)
+  srat_macs_l[[s]] = CreateSeuratObject(ass, assay = "ATAC")
+  srat_macs_l[[s]]$dataset = s
+  srat_macs_l[[s]]$animal = strsplit(s, "_")[[1]][1]
+  
+  
+  
   
 }
 
