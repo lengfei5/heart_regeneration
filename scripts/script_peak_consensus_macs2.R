@@ -10,7 +10,7 @@
 source('functions_scRNAseq.R')
 
 
-for(n in 1:nrow(design))
+for(n in 2:nrow(design))
 {
   # n = 1
   cat('----------- : ', n, ':',  design$condition[n], '-------------\n')
@@ -121,9 +121,51 @@ for(n in 1:nrow(design))
   
   rm(bb)
   
-  
 }
 
+##########################################
+# round 1 peak combining from clusters of each samples 
+##########################################
+library(ChIPseeker)
+library(rtracklayer)
+library("ChIPpeakAnno")
+library("ggplot2")
+library("GenomicFeatures")
+
+peaks = c()
+pval.cutoff = 6 # the 10^-6 seems to be better when checking peak overlapping in replicates
+
+for(m in 1:nrow(design))
+{
+  # m = 1
+  cat(m, '--', design$condition[m], '\n')
+  
+  peakDir = paste0(dataDir, '/multiome_', design$timepoint[m], '/outs/calledPeaks/macs2')
+  peak.files = list.files(path = peakDir,
+                          pattern = '*_peaks.xls', full.names = TRUE)
+  cat(length(peak.files), ' peak files\n')
+  
+  for(n in 1:length(peak.files)) 
+  {
+    cat(n, '\n')
+    p = readPeakFile(peak.files[n], as = "GRanges");
+    #eval(parse(text = paste0("p = pp.", k)));
+    with.p.values = "X.log10.pvalue." %in% colnames(mcols(p))
+    if(with.p.values) {
+      p <- p[mcols(p)[,"X.log10.pvalue."] > pval.cutoff];
+      p = reduce(p);
+      #peaks10= c(peaks10, p10);
+    }else{ 
+      cat("no p values conlumn found for -- ", design.matrix$file.name[k], "\n");
+      PLOT.p10 = FALSE;
+    }
+    #p = reduce(p)
+    peaks = c(peaks, p)
+  }
+  
+  
+  
+}
 
 
 
