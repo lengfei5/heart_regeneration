@@ -82,7 +82,7 @@ design$timepoint = gsub('Amex_scATAC_', '', design$condition)
 source('functions_scRNAseq.R')
 srat = list()
 
-for(n in 2:nrow(design))
+for(n in 1:nrow(design))
 {
   # n = 5
   cat('----------- : ', n, ':',  design$condition[n], '-------------\n')

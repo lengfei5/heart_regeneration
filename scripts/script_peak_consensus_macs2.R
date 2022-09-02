@@ -10,11 +10,9 @@
 source('functions_scRNAseq.R')
 
 
-srat = list()
-
-for(n in 2:nrow(design))
+for(n in 1:nrow(design))
 {
-  # n = 5
+  # n = 1
   cat('----------- : ', n, ':',  design$condition[n], '-------------\n')
   
   # load nf output and process
@@ -42,7 +40,7 @@ for(n in 2:nrow(design))
     assay = "ATAC",
     
   )
-  rm(chrom_assay)
+  rm(chrom_assay, counts)
   
   bb$condition = design$condition[n]
   
@@ -55,50 +53,49 @@ for(n in 2:nrow(design))
   bb$pct_usable_fragments = bb$atac_fragments/bb$atac_raw_reads
   
   DefaultAssay(bb) <- "ATAC"
-  
-  bb <- NucleosomeSignal(bb)
-  bb <- TSSEnrichment(bb, fast = FALSE)
-  
   Idents(bb) = bb$condition
-  bb$high.tss <- ifelse(bb$TSS.enrichment > 5, 'High', 'Low')
   
-  pdfname = paste0(resDir, '/scATAC_QCs_cellRangerOutput_', design$condition[n],  version.analysis,  '.pdf')
-  pdf(pdfname, width=12, height = 8)
+  # bb <- NucleosomeSignal(bb)
+  # bb <- TSSEnrichment(bb, fast = FALSE)
+ 
+  # bb$high.tss <- ifelse(bb$TSS.enrichment > 5, 'High', 'Low')
   
-  TSSPlot(bb, group.by = 'high.tss') + NoLegend()
+  #pdfname = paste0(resDir, '/scATAC_QCs_cellRangerOutput_', design$condition[n],  version.analysis,  '.pdf')
+  #pdf(pdfname, width=12, height = 8)
+  #TSSPlot(bb, group.by = 'high.tss') + NoLegend()
   
   VlnPlot(bb, features = "nCount_ATAC", ncol = 1, y.max = 5000) +
     geom_hline(yintercept = c(500, 1000))
   
-  VlnPlot(bb, 
-          features = c("nCount_ATAC", "atac_fragments", "pct_reads_in_peaks"), 
-          ncol = 3)
+  # VlnPlot(bb, 
+  #         features = c("nCount_ATAC", "atac_fragments", "pct_reads_in_peaks"), 
+  #         ncol = 3)
+  # 
+  # cat(median(bb$nCount_ATAC), '--', median(bb$atac_fragments), ' -- ', median(bb$pct_reads_in_peaks), ' \n')
   
-  cat(median(bb$nCount_ATAC), '--', median(bb$atac_fragments), ' -- ', median(bb$pct_reads_in_peaks), ' \n')
-  
-  VlnPlot(
-    object = bb,
-    features = c("TSS.enrichment", "nucleosome_signal"),
-    ncol = 2,
-    pt.size = 0
-  )
+  # VlnPlot(
+  #   object = bb,
+  #   features = c("TSS.enrichment", "nucleosome_signal"),
+  #   ncol = 2,
+  #   pt.size = 0
+  # )
   
   # quick filtering 
   bb <- subset(
     x = bb,
     subset = nCount_ATAC > 200 &
-      nCount_ATAC < 20000 &
+      nCount_ATAC < 10000 
       #pct_reads_in_peaks > 15 &
       #blacklist_ratio < 0.05 &
-      nucleosome_signal < 4 &
-      TSS.enrichment > 1
+      #nucleosome_signal < 4 &
+      #TSS.enrichment > 1
   )
   
   bb = RunTFIDF(bb)
-  bb = FindTopFeatures(bb, min.cutoff = 5)
+  bb = FindTopFeatures(bb, min.cutoff = "q5")
   bb = RunSVD(bb)
   
-  #DepthCor(bb, n = 30)
+  DepthCor(bb, n = 30)
   #cordat = DepthCor(bb, n = 30)$data
   dims_use = c(2:30)
   print(dims_use)
@@ -107,13 +104,23 @@ for(n in 2:nrow(design))
                      force.recalc = T, graph.name = "thegraph")
   bb = FindClusters(object = bb, verbose = FALSE, algorithm = 3, 
                     graph.name = "thegraph", resolution = 1)
+  
   bb <- RunUMAP(object = bb, reduction = 'lsi', dims = dims_use)
   DimPlot(object = bb, label = TRUE) + NoLegend()
   
-  dev.off()
+  bc_clusters = data.frame(bc = colnames(bb), 
+                           cluster = paste0("cluster_", bb$seurat_clusters), 
+  stringsAsFactors = FALSE)
   
-  srat[[n]] = bb
+  cell.nbs = table(bc_clusters$cluster)
+  cell.nbs = cell.nbs[which(cell.nbs>200)]
+  bc_clusters = bc_clusters[!is.na(match(bc_clusters$cluster, names(cell.nbs))), ]
+  
+  write.table(bc_clusters, file = paste0(topdir, '/cellBarcode_clusters_round_1.txt'), 
+              sep = '\t', row.names = FALSE, col.names = FALSE, quote = FALSE)
+  
   rm(bb)
+  
   
 }
 
