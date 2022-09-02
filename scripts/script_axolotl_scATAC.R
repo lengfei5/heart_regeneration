@@ -42,7 +42,6 @@ mem_used()
 
 library(data.table)
 
-
 ##########################################
 # axoltol genome and annotation (fragmented version) 
 ##########################################
@@ -72,9 +71,8 @@ species = 'axloltl_scATAC'
 
 ########################################################
 ########################################################
-# Section I: 1) check QCs for individual sample
-# 2) recall peaks for eahc sample and save it
-# 3) peak consensus and recount 
+# Section I: check QCs for individual sample from the cellranger-arc output 
+
 ########################################################
 ########################################################
 design = data.frame(sampleID = seq(197254, 197258), 
@@ -82,12 +80,12 @@ design = data.frame(sampleID = seq(197254, 197258),
 design$timepoint = gsub('Amex_scATAC_', '', design$condition) 
 
 source('functions_scRNAseq.R')
+srat = list()
 
-
-for(n in 1:nrow(design))
+for(n in 2:nrow(design))
 {
-  # n = 3
-  cat('-----------', design$condition[n], '-------------\n')
+  # n = 5
+  cat('----------- : ', n, ':',  design$condition[n], '-------------\n')
   
   # load nf output and process
   topdir = paste0(dataDir, '/multiome_', design$timepoint[n], '/outs')
@@ -133,9 +131,13 @@ for(n in 1:nrow(design))
   
   Idents(bb) = bb$condition
   bb$high.tss <- ifelse(bb$TSS.enrichment > 5, 'High', 'Low')
+  
+  pdfname = paste0(resDir, '/scATAC_QCs_cellRangerOutput_', design$condition[n],  version.analysis,  '.pdf')
+  pdf(pdfname, width=12, height = 8)
+  
   TSSPlot(bb, group.by = 'high.tss') + NoLegend()
   
-  VlnPlot(bb, features = "nCount_ATAC", ncol = 1, y.max = 2000) +
+  VlnPlot(bb, features = "nCount_ATAC", ncol = 1, y.max = 5000) +
   geom_hline(yintercept = c(500, 1000))
   
   VlnPlot(bb, 
@@ -162,13 +164,11 @@ for(n in 1:nrow(design))
       TSS.enrichment > 1
   )
   
-  print(n)
-  
   bb = RunTFIDF(bb)
   bb = FindTopFeatures(bb, min.cutoff = 5)
   bb = RunSVD(bb)
   
-  DepthCor(bb, n = 30)
+  #DepthCor(bb, n = 30)
   #cordat = DepthCor(bb, n = 30)$data
   dims_use = c(2:30)
   print(dims_use)
@@ -180,6 +180,24 @@ for(n in 1:nrow(design))
   bb <- RunUMAP(object = bb, reduction = 'lsi', dims = dims_use)
   DimPlot(object = bb, label = TRUE) + NoLegend()
   
+  dev.off()
+  
+  srat[[n]] = bb
+  rm(bb)
+  
+}
+
+
+########################################################
+########################################################
+# Section : recall peaks using macs2 
+# 1) recall peaks for eahc sample and save it
+# 2) peak consensus and recount 
+########################################################
+########################################################
+srat_macs = list()
+for(n in 1:nrow(design))
+{
   table(bb$thegraph_res.1)
   
   macs = CallPeaks(object = bb, 

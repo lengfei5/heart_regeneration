@@ -201,31 +201,112 @@ make_SeuratObj_scRNAseq = function(topdir = './',
   
 }
 
+
+##########################################
+# gene filtering using scran 
+##########################################
+geneFiltering.scran = function(srat = aa, gg.mt, gg.rb)
+{
+  # srat = aa;
+  require(SingleCellExperiment)
+  library(scran)
+  library(scater)
+  library(scuttle)
+  library(Seurat)
+  library(SeuratObject)
+  
+  sce <- as.SingleCellExperiment(srat)
+  rm(srat)
+  
+  fontsize <- theme(axis.text=element_text(size=12), axis.title=element_text(size=16))
+  plotHighestExprs(sce, n=50, exprs_values = "counts")
+  
+  #fontsize <- theme(axis.text=element_text(size=16), axis.title=element_text(size=16))
+  #plotHighestExprs(sce, n=30) + fontsize
+  
+  ave.counts <- calculateAverage(sce, assay.type = "counts")
+  
+  hist(log10(ave.counts), breaks=100, main="", col="grey80",
+       xlab=expression(Log[10]~"average count"))
+  
+  num.cells <- nexprs(sce, byrow=TRUE)
+  
+  smoothScatter(log10(ave.counts), num.cells, ylab="Number of cells",
+                xlab=expression(Log[10]~"average count"))
+  
+  # detected in >= 5 cells, ave.counts >=5 but not too high
+  genes.to.keep <- num.cells > 50 & ave.counts >= 10^-2  & ave.counts <10^2  
+  summary(genes.to.keep)
+  
+  # remove mt and ribo genes
+  genes.to.keep = genes.to.keep & ! rownames(sce) %in% gg.mt & ! rownames(sce) %in% gg.rb
+  summary(genes.to.keep)
+  
+  sce <- sce[genes.to.keep, ]
+  
+  aa = Seurat::as.Seurat(sce)
+  rm(sce);
+  
+  metadata = aa@meta.data
+  library(Seurat)
+  
+  aa = CreateSeuratObject(counts = GetAssayData(object = aa, assay = "RNA", slot = "counts"),
+                            meta.data = metadata[, c(1,3:10)])
+  
+  Idents(aa) = factor(aa$condition, levels = levels)
+  VlnPlot(aa, features = 'nFeature_RNA', y.max = 10000)
+  VlnPlot(aa, features = 'nCount_RNA', y.max = 100000)
+  
+  saveRDS(aa, file = paste0(RdataDir, 'seuratObject_merged_cellFiltered_doubletFinderOut.v2_geneFiltered.15kGene_', 
+                             species, version.analysis, '.rds'))
+  
+  return(aa)
+  
+}
+
 ########################################################
 ########################################################
 # Section : normalization methods
 # 
 ########################################################
 ########################################################
-Normalize_with_scran = function(aa)
+Normalize_with_scran = function(aa, method = c('scran'))
 {
   require(SingleCellExperiment)
   library(scran)
   library(scuttle)
-  
+  library(scRNA.seq.funcs)
+  # sce =  as.SingleCellExperiment(subs)
   sce <- as.SingleCellExperiment(aa)
   
-  clusters <- quickCluster(sce)
-  sce <- computeSumFactors(sce, clusters=clusters)
-  #summary(sizeFactors(scc))
+  if(method == 'scran'){
+    clusters <- quickCluster(sce)
+    sce <- computeSumFactors(sce, clusters=clusters)
+    #summary(sizeFactors(scc))
+    sce <- logNormCounts(sce)
+    
+  }
   
-  sce <- logNormCounts(sce)
+  if(method == 'sf'){
+    expr_mat = counts(sce)
+    sizefactors = calc_sf(expr_mat = expr_mat)
+    sce <- logNormCounts(sce)
+  }
+  
+  if(method == 'UQ'){
+    
+  }
+  if(method == 'RLE'){
+    
+  }
   
   aa = Seurat::as.Seurat(sce)
   
   return(aa)
   
 }
+
+
 
 ### test SC3
 findClusters_SC3 = function(aa)
@@ -443,6 +524,7 @@ explore.umap.params.combination = function(sub.obj,
                                            resDir = './',
                                           pdfname = 'UMAP_explore_parameterCombinations.pdf',
                                           group.by = 'seurat_clusters', 
+                                          cols = NULL,
                                           with_legend = TRUE,
                                           weight.by.var = TRUE,
                                           nfeatures.sampling = c(5000, 8000, 10000),
@@ -500,16 +582,33 @@ explore.umap.params.combination = function(sub.obj,
                                min.dist = min.dist, verbose = FALSE)
             
             if(with_legend){
-              pp = DimPlot(sub.obj, group.by = group.by, reduction = 'umap', label = TRUE, label.size = 6, 
-                           pt.size = 2, repel = TRUE) + 
-                ggtitle(paste0('nfeatures - ', nfeatures,  ', nb.pcs - ', nb.pcs, ', n.neighbors - ', n.neighbors, 
-                               ', min.dist - ', min.dist, ', spread - ', spread))
+              if(is.null(cols)){
+                pp = DimPlot(sub.obj, group.by = group.by, reduction = 'umap', label = TRUE, label.size = 6, 
+                             pt.size = 2, repel = TRUE) + 
+                  ggtitle(paste0('nfeatures - ', nfeatures,  ', nb.pcs - ', nb.pcs, ', n.neighbors - ', n.neighbors, 
+                                 ', min.dist - ', min.dist, ', spread - ', spread))
+              }else{
+                pp = DimPlot(sub.obj, group.by = group.by, reduction = 'umap', label = TRUE, label.size = 6, 
+                             pt.size = 2, repel = TRUE, cols = cols) + 
+                  ggtitle(paste0('nfeatures - ', nfeatures,  ', nb.pcs - ', nb.pcs, ', n.neighbors - ', n.neighbors, 
+                                 ', min.dist - ', min.dist, ', spread - ', spread))
+              }
+             
             }else{
-              pp = DimPlot(sub.obj, group.by = group.by, reduction = 'umap', label = TRUE, label.size = 6, 
-                           pt.size = 2, repel = TRUE) + 
-                NoLegend() + 
-                ggtitle(paste0('nfeatures - ', nfeatures,  ', nb.pcs - ', nb.pcs, ', n.neighbors - ', n.neighbors, 
-                               ', min.dist - ', min.dist, ', spread - ', spread))
+              if(is.null(cols)){
+                pp = DimPlot(sub.obj, group.by = group.by, reduction = 'umap', label = TRUE, label.size = 6, 
+                             pt.size = 2, repel = TRUE) + 
+                  NoLegend() + 
+                  ggtitle(paste0('nfeatures - ', nfeatures,  ', nb.pcs - ', nb.pcs, ', n.neighbors - ', n.neighbors, 
+                                 ', min.dist - ', min.dist, ', spread - ', spread))
+              }else{
+                pp = DimPlot(sub.obj, group.by = group.by, reduction = 'umap', label = TRUE, label.size = 6, 
+                             pt.size = 2, repel = TRUE, cols = cols) + 
+                  NoLegend() + 
+                  ggtitle(paste0('nfeatures - ', nfeatures,  ', nb.pcs - ', nb.pcs, ', n.neighbors - ', n.neighbors, 
+                                 ', min.dist - ', min.dist, ', spread - ', spread))
+              }
+             
             }
             
             plot(pp)
