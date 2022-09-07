@@ -15,7 +15,6 @@ resDir = paste0("../results/sc_multiome", version.analysis)
 RdataDir = paste0(resDir, '/Rdata/')
 
 
-
 if(!dir.exists(resDir)) dir.create(resDir)
 if(!dir.exists(RdataDir)) dir.create(RdataDir)
 
@@ -217,8 +216,8 @@ saveRDS(aa, file = paste0(RdataDir, 'seuratObject_', species, version.analysis, 
 
 ########################################################
 ########################################################
-# Section : cell type annotation  
-# 
+# Section : first cell type annotation  
+# and later doublet removal and manual cell annotated by Elad 
 ########################################################
 ########################################################
 aa = readRDS(file = paste0(RdataDir, 'seuratObject_', species, version.analysis, '_lognormamlized_pca_umap_v3.rds'))
@@ -367,4 +366,13 @@ xx = subset(aa, downsample = 500)
 DoHeatmap(xx, features = top10$gene) + NoLegend()
 
 ggsave(filename = paste0(resDir, '/first_test_clusterMarkers_v2.pdf'), width = 45, height = 40)
+
+
+########################################################
+########################################################
+# Section :
+# 
+########################################################
+########################################################
+
 
