@@ -216,7 +216,7 @@ saveRDS(aa, file = paste0(RdataDir, 'seuratObject_', species, version.analysis, 
 
 ########################################################
 ########################################################
-# Section : first cell type annotation  
+# Section : first test of cell type annotation  
 # and later doublet removal and manual cell annotated by Elad 
 ########################################################
 ########################################################
@@ -370,9 +370,33 @@ ggsave(filename = paste0(resDir, '/first_test_clusterMarkers_v2.pdf'), width = 4
 
 ########################################################
 ########################################################
-# Section :
+# Section : after Elad's doubletFinder, cleaning and manual annotation
 # 
 ########################################################
 ########################################################
+aa = readRDS(file = '/groups/tanaka/Collaborations/Jingkui-Elad/scMultiome/aa_annotated_no_doublets.rds')
+
+Idents(aa) = aa$subtypes
+DimPlot(aa, label = TRUE, group.by = 'subtypes',  repel = TRUE) + NoLegend()
+
+VlnPlot(aa, features = 'nCount_RNA', group.by = 'condition')
+
+aa <- NormalizeData(aa, normalization.method = "LogNormalize", scale.factor = 10000)
+
+aa <- FindVariableFeatures(aa, selection.method = "vst", nfeatures = 8000)
+all.genes <- rownames(aa)
+
+aa <- ScaleData(aa, features = all.genes, vars.to.regress = 'nCount_RNA')
+aa <- RunPCA(aa, features = VariableFeatures(object = aa), verbose = FALSE)
+ElbowPlot(aa, ndims = 30)
+
+aa <- FindNeighbors(aa, dims = 1:30)
+aa <- FindClusters(aa, verbose = FALSE, algorithm = 3, resolution = 0.7)
+
+aa <- RunUMAP(aa, dims = 1:30, n.neighbors = 30, min.dist = 0.1)
+
+DimPlot(aa, label = TRUE, group.by = 'subtypes',  repel = TRUE) + NoLegend()
+
+ggsave(filename = paste0(resDir, '/umap_Elad_doubletRM_cleaned_manualAnnot.pdf'), width = 10, height = 8)
 
 

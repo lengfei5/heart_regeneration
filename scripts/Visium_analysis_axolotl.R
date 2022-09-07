@@ -418,4 +418,66 @@ for(n in 1:length(cc))
   
 }
 
+########################################################
+########################################################
+# Section II : cell type deconvolution for each time point 
+# 
+########################################################
+########################################################
+load(file = paste0(RdataDir, 'seuratObject_design_variableGenes_', species, '_umap.clustered.Rdata'))
+source('functions_Visium.R')
+
+##########################################
+# spatial domain searching and potential define remote regions and border zone 
+##########################################
+obj.list <- SplitObject(st, split.by = "condition")
+# select day4
+aa = obj.list[[2]]
+aa$sampleID = design$sampleID[which(design$condition == names(table(aa$condition)))]
+
+# import manually defined spatial domain by Elad
+sdomain = read.csv('/groups/tanaka/Collaborations/Jingkui-Elad/Mouse_Visium_annotations/Anno_166906.csv')
+sdomain = sdomain[which(sdomain$Anno_1 != ''), ]
+aa$spatial_domain_manual = NA
+
+cells = gsub('_2_1', '',  colnames(aa))
+aa$spatial_domain_manual[match(sdomain$Barcode, cells)] = sdomain$Anno_1
+
+aa = run_bayesSpace(aa)
+
+##########################################
+# cell type deconvolution
+##########################################
+refs = readRDS(file = paste0('../results/Rdata/', 
+                             'Seurat.obj_adultMiceHeart_Forte2020.nonCM_Ren2020CM_refCombined_cleanAnnot_logNormalize_v4.rds'))
+
+refs$celltype[which(refs$celltype == 'immune.others')] = 'Mphage.MCT'
+refs = subset(refs, cells = colnames(refs)[which(refs$celltype != 'SMC')])
+
+st = Run.celltype.deconvolution.RCTD(st, refs)
+
+##########################################
+# cell proximity analysis 
+##########################################
+run_cell_proximity_analysis(aa)
+
+##########################################
+# ligand-receptor-target prediction 
+##########################################
+source('functions_Visium.R')
+run_LIANA()
+
+run_NicheNet()
+
+########################################################
+########################################################
+# Section IV: spatial organization of cell types and genes  
+# 
+########################################################
+########################################################
+load(file = paste0(RdataDir, 'seuratObject_design_variableGenes_', species, '_umap.clustered.Rdata'))
+
+source('functions_Visium.R')
+st = Find.SpatialDE(st)
+
 
