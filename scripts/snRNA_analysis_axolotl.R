@@ -386,7 +386,7 @@ aa <- NormalizeData(aa, normalization.method = "LogNormalize", scale.factor = 10
 aa <- FindVariableFeatures(aa, selection.method = "vst", nfeatures = 8000)
 all.genes <- rownames(aa)
 
-aa <- ScaleData(aa, features = all.genes, vars.to.regress = 'nCount_RNA')
+aa <- ScaleData(aa, features = all.genes)
 aa <- RunPCA(aa, features = VariableFeatures(object = aa), verbose = FALSE)
 ElbowPlot(aa, ndims = 30)
 
@@ -399,4 +399,5 @@ DimPlot(aa, label = TRUE, group.by = 'subtypes',  repel = TRUE) + NoLegend()
 
 ggsave(filename = paste0(resDir, '/umap_Elad_doubletRM_cleaned_manualAnnot.pdf'), width = 10, height = 8)
 
+saveRDS(aa, file = paste0(RdataDir, 'aa_annotated_no_doublets_Elad.rds'))
 
