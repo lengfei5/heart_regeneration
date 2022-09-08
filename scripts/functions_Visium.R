@@ -730,38 +730,19 @@ Convert.batch.corrected.expression.matrix.to.UMIcount = function(refs){
 # For each condition, major cell type is first considered and then subtype in references further considered
 # 
 ##########################################
-Run.celltype.deconvolution.RCTD = function(st, refs, Normalization = 'lognormalize', 
+Run.celltype.deconvolution.RCTD = function(st, # spatial transcriptome seurat object 
+                                           refs, # scRNA-seq reference with annotation names celltype_toUse
+                                           RCTD_out = '../results/RCTD_out', 
+                                           require_int_SpatialRNA = FALSE,
+                                           max_cores = 16,
+                                           Normalization = 'lognormalize', 
                                            save.RCTD.in.seuratObj = FALSE, 
                                            plot.RCTD.summary = TRUE, 
                                            PLOT.scatterpie = TRUE,
                                            run.RCTD.subtype = FALSE)
 {
-  require(RCTD)
+  library(spacexr)
   require(Matrix)
-  # PLOT.scatterpie = TRUE; Normalization = 'lognormalize'; plot.RCTD.summary = TRUE; save.RCTD.in.seuratObj = FALSE;
-  # 
-  # slice = 'adult.day4'; 
-  #refs = readRDS(file = paste0(RdataDir, 
-  #                             'SeuratObj_adultMiceHeart_refCombine_Forte2020.nonCM_Ren2020CM_cleanAnnot_logNormalize_v1.rds'))
-  
-  # import cardiomyocyte reference 
-  # aa = readRDS(file = paste0(RdataDir, 'Seurat.obj_adultMiceHeart_week0.week2_Ren2020_seuratNormalization.rds'))
-  # 
-  # if(Normalization == 'SCT'){
-  #   aa = RunUMAP(aa, dims = 1:20, n.neighbors = 30, min.dist = 0.1)
-  #   #saveRDS(aa, file =  paste0(RdataDir, 'Seurat.obj_adultMiceHeart_week0.week2_Ren2020_SCT_umap.rds'))
-  # }else{
-  #   aa <- RunUMAP(aa, dims = 1:20, n.neighbors = 20, min.dist = 0.05)
-  #   #saveRDS(aa, file =  paste0(RdataDir, 'Seurat.obj_adultMiceHeart_week0.week2_Ren2020_seuratNormalization_umap.rds'))
-  # }
-  # 
-  # aa = aa[ ,!is.na(aa$CellType)]
-  # Idents(aa) = aa$CellType
-  
-  # aa.markers <- FindAllMarkers(aa, only.pos = TRUE, min.pct = 0.2, logfc.threshold = 0.5)
-  # gene used for cell type signature
-  #genes.used =  intersect(aa.markers$gene[!is.na(match(aa.markers$gene, rownames(aa)))], 
-  #                        aa.markers$gene[!is.na(match(aa.markers$gene, rownames(stx)))])
   
   ##########################################
   # prepare references for RTCD
@@ -769,14 +750,20 @@ Run.celltype.deconvolution.RCTD = function(st, refs, Normalization = 'lognormali
   # first for major cell types 
   # secondly for subtypes
   ##########################################
-  E.corrected <- refs@assays$integrated@data
-  E.corrected = expm1(E.corrected) # linear scale of corrected gene expression
+  cat('-- prepare reference --\n')
+  
+  #E.corrected <- refs@assays$integrated@data
+  #E.corrected = expm1(E.corrected) # linear scale of corrected gene expression
+  E_refs = GetAssayData(object = refs, slot = "data")
+  E_refs = expm1(E_refs) # linear scale of corrected gene expression
   
   ### Create the Reference object for major cell types
-  cell_types <- refs@meta.data$celltype
+  cell_types <- refs@meta.data$celltype_toUse
   names(cell_types) <- colnames(refs) # create cell_types named list
   cell_types <- as.factor(cell_types) # convert to factor data type
-  reference <- Reference(E.corrected, cell_types, nUMI = NULL, require_int = FALSE)
+  reference <- Reference(E_refs, cell_types, nUMI = NULL, require_int = FALSE)
+  
+  rm(E_refs, cell_types)
   
   ## Examine reference object (optional)
   print(dim(reference@counts)) #observe Digital Gene Expression matrix
@@ -784,47 +771,48 @@ Run.celltype.deconvolution.RCTD = function(st, refs, Normalization = 'lognormali
   table(reference@cell_types) #number of occurences for each cell type
   
   ### create reference objects for subtypes
-  if(run.RCTD.subtype){
-    subtypes <- refs@meta.data$subtype
-    names(subtypes) <- colnames(refs) # create cell_types named list
-    subtypes <- as.factor(subtypes) # convert to factor data type
-    reference_subtype <- Reference(E.corrected, subtypes, nUMI = NULL, require_int = FALSE)
-    table(reference_subtype@cell_types)
-  }
-  
-  rm(E.corrected)
+  # if(run.RCTD.subtype){
+  #   subtypes <- refs@meta.data$subtype
+  #   names(subtypes) <- colnames(refs) # create cell_types named list
+  #   subtypes <- as.factor(subtypes) # convert to factor data type
+  #   reference_subtype <- Reference(E.corrected, subtypes, nUMI = NULL, require_int = FALSE)
+  #   table(reference_subtype@cell_types)
+  # }
+  # 
+  # #rm(E.corrected)
   
   ##########################################
-  # loop over all conditions of st
+  # loop over all conditions of st for now
   ##########################################
-  cat('visium conditions :\n')
+  cat('-- check visium conditions -- \n')
   print(table(st$condition))
   cc = names(table(st$condition))
   
   for(n in 1:length(cc))
   #for(n in c(1, 2, 4))
   {
-    # n = 4
+    # n = 1
     cat('slice -- ', cc[n], '\n')
     slice = cc[n]
     stx = st[, which(st$condition == slice)]
     
-    resultsdir <- paste0(resDir, '/RCTD_v2/', slice)
+    resultsdir <- paste0(RCTD_out, '/', slice)
     system(paste0('mkdir -p ', resultsdir))
     
     ##########################################
     # prepare ST data for RTCD
     # original code from https://raw.githack.com/dmcable/RCTD/dev/vignettes/spatial-transcriptomics.html
     ##########################################
-    counts <- stx@assays$Spatial@counts
-    #counts = counts[!is.na(match(rownames(counts), genes.used)), ]
+    counts = GetAssayData(object = st, slot = "counts")
+    #counts <- stx@assays$Spatial@counts
+    
     coords <- eval(parse(text = paste0('stx@images$',  slice, '@coordinates')))
     coords = coords[, c(4, 5)]
     
     nUMI <- colSums(counts) # In this case, total counts per pixel is nUMI
     
-    ### Create SpatialRNA object
-    puck <- SpatialRNA(coords, counts, nUMI)
+    ### Create SpatialRNA object, require_int = FALSE, because of kallisto output
+    puck <- SpatialRNA(coords, as.matrix(counts), nUMI, require_int = require_int_SpatialRNA)
     
     ## Examine SpatialRNA object (optional)
     print(dim(puck@counts)) # observe Digital Gene Expression matrix
@@ -841,10 +829,12 @@ Run.celltype.deconvolution.RCTD = function(st, refs, Normalization = 'lognormali
     ggsave(paste0(resultsdir, '/RCTD_nUMI_plot_', slice, '.pdf'), width = 12, height = 10)
     
     # make RCTD object
-    myRCTD <- create.RCTD(puck, reference, max_cores = 32, gene_cutoff = 0.000125, fc_cutoff = 0.5, 
-                          gene_cutoff_reg = 2e-04,  fc_cutoff_reg = 0.75,
-                          UMI_min = 100, UMI_max = 2e+07, 
-                          CELL_MIN_INSTANCE = 50)
+    myRCTD <- create.RCTD(puck, reference, max_cores = max_cores, 
+                          gene_cutoff = 0.000125, fc_cutoff = 0.5, 
+                          gene_cutoff_reg = 2e-04,  
+                          fc_cutoff_reg = 0.75,
+                          UMI_min = 20, UMI_max = 2e+07, 
+                          CELL_MIN_INSTANCE = 30)
     
     doubleCheck.markerGenes = FALSE
     if(doubleCheck.markerGenes){
@@ -865,13 +855,13 @@ Run.celltype.deconvolution.RCTD = function(st, refs, Normalization = 'lognormali
     # run RCTD main function
     tic()
     myRCTD <- run.RCTD(myRCTD, doublet_mode = "doublet")
-    saveRDS(myRCTD, file = paste0(RdataDir, 'RCTD_results_refCombined_Forte2020.Ren2020_doubletMode_rmSMC_', slice, '.rds'))
+    saveRDS(myRCTD, file = paste0(resultsdir, '/RCTD_out_doubletMode_', slice, '.rds'))
     toc()
     
     ##########################################
     # check the result
     ##########################################
-    myRCTD = readRDS(file = paste0(RdataDir, 'RCTD_results_refCombined_Forte2020.Ren2020_doubletMode_rmSMC_', slice, '.rds'))
+    myRCTD = readRDS(file = paste0(resultsdir, '/RCTD_out_doubletMode_', slice, '.rds'))
     results <- myRCTD@results
     
     # normalize the cell type proportions to sum to 1.
@@ -882,15 +872,20 @@ Run.celltype.deconvolution.RCTD = function(st, refs, Normalization = 'lognormali
     
     # make the plots 
     if(plot.RCTD.summary){
-      # Plots the confident weights for each cell type as in full_mode (saved as 'results/cell_type_weights_unthreshold.pdf')
+      
+      # Plots the confident weights for each cell type as in full_mode 
+      # (saved as 'results/cell_type_weights_unthreshold.pdf')
       plot_weights(cell_type_names, spatialRNA, resultsdir, norm_weights)
       
-      # Plots all weights for each cell type as in full_mode. (saved as 'results/cell_type_weights.pdf')
+      # Plots all weights for each cell type as in full_mode. (saved as 'resultrs/cell_type_weights.pdf')
       plot_weights_unthreshold(cell_type_names, spatialRNA, resultsdir, norm_weights) 
-      # Plots the weights for each cell type as in doublet_mode. (saved as 'results/cell_type_weights_doublets.pdf')
       
+      # Plots the weights for each cell type as in doublet_mode. 
+      # (saved as 'results/cell_type_weights_doublets.pdf')
       plot_weights_doublet(cell_type_names, spatialRNA, resultsdir, results$weights_doublet, results$results_df) 
-      # Plots the number of confident pixels of each cell type in 'full_mode'. (saved as 'results/cell_type_occur.pdf')
+      
+      # Plots the number of confident pixels of each cell type in 'full_mode'. 
+      # (saved as 'results/cell_type_occur.pdf')
       plot_cond_occur(cell_type_names, resultsdir, norm_weights, spatialRNA)
       
       # makes a map of all cell types, (saved as 
@@ -982,10 +977,10 @@ Run.celltype.deconvolution.RCTD = function(st, refs, Normalization = 'lognormali
       #cell_types_counts = cell_types_counts[which(cell_types_counts>0)]
       #cell_types_counts = cell_types_counts[order(-cell_types_counts)]
       #cell_types_plt <- cell_types_plt[order(-ss)]
-      #col_vector = getPalette(length(cell_types_plt))
+      col_vector = getPalette(length(cell_types_plt))
       #names(col_vector) = cell_types_plt
-      col_ct = readRDS(file = paste0(RdataDir, 'main_celltype_colors_4RCTD.rds'))
-      #col_ct <- col_vector[seq_len(length(cell_types_plt))]
+      #col_ct = readRDS(file = paste0(RdataDir, 'main_celltype_colors_4RCTD.rds'))
+      col_ct <- col_vector[seq_len(length(cell_types_plt))]
       #names(col_ct) = cell_types_plt
       #saveRDS(col_ct, file = paste0(RdataDir, 'main_celltype_colors_4RCTD.rds'))
       
@@ -993,10 +988,13 @@ Run.celltype.deconvolution.RCTD = function(st, refs, Normalization = 'lognormali
       text(1:length(col_ct), 1:length(col_ct), names(col_ct), offset = 2, adj = 0.5,  col = col_ct)
       
       spatial_coord = data.frame(spatial_coord, weights)
+      spatial_coord$x = as.numeric(spatial_coord$x)
+      spatial_coord$y = as.numeric(spatial_coord$y)
+      
       
       ggplot() + geom_scatterpie(aes(x=x, y=y), data=spatial_coord,
-                                 cols=cell_type_names, 
-                                 color = NA,
+                                 cols=colnames(spatial_coord)[-c(1:3)], 
+                                 #color = NA,
                                  alpha = 1, 
                                  pie_scale = 0.4) +
         ggplot2::scale_fill_manual(values = col_ct) + # try to change the color of cell types
@@ -1006,7 +1004,6 @@ Run.celltype.deconvolution.RCTD = function(st, refs, Normalization = 'lognormali
         ggplot2::scale_x_reverse() + # flip first and reverse x to match seurat Spatial plots
         cowplot::theme_half_open(11, rel_small = 1) +
         ggplot2::theme_void() + 
-        
         ggplot2::labs(title = "Spatial scatterpie") +
         ggplot2::theme(
           # plot.background = element_rect(fill = "#FFFFFF"),
@@ -1048,6 +1045,7 @@ Run.celltype.deconvolution.RCTD = function(st, refs, Normalization = 'lognormali
   }
   
 }
+
 
 ########################################################
 ########################################################

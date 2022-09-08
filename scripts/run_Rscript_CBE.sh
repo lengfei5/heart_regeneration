@@ -1,9 +1,9 @@
 #!/bin/bash
 
-#SBATCH --time=8:00:00
+#SBATCH --time=12:00:00
 #SBATCH --nodes=1
 #SBATCH --cpus-per-task=16
-#SBATCH --mem=80G
+#SBATCH --mem=64G
 #SBATCH --job-name="sc_Rscript"
 #SBATCH --output="logs/slurm-%x_%j.out"
 #SBATCH --error="logs/slurm-%x_%j.err"

@@ -290,12 +290,27 @@ SpatialFeaturePlot(st, features = features[1], image.alpha = 0.5)
 load(file = paste0(RdataDir, 'seuratObject_design_variableGenes_umap.clustered', species, '.Rdata'))
 #st = Seurat::SplitObject(st, split.by = 'condition')
 
+st$condition = factor(st$condition, levels = design$condition)
+
+DefaultAssay(st) = 'Spatial'
+st <- NormalizeData(st, normalization.method = "LogNormalize", scale.factor = 10000)
+st <- FindVariableFeatures(st, selection.method = "vst", nfeatures = 3000)
+all.genes <- rownames(st)
+st <- ScaleData(st, features = all.genes)
+
+st <- RunPCA(st, verbose = FALSE, features = VariableFeatures(object = st), weight.by.var = TRUE)
+ElbowPlot(st, ndims = 30)
+
+st <- RunUMAP(st, dims = 1:20, n.neighbors = 30, min.dist = 0.05)
+
+DimPlot(st, group.by = 'condition', label = TRUE, repel = TRUE)
+
+
 cat('visium conditions :\n')
 print(table(design$condition))
 cc = design$condition
 
 use.SCTransform = TRUE
-
 
 for(n in 1:length(cc))
 #for(n in 1:2)
@@ -420,54 +435,97 @@ for(n in 1:length(cc))
 
 ########################################################
 ########################################################
-# Section II : cell type deconvolution for each time point 
-# 
+# Section IV : cell type deconvolution for each time point 
+# using the snRNA-seq annotated by Elad
 ########################################################
 ########################################################
-load(file = paste0(RdataDir, 'seuratObject_design_variableGenes_', species, '_umap.clustered.Rdata'))
+load(file = paste0(RdataDir, 'seuratObject_design_variableGenes_umap.clustered', species, '.Rdata'))
+#st = Seurat::SplitObject(st, split.by = 'condition')
+st$condition = factor(st$condition, levels = design$condition)
+
+VlnPlot(st, features = 'nFeature_Spatial', group.by = 'condition') +
+  geom_hline(yintercept = c(200, 500, 1000, 2000))
+ggsave(paste0(resDir, '/QCs_nFeatures_mergedReseq.pdf'), width = 12, height = 8)
+
+VlnPlot(st, features = 'nFeature_SCT', group.by = 'condition') +
+  geom_hline(yintercept = c(200, 500, 1000, 2000))
+ggsave(paste0(resDir, '/QCs_nFeatures_SCT_mergedReseq.pdf'), width = 12, height = 8)
+
+
+cat('visium conditions :\n')
+print(table(design$condition))
+cc = design$condition
+
 source('functions_Visium.R')
 
 ##########################################
-# spatial domain searching and potential define remote regions and border zone 
+# step 1) Spatial domain searching and potential define remote regions and border zone
+# here using computational methods to define regions of interest or cell niches
 ##########################################
 obj.list <- SplitObject(st, split.by = "condition")
-# select day4
-aa = obj.list[[2]]
-aa$sampleID = design$sampleID[which(design$condition == names(table(aa$condition)))]
 
-# import manually defined spatial domain by Elad
-sdomain = read.csv('/groups/tanaka/Collaborations/Jingkui-Elad/Mouse_Visium_annotations/Anno_166906.csv')
-sdomain = sdomain[which(sdomain$Anno_1 != ''), ]
-aa$spatial_domain_manual = NA
-
-cells = gsub('_2_1', '',  colnames(aa))
-aa$spatial_domain_manual[match(sdomain$Barcode, cells)] = sdomain$Anno_1
-
-aa = run_bayesSpace(aa)
-
-##########################################
-# cell type deconvolution
-##########################################
-refs = readRDS(file = paste0('../results/Rdata/', 
-                             'Seurat.obj_adultMiceHeart_Forte2020.nonCM_Ren2020CM_refCombined_cleanAnnot_logNormalize_v4.rds'))
-
-refs$celltype[which(refs$celltype == 'immune.others')] = 'Mphage.MCT'
-refs = subset(refs, cells = colnames(refs)[which(refs$celltype != 'SMC')])
-
-st = Run.celltype.deconvolution.RCTD(st, refs)
+for(n in 1:nrow(design))
+{
+  # select day4
+  aa = obj.list[[2]]
+  aa$sampleID = design$sampleID[which(design$condition == names(table(aa$condition)))]
+  
+  # import manually defined spatial domain by Elad
+  sdomain = read.csv('/groups/tanaka/Collaborations/Jingkui-Elad/Mouse_Visium_annotations/Anno_166906.csv')
+  sdomain = sdomain[which(sdomain$Anno_1 != ''), ]
+  aa$spatial_domain_manual = NA
+  
+  cells = gsub('_2_1', '',  colnames(aa))
+  aa$spatial_domain_manual[match(sdomain$Barcode, cells)] = sdomain$Anno_1
+  
+  aa = run_bayesSpace(aa)
+  
+}
 
 ##########################################
-# cell proximity analysis 
+# step 2) cell type deconvolution using RCTD for Visium data
+##########################################
+load(file = paste0(RdataDir, 'seuratObject_design_variableGenes_umap.clustered', species, '.Rdata'))
+st$condition = factor(st$condition, levels = design$condition)
+
+refs = readRDS(file = paste0('../results/sc_multiome_R13591_intron.exon.20220729/Rdata/', 
+                             'aa_annotated_no_doublets_Elad.rds'))
+
+#refs$celltype[which(refs$celltype == 'immune.others')] = 'Mphage.MCT'
+#refs = subset(refs, cells = colnames(refs)[which(refs$celltype != 'SMC')])
+
+## preapre the paramters for RCTD
+refs = subset(refs, cells = colnames(refs)[grep('doubluets', refs$subtypes, invert = TRUE)])
+
+refs$celltype_toUse = refs$subtypes
+DefaultAssay(refs) = 'RNA'
+DefaultAssay(st) = 'Spatial'
+require_int_SpatialRNA = FALSE
+RCTD_out = paste0(resDir, '/RCTD_coarse_out')
+max_cores = 16
+
+source('functions_Visium.R')
+
+st = Run.celltype.deconvolution.RCTD(st, refs, 
+                                     require_int_SpatialRNA = require_int_SpatialRNA,
+                                     max_cores = max_cores,
+                                     RCTD_out = RCTD_out
+                                     )
+
+##########################################
+# step 3) cell proximity analysis 
 ##########################################
 run_cell_proximity_analysis(aa)
 
+
 ##########################################
-# ligand-receptor-target prediction 
+# step 4) ligand-receptor-target prediction 
 ##########################################
 source('functions_Visium.R')
 run_LIANA()
 
 run_NicheNet()
+
 
 ########################################################
 ########################################################
@@ -475,8 +533,6 @@ run_NicheNet()
 # 
 ########################################################
 ########################################################
-load(file = paste0(RdataDir, 'seuratObject_design_variableGenes_', species, '_umap.clustered.Rdata'))
-
 source('functions_Visium.R')
 st = Find.SpatialDE(st)
 
