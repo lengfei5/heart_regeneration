@@ -30,7 +30,6 @@ get_geneName = function(xx)
 get_geneID = function(xx)
 {
   return(sapply(xx, function(x) {test = unlist(strsplit(as.character(x), '-')); return(test[length(test)])}))
-  
 }
 
 ########################################################

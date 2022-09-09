@@ -490,20 +490,48 @@ st$condition = factor(st$condition, levels = design$condition)
 refs = readRDS(file = paste0('../results/sc_multiome_R13591_intron.exon.20220729/Rdata/', 
                              'aa_annotated_no_doublets_Elad.rds'))
 
-
-## preapre the paramters for RCTD
+## NK.cells.or.doublets cluster is weired
 refs = subset(refs, cells = colnames(refs)[grep('doubluets', refs$subtypes, invert = TRUE)])
+refs = subset(refs, cells = colnames(refs)[grep('Neuronal', refs$subtypes, invert = TRUE)])
 
+
+refs$celltypes = refs$subtypes
+refs$celltypes[grep('CM_|CMs_|_CMs', refs$subtypes)] = 'CM'
+refs$celltypes[grep('EC|EC_', refs$subtypes)] = 'EC'
+refs$celltypes[grep('FB_', refs$subtypes)] = 'FB'
+refs$celltypes[grep('B_cells', refs$subtypes)] = 'Bcell'
+refs$celltypes[grep('Macrophages|_MF', refs$subtypes)] = 'Macrophages'
+refs$celltypes[grep('Megakeryocytes', refs$subtypes)] = 'Megakeryocytes'
+refs$celltypes[grep('RBC', refs$subtypes)] = 'RBC'
+
+## prepare the parameters for RCTD coarse cell types
+refs$celltype_toUse = refs$celltypes
+DefaultAssay(refs) = 'RNA'
+DefaultAssay(st) = 'Spatial'
+require_int_SpatialRNA = FALSE
+RCTD_out = paste0(resDir, '/RCTD_coarse_out_v1')
+max_cores = 32
+
+source('functions_Visium.R')
+
+Run.celltype.deconvolution.RCTD(st, refs, 
+                                require_int_SpatialRNA = require_int_SpatialRNA,
+                                max_cores = max_cores,
+                                RCTD_out = RCTD_out
+)
+
+
+## preapre the paramters for RCTD subtypes
 refs$celltype_toUse = refs$subtypes
 DefaultAssay(refs) = 'RNA'
 DefaultAssay(st) = 'Spatial'
 require_int_SpatialRNA = FALSE
-RCTD_out = paste0(resDir, '/RCTD_coarse_out')
+RCTD_out = paste0(resDir, '/RCTD_subtypes_out')
 max_cores = 16
 
 source('functions_Visium.R')
 
-st = Run.celltype.deconvolution.RCTD(st, refs, 
+Run.celltype.deconvolution.RCTD(st, refs, 
                                      require_int_SpatialRNA = require_int_SpatialRNA,
                                      max_cores = max_cores,
                                      RCTD_out = RCTD_out
