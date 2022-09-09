@@ -401,3 +401,13 @@ ggsave(filename = paste0(resDir, '/umap_Elad_doubletRM_cleaned_manualAnnot.pdf')
 
 saveRDS(aa, file = paste0(RdataDir, 'aa_annotated_no_doublets_Elad.rds'))
 
+##########################################
+# double check the TF and ligand-repceptor coverage by snRNA-seq 
+##########################################
+aa = readRDS(file = paste0(RdataDir, 'aa_annotated_no_doublets_Elad.rds'))
+aa = subset(aa, cells = colnames(aa)[grep('doubluets|Neuronal', aa$subtypes, invert = TRUE)])
+
+
+
+
+
