@@ -23,7 +23,6 @@ library(pryr) # monitor the memory usage
 require(ggplot2)
 mem_used()
 
-
 ########################################################
 ########################################################
 # Section I: import the processed visium data by nf from Tomas and 
@@ -491,8 +490,6 @@ st$condition = factor(st$condition, levels = design$condition)
 refs = readRDS(file = paste0('../results/sc_multiome_R13591_intron.exon.20220729/Rdata/', 
                              'aa_annotated_no_doublets_Elad.rds'))
 
-#refs$celltype[which(refs$celltype == 'immune.others')] = 'Mphage.MCT'
-#refs = subset(refs, cells = colnames(refs)[which(refs$celltype != 'SMC')])
 
 ## preapre the paramters for RCTD
 refs = subset(refs, cells = colnames(refs)[grep('doubluets', refs$subtypes, invert = TRUE)])
