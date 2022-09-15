@@ -42,33 +42,15 @@ if(Filtering.lowly.highly.expressed.genes){
   summary(genes.to.keep)
   
   sce <- sce[genes.to.keep, ]
+  ave.counts <- calculateAverage(sce, assay.type = "counts")
+  sce = sce[order(ave.counts), ]
   
   ggs = get_geneName(rownames(sce))
   
 }
 
 
-## import tf annotation
-tfs = readRDS(file = paste0('/groups/tanaka/People/current/jiwang/Databases/motifs_TFs/TFs_annot/',
-                            'curated_human_TFs_Lambert.rds'))
-tfs = unique(tfs$`HGNC symbol`)
 
-## ligand-receptor from nichenet 
-## https://github.com/saeyslab/nichenetr/blob/master/vignettes/ligand_activity_geneset.md
-dataPath_nichenet = '../data/NicheNet/'
-
-ligand_target_matrix = readRDS(paste0(dataPath_nichenet,  "ligand_target_matrix.rds"))
-ligand_target_matrix[1:5,1:5] # target genes in rows, ligands in columns
-
-lr_network = readRDS(paste0(dataPath_nichenet, "lr_network.rds"))
-head(lr_network)
-
-ligands = lr_network %>% pull(from) %>% unique()
-receptors = lr_network %>% pull(to) %>% unique()
-
-annotated_tfs = intersect(tfs, annot$gene.symbol.toUse)
-annotated_ligands = intersect(ligands, annot$gene.symbol.toUse)
-annotated_receptors = intersect(receptors, annot$gene.symbol.toUse)
 
 expressed_tfs = intersect(tfs, ggs)
 expressed_ligands = intersect(ligands, ggs)
@@ -96,3 +78,126 @@ rownames(res) = c('database', 'annotated.axolotl', 'detected.snRNA')
 
 write.csv(res, file = paste0(resDir, '/tfs_ligands_receptors_coverage_snRNA.csv'), 
           row.names = TRUE)
+
+## double check individual profile of TFs, ligands and receptors
+ggs = get_geneName(rownames(sce))
+mm = match(ggs, expressed_tfs)
+kk = which(!is.na(mm) & ggs != '')
+
+
+subs = sce[kk, ]
+ave.counts <- calculateAverage(subs, assay.type = "counts")
+num.cells <- nexprs(subs, byrow=TRUE)
+
+res = data.frame(gene = row.names(subs), ave.counts = ave.counts, number.cells = num.cells, 
+                 stringsAsFactors = FALSE)
+res = res[order(-res$ave.counts), ]
+
+write.csv(res, file = paste0(resDir, '/tfs_detected_aveCounts_numCells.csv'), 
+          row.names = TRUE)
+
+
+Idents(aa) = aa$subtypes
+
+for(n in 1:length(kk))
+#for(n in 1:10)
+{
+  # n = 1
+  cat(n, '\n')
+  p1 = FeaturePlot(aa, features = rownames(sce)[kk[n]])
+  p2 = VlnPlot(aa, features = rownames(sce)[kk[n]]) + NoLegend()
+  
+  p1 + p2
+  
+  ggsave(filename = paste0(resDir, '/tfs/CoverageTest_', rownames(sce)[kk[n]], '.pdf'),
+         width = 10, height = 16)
+  
+}
+
+
+ggs = get_geneName(rownames(sce))
+mm = match(ggs, expressed_ligands)
+kk = which(!is.na(mm) & ggs != '')
+
+subs = sce[kk, ]
+ave.counts <- calculateAverage(subs, assay.type = "counts")
+num.cells <- nexprs(subs, byrow=TRUE)
+
+res = data.frame(gene = row.names(subs), ave.counts = ave.counts, number.cells = num.cells, 
+                 stringsAsFactors = FALSE)
+res = res[order(-res$ave.counts), ]
+
+write.csv(res, file = paste0(resDir, '/ligands_detected_aveCounts_numCells.csv'), 
+          row.names = TRUE)
+
+ggs = get_geneName(rownames(sce))
+kk = which(!is.na(match(ggs, expressed_ligands)))
+Idents(aa) = aa$subtypes
+
+for(n in 1:length(kk))
+#for(n in 1:10)
+{
+  # n = 1
+  cat(n, '\n')
+  p1 = FeaturePlot(aa, features = rownames(sce)[kk[n]])
+  p2 = VlnPlot(aa, features = rownames(sce)[kk[n]]) + NoLegend()
+  
+  p1 + p2
+  
+  ggsave(filename = paste0(resDir, '/ligands/CoverageTest_', rownames(sce)[kk[n]], '.pdf'),
+         width = 10, height = 16)
+  
+}
+
+ggs = get_geneName(rownames(sce))
+mm = match(ggs, expressed_receptors)
+kk = which(!is.na(mm) & ggs != '')
+
+subs = sce[kk, ]
+ave.counts <- calculateAverage(subs, assay.type = "counts")
+num.cells <- nexprs(subs, byrow=TRUE)
+
+res = data.frame(gene = row.names(subs), ave.counts = ave.counts, number.cells = num.cells, 
+                 stringsAsFactors = FALSE)
+res = res[order(-res$ave.counts), ]
+
+write.csv(res, file = paste0(resDir, '/receptors_detected_aveCounts_numCells.csv'), 
+          row.names = TRUE)
+
+
+kk = which(!is.na(match(ggs, expressed_receptors)))
+Idents(aa) = aa$subtypes
+
+for(n in 1:length(kk))
+  #for(n in 1:10)
+{
+  # n = 1
+  cat(n, '\n')
+  p1 = FeaturePlot(aa, features = rownames(sce)[kk[n]])
+  p2 = VlnPlot(aa, features = rownames(sce)[kk[n]]) + NoLegend()
+  
+  p1 + p2
+  
+  ggsave(filename = paste0(resDir, '/receptors/CoverageTest_', rownames(sce)[kk[n]], '.pdf'),
+         width = 10, height = 16)
+  
+}
+
+##########################################
+# Lust et al. brain data to compare  
+##########################################
+lust = readRDS(file = paste0("../data/Lust_brain/all_nuclei_clustered_highlevel_anno.rds"))
+
+DimPlot(lust, dims = c(1,2), reduction = 'umap_harmony', group.by = 'high_level_anno')
+
+srat_mtm = subset(lust, chem == 'multiome')
+srat_sn = subset(lust, chem == 'v3.1')
+
+rm(lust)
+
+
+
+
+
+
+

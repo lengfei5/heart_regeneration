@@ -69,23 +69,196 @@ granges_axolotl$gene_biotype = "protein_coding"
 
 species = 'axloltl_scATAC'
 
-########################################################
-########################################################
-# Section I: 
-# 1) requantify the count table using the peak consensus by macs2
-# 2) check QCs for individual sample from the cellranger-arc output
-########################################################
-########################################################
 design = data.frame(sampleID = seq(197254, 197258), 
                     condition = c(paste0('Amex_scATAC_d', c(0, 1, 4, 7, 14))), stringsAsFactors = FALSE)
 design$timepoint = gsub('Amex_scATAC_', '', design$condition) 
 
 source('functions_scRNAseq.R')
 library(future)
+
+########################################################
+########################################################
+# Section I: merge all cellranger peaks as peak consensus
+# and quantify the count tables 
+# 
+########################################################
+########################################################
+# merge the peak first 
+for(n in 1:nrow(design))
+{
+  # n = 1
+  cat('----------- : ', n, ':',  design$condition[n], '-------------\n')
+  topdir = paste0(dataDir, '/multiome_', design$timepoint[n], '/outs')
+  
+  p = read.table(paste0(topdir, "/atac_peaks.bed"), 
+                     col.names = c("chr", "start", "end"))
+  p = makeGRangesFromDataFrame(p)
+  cat('---', length(p), ' peaks \n')
+  
+  if(n == 1){
+    peaks = p
+  }else{
+    peaks = union(peaks, p)
+  }
+}
+length(peaks)
+
+##########################################
+# combine peaks filtering
+##########################################
+combined.peaks = peaks
+rm(peaks)
+
+peakwidths = width(combined.peaks)
+combined.peaks = combined.peaks[peakwidths > 50]
+# there is a problem with coordinates starting at 0 for some reason...
+combined.peaks = restrict(combined.peaks, start = 1)
+cat(length(combined.peaks), ' combined peaks \n')
+
+srat_cr = list()
+for(n in 1:nrow(design))
+{
+  # n = 1
+  cat('----------- : ', n, ':',  design$condition[n], '-------------\n')
+  
+  # load nf output and process
+  topdir = paste0(dataDir, '/multiome_', design$timepoint[n], '/outs')
+  counts <- Read10X_h5(filename = paste0(topdir, "/filtered_feature_bc_matrix.h5"))
+  fragpath <- paste0(topdir, "/atac_fragments.tsv.gz")
+  frags_l = CreateFragmentObject(path = fragpath, cells = colnames(counts$Peaks))
+  
+  # slow step takes 16 mins without parall computation
+  tic()
+  feat = FeatureMatrix(fragments = frags_l, features = combined.peaks, 
+                       cells = colnames(counts$Peaks))
+  toc()
+  
+  chrom_assay <- CreateChromatinAssay(
+    counts = feat,
+    sep = c(":", "-"),
+    fragments = frags_l,
+    annotation = granges_axolotl,
+    min.cells = 0,
+    min.features = 0 
+  )
+  
+  bb <- CreateSeuratObject(
+    counts = chrom_assay,
+    assay = "ATAC",
+    
+  )
+  rm(chrom_assay)
+  
+  metadata <- read.csv(
+    file = paste0(topdir, '/per_barcode_metrics.csv'),
+    header = TRUE,
+    row.names = 1
+  )
+  
+  bb$condition = design$condition[n]
+  
+  mm = match(colnames(bb), metadata$gex_barcode)
+  metadata = metadata[, c(1,2, 3, 21:30)]
+  
+  bb = AddMetaData(bb, metadata = metadata)
+  
+  bb$pct_reads_in_peaks <- bb$atac_peak_region_fragments / bb$atac_fragments * 100
+  bb$pct_usable_fragments = bb$atac_fragments/bb$atac_raw_reads
+  
+  DefaultAssay(bb) <- "ATAC"
+  
+  srat_cr[[n]] = bb
+  
+}
+
+srat_cr = Reduce(merge, srat_cr)
+
+saveRDS(srat_cr, file = (paste0(RdataDir, 'seuratObj_scATAC_merged.peaks.cellranger.441K.rds')))
+
+##########################################
+# filtering and normalization
+##########################################
+srat_cr = readRDS(file = (paste0(RdataDir, 'seuratObj_scATAC_merged.peaks.cellranger.441K.rds')))
+levels = design$condition
+srat_cr$condition = factor(srat_cr$condition, levels = levels)
+Idents(srat_cr) = srat_cr$condition
+
+srat_cr <- NucleosomeSignal(srat_cr)
+srat_cr <- TSSEnrichment(srat_cr, fast = FALSE)
+
+srat_cr$high.tss <- ifelse(srat_cr$TSS.enrichment > 5, 'High', 'Low')
+
+saveRDS(srat_cr, file = (paste0(RdataDir, 'seuratObj_scATAC_merged.peaks.cellranger.441K_QCs.rds')))
+
+
+TSSPlot(srat_cr, group.by = 'high.tss') + NoLegend()
+VlnPlot(srat_cr, features = "nCount_ATAC", ncol = 1, y.max = 5000, group.by = 'condition', pt.size = 0.) +
+  geom_hline(yintercept = c(200, 500, 1000))
+
+ggsave(filename = paste0(resDir, '/QCs_nCount_ATAC_cellRangerPeaks.pdf'), height =8, width = 12 )
+
+VlnPlot(srat_cr, features = c("atac_fragments"), y.max = 10^5)
+ggsave(filename = paste0(resDir, '/QCs_atac_fragments_cellRangerPeaks.pdf'), height =8, width = 12 )
+
+VlnPlot(srat_cr, features = c("pct_reads_in_peaks"))
+ggsave(filename = paste0(resDir, '/QCs_pct_readsWithinPeaks_cellRangerPeaks.pdf'), height =8, width = 12 )
+
+VlnPlot(object = srat_cr, features = c("TSS.enrichment"), pt.size = 0, y.max = 10) +
+  geom_hline(yintercept = c(1, 2))
+ggsave(filename = paste0(resDir, '/QCs_TSS.enrichment_cellRangerPeaks.pdf'), height =8, width = 12 )
+
+VlnPlot(object = srat_cr, features = c("nucleosome_signal"), pt.size = 0)
+ggsave(filename = paste0(resDir, '/QCs_nucleosome_signal_cellRangerPeaks.pdf'), height =8, width = 12 )
+
+# quick filtering 
+srat_cr <- subset(
+  x = srat_cr,
+  subset = nCount_ATAC > 100 &
+    nCount_ATAC < 20000 &
+    #pct_reads_in_peaks > 15 &
+    #blacklist_ratio < 0.05 &
+    nucleosome_signal < 4 &
+    TSS.enrichment > 1
+)
+
+srat_cr = RunTFIDF(srat_cr)
+srat_cr = FindTopFeatures(srat_cr, min.cutoff = 'q5')
+srat_cr = RunSVD(srat_cr)
+
+DepthCor(srat_cr, n = 30)
+
+#cordat = DepthCor(srat_cr, n = 30)$data
+cordat = DepthCor(srat_cr, reduction = "lsi", n = 30)$data
+dims_use = cordat$Component[abs(cordat$counts)<0.3]
+
+#dims_use = c(2:30)
+print(dims_use)
+
+srat_cr = FindNeighbors(object = srat_cr, reduction = 'lsi', dims = dims_use, 
+                     force.recalc = T, graph.name = "thegraph")
+srat_cr = FindClusters(object = srat_cr, verbose = FALSE, algorithm = 3, 
+                    graph.name = "thegraph", resolution = 1)
+
+srat_cr <- RunUMAP(object = srat_cr, reduction = 'lsi', dims = dims_use, n.neighbors = 30, min.dist = 0.1)
+
+DimPlot(object = srat_cr, label = TRUE, repel = TRUE) + NoLegend()
+ggsave(filename = paste0(resDir, '/cellRangerPeaks_umap_v1.pdf'), height =8, width = 12 )
+
+DimPlot(object = srat_cr, label = TRUE, repel = TRUE, split.by = 'condition') + NoLegend()
+ggsave(filename = paste0(resDir, '/cellRangerPeaks_umap_perCondition_v1.pdf'), height =8, width = 30 )
+
+
+########################################################
+########################################################
+# Section II: 
+# 1) requantify the count table using the peak consensus by macs2
+# 2) check QCs for individual sample from the cellranger-arc output
+########################################################
+########################################################
 # check the current active plan
-plan()
-plan("multicore", workers = 16)
-plan()
+#plan()
+#plan("multicore", workers = 1)
+#plan()
 
 #combined.peaks = readRDS(file = paste0(RdataDir, 'merged_peaks_macs2_secondRound_290K.rds'))
 combined.peaks = readRDS(file = paste0(RdataDir, 'merged_peaks_macs2_secondRound_800K_pval5.rds'))
