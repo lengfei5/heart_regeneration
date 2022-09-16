@@ -379,5 +379,5 @@ for(n in 1:nrow(res))
   ggsave(filename = paste0(resDir, '/coverageTest_LustBrain/CoverageTest_rank_', n, '_', res$gene[n], '.pdf'),
          width = 20, height = 8)
   
-  
 }
+

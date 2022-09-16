@@ -510,7 +510,8 @@ DefaultAssay(refs) = 'RNA'
 DefaultAssay(st) = 'Spatial'
 require_int_SpatialRNA = FALSE
 RCTD_out = paste0(resDir, '/RCTD_coarse_out_v1')
-max_cores = 32
+
+max_cores = 16
 
 source('functions_Visium.R')
 
