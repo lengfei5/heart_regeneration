@@ -494,8 +494,8 @@ refs = readRDS(file = paste0('../results/sc_multiome_R13591_intron.exon.20220729
 refs = subset(refs, cells = colnames(refs)[grep('doubluets', refs$subtypes, invert = TRUE)])
 refs = subset(refs, cells = colnames(refs)[grep('Neuronal', refs$subtypes, invert = TRUE)])
 
-
 refs$celltypes = refs$subtypes
+
 refs$celltypes[grep('CM_|CMs_|_CMs', refs$subtypes)] = 'CM'
 refs$celltypes[grep('EC|EC_', refs$subtypes)] = 'EC'
 refs$celltypes[grep('FB_', refs$subtypes)] = 'FB'
@@ -527,7 +527,7 @@ refs$celltype_toUse = refs$subtypes
 DefaultAssay(refs) = 'RNA'
 DefaultAssay(st) = 'Spatial'
 require_int_SpatialRNA = FALSE
-RCTD_out = paste0(resDir, '/RCTD_subtypes_out')
+RCTD_out = paste0(resDir, '/RCTD_subtype_out')
 max_cores = 16
 
 source('functions_Visium.R')
