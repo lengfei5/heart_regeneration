@@ -405,9 +405,31 @@ saveRDS(aa, file = paste0(RdataDir, 'aa_annotated_no_doublets_Elad.rds'))
 # double check the TF and ligand-repceptor coverage by snRNA-seq 
 ##########################################
 aa = readRDS(file = paste0(RdataDir, 'aa_annotated_no_doublets_Elad.rds'))
-aa = subset(aa, cells = colnames(aa)[grep('doubluets|Neuronal', aa$subtypes, invert = TRUE)])
+aa = subset(aa, cells = colnames(aa)[grep('doubluets', aa$subtypes, invert = TRUE)])
 
+counts = data.frame(table(aa$subtypes), stringsAsFactors = FALSE)
+colnames(counts) = c('subtype', 'cell.number')
 
+ggplot(data=counts, aes(y=cell.number, x=reorder(subtype, -cell.number), fill = reorder(subtype, -cell.number))) + 
+  geom_bar(position="dodge", stat="identity") +
+  theme_classic() +
+  #theme(axis.text.x = element_text(angle = 90, size = 10)) +
+  scale_fill_viridis_d(option = 'magma', direction = -1) +
+  labs(x = 'subtypes', y = 'cell numbers') +
+  theme(axis.text.x = element_text(angle = 60, size = 12, hjust = 1), 
+        axis.text.y = element_text(angle = 0, size = 12), 
+        axis.title =  element_text(size = 12),
+        legend.text = element_text(size=12),
+        legend.title = element_text(size = 14),
+        legend.position='none',
+        #plot.margin = margin()
+        #legend.key.size = unit(1, 'cm')
+        #legend.key.width= unit(1, 'cm')
+  )
 
+ggsave(paste0(resDir, "/cellNumbers_subtypes.pdf"),  width = 10, height = 6)
+
+write.table(counts, file = paste0(resDir, "/cellNumber_subtypes.txt"), 
+            quote = FALSE, row.names = FALSE, col.names = TRUE, sep = '\t')
 
 

@@ -22,7 +22,7 @@ RCTD_out = paste0(resDir, '/RCTD_subtype_out')
 for(n in 1:length(cc))
 #for(n in c(1, 2, 4))
 {
-  # n = 2
+  # n = 4
   cat('slice -- ', cc[n], '\n')
   slice = cc[n]
   #stx = st[, which(st$condition == slice)]

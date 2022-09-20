@@ -27,6 +27,7 @@ annotated_ligands = intersect(ligands, annot$gene.symbol.toUse)
 annotated_receptors = intersect(receptors, annot$gene.symbol.toUse)
 
 
+
 ggs = get_geneName(rownames(aa))
 
 ## filter lowly expressed and highly expressed genes
