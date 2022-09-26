@@ -404,8 +404,7 @@ saveRDS(aa, file = paste0(RdataDir, 'aa_annotated_no_doublets_Elad.rds'))
 ##########################################
 # double check the TF and ligand-repceptor coverage by snRNA-seq 
 ##########################################
-aa = readRDS(file = paste0(RdataDir, 'aa_annotated_no_doublets_Elad.rds'))
-aa = subset(aa, cells = colnames(aa)[grep('doubluets', aa$subtypes, invert = TRUE)])
+
 
 counts = data.frame(table(aa$subtypes), stringsAsFactors = FALSE)
 colnames(counts) = c('subtype', 'cell.number')
@@ -431,5 +430,37 @@ ggsave(paste0(resDir, "/cellNumbers_subtypes.pdf"),  width = 10, height = 6)
 
 write.table(counts, file = paste0(resDir, "/cellNumber_subtypes.txt"), 
             quote = FALSE, row.names = FALSE, col.names = TRUE, sep = '\t')
+
+
+##########################################
+# save snRNA-seq data for cell2location 
+##########################################
+refs = readRDS(file = paste0(RdataDir, 'aa_annotated_no_doublets_Elad.rds'))
+refs = subset(refs, cells = colnames(refs)[grep('doubluets', refs$subtypes, invert = TRUE)])
+
+refs$celltypes = refs$subtypes
+
+refs$celltypes[grep('CM_|CMs_|_CMs', refs$subtypes)] = 'CM'
+refs$celltypes[grep('EC|EC_', refs$subtypes)] = 'EC'
+refs$celltypes[grep('FB_', refs$subtypes)] = 'FB'
+refs$celltypes[grep('B_cells', refs$subtypes)] = 'Bcell'
+refs$celltypes[grep('Macrophages|_MF', refs$subtypes)] = 'Macrophages'
+refs$celltypes[grep('Megakeryocytes', refs$subtypes)] = 'Megakeryocytes'
+refs$celltypes[grep('RBC', refs$subtypes)] = 'RBC'
+
+gbm = GetAssayData(object = refs, slot = "counts")
+
+sparse.gbm <- Matrix(t(gbm) , sparse = T )
+head(sparse.gbm)
+writeMM(obj = sparse.gbm, file="../data/snRNAseq_countMatrix.mtx")
+
+
+
+# save genes and cells names
+write.csv(x = rownames(gbm), file = "../data/snRNAseq_countMatrix_gene.csv", row.names = FALSE, quote = FALSE)
+write.csv(x = colnames(gbm), file = "../data/snRNAseq_countMatrix_barcodes.csv", row.names = FALSE, quote = FALSE)
+
+write.csv(x = refs@meta.data, file = '../data/snRNAseq_countMatrix_metadata.csv', row.names = TRUE, 
+          quote = TRUE)
 
 

@@ -538,6 +538,21 @@ Run.celltype.deconvolution.RCTD(st, refs,
                                      RCTD_out = RCTD_out
                                      )
 
+
+
+##########################################
+# test cell2location: prepare loom files
+##########################################
+load(file = paste0(RdataDir, 'seuratObject_design_variableGenes_umap.clustered', species, '.Rdata'))
+st$condition = factor(st$condition, levels = design$condition)
+st_list = Seurat::SplitObject(st, split.by = 'condition')
+
+for(n in 1:length(st_list)){
+  # n = 1
+  stx = st_list[[n]]
+  
+}
+
 ##########################################
 # step 3) cell proximity analysis 
 ##########################################
