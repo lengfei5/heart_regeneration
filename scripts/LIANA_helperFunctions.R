@@ -532,6 +532,12 @@ test.liana.wrap.step.by.step = function()
                   target_groups = c("CM", "prolife.Mphage"))
   
   
+  liana_trunc <- liana_test %>%
+    # only keep interactions concordant between methods
+    filter(aggregate_rank <= 0.01) # this can be FDR-corr if n is too high
+  
+  heat_freq(liana_trunc)
+  
   # run any method of choice
   # Load Sce testdata
   # sce <- readRDS(file.path(liana_path , "testdata", "input", "testsce.rds"))

@@ -504,6 +504,7 @@ refs$celltypes[grep('Macrophages|_MF', refs$subtypes)] = 'Macrophages'
 refs$celltypes[grep('Megakeryocytes', refs$subtypes)] = 'Megakeryocytes'
 refs$celltypes[grep('RBC', refs$subtypes)] = 'RBC'
 
+
 ## prepare the parameters for RCTD coarse cell types
 refs$celltype_toUse = refs$celltypes
 DefaultAssay(refs) = 'RNA'
@@ -543,6 +544,7 @@ Run.celltype.deconvolution.RCTD(st, refs,
 ##########################################
 # test cell2location: prepare loom files
 ##########################################
+require(SeuratDisk)
 load(file = paste0(RdataDir, 'seuratObject_design_variableGenes_umap.clustered', species, '.Rdata'))
 st$condition = factor(st$condition, levels = design$condition)
 st_list = Seurat::SplitObject(st, split.by = 'condition')
@@ -550,8 +552,29 @@ st_list = Seurat::SplitObject(st, split.by = 'condition')
 for(n in 1:length(st_list)){
   # n = 1
   stx = st_list[[n]]
+  stx$condition = droplevels(stx$condition)
+  cc = unique(stx$condition)
+  DefaultAssay(stx) = 'Spatial'
+  
+  #stx = DietSeurat(stx, counts = TRUE, data = TRUE, scale.data = FALSE, assays = 'Spatial', graphs = NULL, images = NULL)
+  stx = CreateSeuratObject(counts = GetAssayData(stx, slot = "counts"), assay = "Visium", 
+                           meta.data = stx@meta.data) # create object
+  
+  stx <- as.loom(stx, filename = paste0("../data/visium_", cc, ".loom"), verbose = FALSE, overwrite = TRUE)
+  stx
+  
+  stx$close_all()
   
 }
+
+# or save all visium data into one loop file
+DefaultAssay(st) = 'Spatial'
+st_all = CreateSeuratObject(counts = GetAssayData(st, slot = "counts"), assay = "Visium", 
+                         meta.data = st@meta.data) # create object
+
+st_all <- as.loom(st_all, filename = paste0("../data/visium_Amex_all.loom"), verbose = FALSE, overwrite = TRUE)
+
+st_all$close_all()
 
 ##########################################
 # step 3) cell proximity analysis 
@@ -563,6 +586,24 @@ run_cell_proximity_analysis(aa)
 # step 4) ligand-receptor-target prediction 
 ##########################################
 source('functions_Visium.R')
+refs = readRDS(file = paste0('../results/sc_multiome_R13591_intron.exon.20220729/Rdata/', 
+                             'aa_annotated_no_doublets_Elad.rds'))
+
+## NK.cells.or.doublets cluster is weired
+refs = subset(refs, cells = colnames(refs)[grep('doubluets', refs$subtypes, invert = TRUE)])
+refs = subset(refs, cells = colnames(refs)[grep('Neuronal', refs$subtypes, invert = TRUE)])
+
+refs$celltypes = refs$subtypes
+
+refs$celltypes[grep('CM_|CMs_|_CMs', refs$subtypes)] = 'CM'
+refs$celltypes[grep('EC|EC_', refs$subtypes)] = 'EC'
+refs$celltypes[grep('FB_', refs$subtypes)] = 'FB'
+refs$celltypes[grep('B_cells', refs$subtypes)] = 'Bcell'
+refs$celltypes[grep('Macrophages|_MF', refs$subtypes)] = 'Macrophages'
+refs$celltypes[grep('Megakeryocytes', refs$subtypes)] = 'Megakeryocytes'
+refs$celltypes[grep('RBC', refs$subtypes)] = 'RBC'
+
+
 run_LIANA()
 
 run_NicheNet()

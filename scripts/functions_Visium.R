@@ -1464,14 +1464,15 @@ run_LIANA = function() # original code from https://saezlab.github.io/liana/arti
   # Resource currently included in OmniPathR (and hence `liana`) include:
   show_methods()
   
-  liana_path <- system.file(package = "liana")
-  testdata <- readRDS(file.path(liana_path , "testdata", "input", "testdata.rds"))
+  # liana_path <- system.file(package = "liana")
+  # testdata <- readRDS(file.path(liana_path , "testdata", "input", "testdata.rds"))
+  # 
+  # testdata %>% glimpse()
   
-  testdata %>% glimpse()
-  
-  sels =c(which(refs$celltype == 'CM')[1:1000], 
-          which(refs$celltype == 'FB')[1:1000], 
-          which(refs$celltype == 'prolife.Mphage'))
+  sels =c(which(refs$celltypes == 'CM')[1:1000], 
+          which(refs$celltypes == 'FB')[1:1000], 
+          which(refs$celltypes == 'Macrophages')[1:1000], 
+          which(refs$celltypes == 'Neutrophil'))
   
   subref = subset(refs, cells = colnames(refs)[sels])
   
@@ -1481,10 +1482,10 @@ run_LIANA = function() # original code from https://saezlab.github.io/liana/arti
   
   # Run liana
   # liana_test <- liana_wrap(testdata, method = 'cellphonedb', resource = 'CellPhoneDB')
-  
+  source('functions_scRNAseq.R')
   sce <- as.SingleCellExperiment(subref)
-  colLabels(sce) = as.factor(sce$celltype)
-  rownames(sce) = toupper(rownames(sce))
+  colLabels(sce) = as.factor(sce$celltypes)
+  rownames(sce) = toupper(get_geneName(rownames(sce)))
   
   raw = counts(sce)
   
@@ -1509,9 +1510,6 @@ run_LIANA = function() # original code from https://saezlab.github.io/liana/arti
   liana_test %>% glimpse
   
   # We can aggregate these results into a tibble with consensus ranks
-  liana_test %>% glimpse
-  
-  # We can aggregate these results into a tibble with consensus ranks
   liana_test <- liana_test %>%
     liana_aggregate(resource = 'Consensus')
   
@@ -1519,8 +1517,12 @@ run_LIANA = function() # original code from https://saezlab.github.io/liana/arti
     filter(source =="FB") %>%
     top_n(25,  desc(aggregate_rank)) %>%
     liana_dotplot(source_groups = c("FB"),
-                  target_groups = c("CM", "prolife.Mphage"))
-  ggsave(filename = paste0(resDir, '/liana_LR_prediction_FB_to_CM_prolife.Mphage.pdf'), width = 12, height = 8)
+                  target_groups = c("CM", "Macrophages"))
+  liana_test %>%
+    liana_dotplot(source_groups = c("FB"),
+                  target_groups = c("CM", "Macrophages", "Neutrophil"),
+                  ntop = 20)
+  ggsave(filename = paste0(resDir, '/liana_LR_prediction_FB_to_CM_.pdf'), width = 12, height = 8)
   
   
   liana_test %>% 
@@ -1530,13 +1532,23 @@ run_LIANA = function() # original code from https://saezlab.github.io/liana/arti
                   target_groups = c("FB", "prolife.Mphage"))
   ggsave(filename = paste0(resDir, '/liana_LR_prediction_CM_to_FB_prolife.Mphage.pdf'), width = 12, height = 8)
   
-  liana_test %>% 
-    filter(source =="prolife.Mphage") %>%
-    top_n(25,  desc(aggregate_rank)) %>%
-    liana_dotplot(source_groups = c("prolife.Mphage"),
-                  target_groups = c("FB", "CM"))
-  ggsave(filename = paste0(resDir, '/liana_LR_prediction_prolife.Mphage_to_FB_CM.pdf'), width = 12, height = 8)
+  # liana_test %>% 
+  #   filter(source =="prolife.Mphage") %>%
+  #   top_n(25,  desc(aggregate_rank)) %>%
+  #   liana_dotplot(source_groups = c("prolife.Mphage"),
+  #                 target_groups = c("FB", "CM"))
+  # ggsave(filename = paste0(resDir, '/liana_LR_prediction_prolife.Mphage_to_FB_CM.pdf'), width = 12, height = 8)
+  # 
   
+  liana_trunc <- liana_test %>%
+    # only keep interactions concordant between methods
+    filter(aggregate_rank <= 0.01) # this can be FDR-corr if n is too high
+  
+  heat_freq(liana_trunc)
+  
+  p <- chord_freq(liana_trunc,
+                  source_groups = c("CM", "FB", "Macrophages", "Neutrophil"),
+                  target_groups = c("CM", "FB", "Macrophages", "Neutrophil"))
   
   # run any method of choice
   # Load Sce testdata
@@ -1777,5 +1789,6 @@ run_liana_nitchenet = function()
   # combine plots
   plot_grid(liana_receptor_heatmap, nichenet_scores_plot,
             align = "h", nrow = 1, rel_widths = c(0.8,0.3))
+  
   
 }
