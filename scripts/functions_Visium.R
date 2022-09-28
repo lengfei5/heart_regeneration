@@ -1513,11 +1513,6 @@ run_LIANA = function() # original code from https://saezlab.github.io/liana/arti
   liana_test <- liana_test %>%
     liana_aggregate(resource = 'Consensus')
   
-  liana_test %>% 
-    filter(source =="FB") %>%
-    top_n(25,  desc(aggregate_rank)) %>%
-    liana_dotplot(source_groups = c("FB"),
-                  target_groups = c("CM", "Macrophages"))
   liana_test %>%
     liana_dotplot(source_groups = c("FB"),
                   target_groups = c("CM", "Macrophages", "Neutrophil"),
@@ -1527,9 +1522,10 @@ run_LIANA = function() # original code from https://saezlab.github.io/liana/arti
   
   liana_test %>% 
     filter(source =="CM") %>%
-    top_n(25,  desc(aggregate_rank)) %>%
+    #top_n(25,  desc(aggregate_rank)) %>%
     liana_dotplot(source_groups = c("CM"),
-                  target_groups = c("FB", "prolife.Mphage"))
+                  target_groups = c("FB", "Macrophages", "Neutrophil"),
+                  ntop = 20)
   ggsave(filename = paste0(resDir, '/liana_LR_prediction_CM_to_FB_prolife.Mphage.pdf'), width = 12, height = 8)
   
   # liana_test %>% 
