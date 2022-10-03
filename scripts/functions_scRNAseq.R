@@ -558,7 +558,8 @@ explore.umap.params.combination = function(sub.obj,
     # nfeatures = nfeatures.sampling[1]
     cat('------------- nfeatures - ', nfeatures, '\n')
     sub.obj <- FindVariableFeatures(sub.obj, selection.method = "vst", nfeatures = nfeatures, verbose = FALSE)
-    sub.obj = ScaleData(sub.obj, verbose = FALSE)
+    # not scale every time
+    # sub.obj = ScaleData(sub.obj, verbose = FALSE)
     sub.obj <- RunPCA(object = sub.obj, features = VariableFeatures(sub.obj), verbose = FALSE, 
                       npcs = max(50, nb.pcs.sampling), 
                       weight.by.var = weight.by.var)
