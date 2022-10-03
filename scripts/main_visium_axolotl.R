@@ -503,7 +503,9 @@ source('analysis_RCTD_result.R')
 ########################################################
 ########################################################
 # Section : cell-to-cell communication analysis
-# 
+# 1) step: define spatial domain 
+# 2) step: neighborhood enrichment analysis
+# 3) step: ligand-receptor analysis
 ########################################################
 ########################################################
 load(file = paste0(RdataDir, 'seuratObject_design_variableGenes_umap.clustered', species, '.Rdata'))
@@ -512,6 +514,7 @@ st$condition = factor(st$condition, levels = design$condition)
 
 VlnPlot(st, features = 'nFeature_Spatial', group.by = 'condition') +
   geom_hline(yintercept = c(200, 500, 1000, 2000))
+
 ggsave(paste0(resDir, '/QCs_nFeatures_mergedReseq.pdf'), width = 12, height = 8)
 
 VlnPlot(st, features = 'nFeature_SCT', group.by = 'condition') +
@@ -520,7 +523,7 @@ ggsave(paste0(resDir, '/QCs_nFeatures_SCT_mergedReseq.pdf'), width = 12, height 
 
 
 cat('visium conditions :\n')
-print(table(design$condition))
+print(table(st$condition))
 cc = design$condition
 
 source('functions_Visium.R')
@@ -546,6 +549,7 @@ for(n in 1:nrow(design))
   aa$spatial_domain_manual[match(sdomain$Barcode, cells)] = sdomain$Anno_1
   
   aa = run_bayesSpace(aa)
+  
   
 }
 

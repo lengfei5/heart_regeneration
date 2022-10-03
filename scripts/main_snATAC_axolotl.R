@@ -192,8 +192,9 @@ saveRDS(srat_cr, file = (paste0(RdataDir, 'seuratObj_scATAC_merged.peaks.cellran
 
 
 TSSPlot(srat_cr, group.by = 'high.tss') + NoLegend()
-VlnPlot(srat_cr, features = "nCount_ATAC", ncol = 1, y.max = 5000, group.by = 'condition', pt.size = 0.) +
-  geom_hline(yintercept = c(200, 500, 1000))
+
+VlnPlot(srat_cr, features = "nCount_ATAC", ncol = 1, y.max = 10000, group.by = 'condition', pt.size = 0., log = TRUE) +
+  geom_hline(yintercept = c(200, 500, 1000, 2000))
 
 ggsave(filename = paste0(resDir, '/QCs_nCount_ATAC_cellRangerPeaks.pdf'), height =8, width = 12 )
 

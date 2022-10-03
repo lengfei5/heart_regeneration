@@ -327,7 +327,7 @@ run_bayesSpace = function(aa)
     
   }
  
-  Run.bayesSpace.enhanced.clustering = FALSE # this takes >1hour at least long time
+  Run.bayesSpace.enhanced.clustering = FALSE # this takes > 1 hour at least long time
   if(Run.bayesSpace.enhanced.clustering){
     ## Run BayesSpace enhanced clustering
     set.seed(100)
