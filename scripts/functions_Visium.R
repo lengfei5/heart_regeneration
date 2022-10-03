@@ -1055,7 +1055,7 @@ Run.celltype.deconvolution.RCTD = function(st, # spatial transcriptome seurat ob
 # 
 ########################################################
 ########################################################
-run_cell_proximity_analysis = function(aa)
+run_neighborhood_analysis = function(aa)
 {
   # import the manual spatial domain or by bayesSpace
   slice = "adult.day4"
@@ -1132,7 +1132,11 @@ run_cell_proximity_analysis = function(aa)
   
   
 }
-
+##########################################
+# The original code from somewhere for the cell type proximity network analysis 
+# paper https://www.nature.com/articles/s41467-021-21892-z
+# https://github.com/madhavmantri/chicken_heart/blob/master/scripts/anchor_integeration.R
+##########################################
 analyze.celltype.proximity.network = function()
 {
   # setRepositories(ind = 1:2)

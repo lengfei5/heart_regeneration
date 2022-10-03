@@ -434,8 +434,76 @@ for(n in 1:length(cc))
 
 ########################################################
 ########################################################
-# Section IV : cell type deconvolution for each time point 
+# Section IV : cell type deconvolution for each time point with RCTD (not cell2location)
 # using the snRNA-seq annotated by Elad
+########################################################
+########################################################
+load(file = paste0(RdataDir, 'seuratObject_design_variableGenes_umap.clustered', species, '.Rdata'))
+st$condition = factor(st$condition, levels = design$condition)
+
+# refined subtypes by Elad
+refs = readRDS(file = paste0('../results/sc_multiome_R13591_intron.exon.20220729/Rdata/', 
+                             'aa_annotated_no_doublets_20220930.rds'))
+
+## NK.cells.or.doublets cluster is weired
+#refs = subset(refs, cells = colnames(refs)[grep('doubluets', refs$subtypes, invert = TRUE)])
+#refs = subset(refs, cells = colnames(refs)[grep('Neuronal', refs$subtypes, invert = TRUE)])
+
+refs$celltypes = as.character(refs$subtypes)
+
+refs$celltypes[grep('CM_|CMs_|_CM|_CM_', refs$subtypes)] = 'CM'
+refs$celltypes[grep('EC_|_EC', refs$subtypes)] = 'EC'
+refs$celltypes[grep('FB_', refs$subtypes)] = 'FB'
+refs$celltypes[grep('B_cells', refs$subtypes)] = 'Bcell'
+
+refs$celltypes[grep('Macrophages|_MF', refs$subtypes)] = 'Macrophages'
+refs$celltypes[grep('Megakeryocytes', refs$subtypes)] = 'Megakeryocytes'
+refs$celltypes[grep('RBC', refs$subtypes)] = 'RBC'
+
+
+## prepare the parameters for RCTD coarse cell types
+Run.RCTD.coarse.celltypes = FALSE
+if(Run.RCTD.coarse.celltypes){
+  refs$celltype_toUse = refs$celltypes
+  DefaultAssay(refs) = 'RNA'
+  DefaultAssay(st) = 'Spatial'
+  require_int_SpatialRNA = FALSE
+  RCTD_out = paste0(resDir, '/RCTD_coarse_out_v1')
+  
+  max_cores = 16
+  
+  source('functions_Visium.R')
+  
+  Run.celltype.deconvolution.RCTD(st, refs, 
+                                  require_int_SpatialRNA = require_int_SpatialRNA,
+                                  max_cores = max_cores,
+                                  RCTD_out = RCTD_out
+  )
+  
+}
+
+## preapre the paramters for RCTD subtypes
+refs$celltype_toUse = refs$subtypes
+DefaultAssay(refs) = 'RNA'
+DefaultAssay(st) = 'Spatial'
+require_int_SpatialRNA = FALSE
+RCTD_out = paste0(resDir, '/RCTD_subtype_out_v2')
+max_cores = 32
+
+source('functions_Visium.R')
+
+Run.celltype.deconvolution.RCTD(st, refs, 
+                                require_int_SpatialRNA = require_int_SpatialRNA,
+                                max_cores = max_cores,
+                                RCTD_out = RCTD_out
+)
+
+
+
+########################################################
+########################################################
+# Section : cell-to-cell communication analysis
+# 
 ########################################################
 ########################################################
 load(file = paste0(RdataDir, 'seuratObject_design_variableGenes_umap.clustered', species, '.Rdata'))
@@ -481,109 +549,15 @@ for(n in 1:nrow(design))
   
 }
 
+
 ##########################################
-# step 2) cell type deconvolution using RCTD for Visium data
+# step 2) cell proximity analysis 
 ##########################################
-load(file = paste0(RdataDir, 'seuratObject_design_variableGenes_umap.clustered', species, '.Rdata'))
-st$condition = factor(st$condition, levels = design$condition)
-
-refs = readRDS(file = paste0('../results/sc_multiome_R13591_intron.exon.20220729/Rdata/', 
-                             'aa_annotated_no_doublets_Elad.rds'))
-
-## NK.cells.or.doublets cluster is weired
-refs = subset(refs, cells = colnames(refs)[grep('doubluets', refs$subtypes, invert = TRUE)])
-refs = subset(refs, cells = colnames(refs)[grep('Neuronal', refs$subtypes, invert = TRUE)])
-
-refs$celltypes = refs$subtypes
-
-refs$celltypes[grep('CM_|CMs_|_CMs', refs$subtypes)] = 'CM'
-refs$celltypes[grep('EC|EC_', refs$subtypes)] = 'EC'
-refs$celltypes[grep('FB_', refs$subtypes)] = 'FB'
-refs$celltypes[grep('B_cells', refs$subtypes)] = 'Bcell'
-refs$celltypes[grep('Macrophages|_MF', refs$subtypes)] = 'Macrophages'
-refs$celltypes[grep('Megakeryocytes', refs$subtypes)] = 'Megakeryocytes'
-refs$celltypes[grep('RBC', refs$subtypes)] = 'RBC'
-
-
-## prepare the parameters for RCTD coarse cell types
-refs$celltype_toUse = refs$celltypes
-DefaultAssay(refs) = 'RNA'
-DefaultAssay(st) = 'Spatial'
-require_int_SpatialRNA = FALSE
-RCTD_out = paste0(resDir, '/RCTD_coarse_out_v1')
-
-max_cores = 16
-
-source('functions_Visium.R')
-
-Run.celltype.deconvolution.RCTD(st, refs, 
-                                require_int_SpatialRNA = require_int_SpatialRNA,
-                                max_cores = max_cores,
-                                RCTD_out = RCTD_out
-)
-
-
-## preapre the paramters for RCTD subtypes
-refs$celltype_toUse = refs$subtypes
-DefaultAssay(refs) = 'RNA'
-DefaultAssay(st) = 'Spatial'
-require_int_SpatialRNA = FALSE
-RCTD_out = paste0(resDir, '/RCTD_subtype_out')
-max_cores = 16
-
-source('functions_Visium.R')
-
-Run.celltype.deconvolution.RCTD(st, refs, 
-                                     require_int_SpatialRNA = require_int_SpatialRNA,
-                                     max_cores = max_cores,
-                                     RCTD_out = RCTD_out
-                                     )
-
+run_neighborhood_analysis(aa)
 
 
 ##########################################
-# test cell2location: prepare loom files
-##########################################
-require(SeuratDisk)
-load(file = paste0(RdataDir, 'seuratObject_design_variableGenes_umap.clustered', species, '.Rdata'))
-st$condition = factor(st$condition, levels = design$condition)
-st_list = Seurat::SplitObject(st, split.by = 'condition')
-
-for(n in 1:length(st_list)){
-  # n = 1
-  stx = st_list[[n]]
-  stx$condition = droplevels(stx$condition)
-  cc = unique(stx$condition)
-  DefaultAssay(stx) = 'Spatial'
-  
-  #stx = DietSeurat(stx, counts = TRUE, data = TRUE, scale.data = FALSE, assays = 'Spatial', graphs = NULL, images = NULL)
-  stx = CreateSeuratObject(counts = GetAssayData(stx, slot = "counts"), assay = "Visium", 
-                           meta.data = stx@meta.data) # create object
-  
-  stx <- as.loom(stx, filename = paste0("../data/visium_", cc, ".loom"), verbose = FALSE, overwrite = TRUE)
-  stx
-  
-  stx$close_all()
-  
-}
-
-# or save all visium data into one loop file
-DefaultAssay(st) = 'Spatial'
-st_all = CreateSeuratObject(counts = GetAssayData(st, slot = "counts"), assay = "Visium", 
-                         meta.data = st@meta.data) # create object
-
-st_all <- as.loom(st_all, filename = paste0("../data/visium_Amex_all.loom"), verbose = FALSE, overwrite = TRUE)
-
-st_all$close_all()
-
-##########################################
-# step 3) cell proximity analysis 
-##########################################
-run_cell_proximity_analysis(aa)
-
-
-##########################################
-# step 4) ligand-receptor-target prediction 
+# step 3) ligand-receptor-target prediction 
 ##########################################
 source('functions_Visium.R')
 refs = readRDS(file = paste0('../results/sc_multiome_R13591_intron.exon.20220729/Rdata/', 
