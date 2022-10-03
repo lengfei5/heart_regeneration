@@ -1060,6 +1060,7 @@ run_neighborhood_analysis = function(aa)
   # import the manual spatial domain or by bayesSpace
   slice = "adult.day4"
   q = 8
+  
   aa =  readRDS(file = paste0(paste0(RdataDir, "/SeuratObj_spatialDomain_BayesSpace_", 
                             species, '_', slice,  "_with.", q, "clusters.rds")))
   

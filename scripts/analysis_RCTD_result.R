@@ -17,12 +17,13 @@ print(table(st$condition))
 cc = names(table(st$condition))
 
 #RCTD_out = paste0(resDir, '/RCTD_coarse_out_v1')
-RCTD_out = paste0(resDir, '/RCTD_subtype_out')
+#RCTD_out = paste0(resDir, '/RCTD_subtype_out')
+RCTD_out = paste0(resDir, '/RCTD_subtype_out_v2')
 
 for(n in 1:length(cc))
 #for(n in c(1, 2, 4))
 {
-  # n = 4
+  # n = 2
   cat('slice -- ', cc[n], '\n')
   slice = cc[n]
   #stx = st[, which(st$condition == slice)]
@@ -48,18 +49,29 @@ for(n in 1:length(cc))
   
   spatialRNA <- myRCTD@spatialRNA
   
+  
+  stx$condition = droplevels(stx$condition)
+  DefaultAssay(stx) = 'SCT'
+  
+  SpatialFeaturePlot(stx, images =  slice, #slot = 'data',
+                     features = "LOC115076416-AMEX60DD051098") +
+    ggtitle('NPPA-AMEX60DD051098')
+  #coord_flip() + 
+  #ggplot2::scale_y_reverse() # rotate the coordinates to have the same as RCTD 
+  ggsave(filename =  paste0(RCTD_out, "/Spatial_patterning_", slice, "_NPPA.pdf"), width = 12, height = 8)
+  
   # make the plots 
   if(plot.RCTD.summary){
-    stx$condition = droplevels(stx$condition)
-    DefaultAssay(stx) = 'SCT'
-    
-    SpatialFeaturePlot(stx, images =  slice, slot = 'data',
-                       features = "LOC115076416-AMEX60DD051098", image.alpha = 0.5) +
-      ggtitle('NPPA-AMEX60DD051098') +
-      coord_flip() + 
-      ggplot2::scale_y_reverse() # rotate the coordinates to have the same as RCTD 
-    
-    ggsave(filename =  paste0(resultsdir, "/Spatial_patterning_", slice, "_NPPA.pdf"), width = 12, height = 8)
+    # stx$condition = droplevels(stx$condition)
+    # DefaultAssay(stx) = 'SCT'
+    # 
+    # SpatialFeaturePlot(stx, images =  slice, slot = 'data',
+    #                    features = "LOC115076416-AMEX60DD051098", image.alpha = 0.5) +
+    #   ggtitle('NPPA-AMEX60DD051098') +
+    #   coord_flip() + 
+    #   ggplot2::scale_y_reverse() # rotate the coordinates to have the same as RCTD 
+    # 
+    # ggsave(filename =  paste0(resultsdir, "/Spatial_patterning_", slice, "_NPPA.pdf"), width = 12, height = 8)
       
     # Plots the confident weights for each cell type as in full_mode 
     # (saved as 'results/cell_type_weights_unthreshold.pdf')
@@ -201,10 +213,10 @@ for(n in 1:length(cc))
         plot.title = ggplot2::element_text(hjust = 0.5, size = 20)) +
       ggplot2::guides(fill = guide_legend(ncol = 1))
     
-    ggsave(paste0(resultsdir, '/RCTD_scatterpie_', slice, '_v0.pdf'), width = 16, height = 10)
+    ggsave(paste0(RCTD_out, '/RCTD_scatterpie_', slice, '.pdf'), width = 16, height = 10)
     
     
-    pdfname = paste0(resultsdir, '/Spatial_distribution_each_celltype.pdf')
+    pdfname = paste0(RCTD_out, '/Spatial_distribution_each_celltype_', slice, '.pdf')
     pdf(pdfname, width=16, height = 10)
     
     for(m in 1:length(cell_types_plt)){
@@ -235,7 +247,6 @@ for(n in 1:length(cc))
     }
     
     dev.off()
-    
     
   }
   

@@ -498,7 +498,7 @@ Run.celltype.deconvolution.RCTD(st, refs,
                                 RCTD_out = RCTD_out
 )
 
-
+source('analysis_RCTD_result.R')
 
 ########################################################
 ########################################################
