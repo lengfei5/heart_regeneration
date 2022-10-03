@@ -532,8 +532,8 @@ source('functions_Visium.R')
 # step 1) Spatial domain searching and potential define remote regions and border zone
 # here using computational methods to define regions of interest or cell niches
 ##########################################
+## import manually defined spatial domains
 obj.list <- SplitObject(st, split.by = "condition")
-
 for(n in 1:nrow(design))
 {
   # select day4
@@ -548,10 +548,10 @@ for(n in 1:nrow(design))
   cells = gsub('_2_1', '',  colnames(aa))
   aa$spatial_domain_manual[match(sdomain$Barcode, cells)] = sdomain$Anno_1
   
-  aa = run_bayesSpace(aa)
-  
-  
 }
+
+## run bayesSpace to systematic spatial domain searching
+run_bayesSpace(st, outDir = paste0(resDir, '/bayesSpace/'))
 
 
 ##########################################
