@@ -857,39 +857,72 @@ Run.celltype.deconvolution.RCTD = function(st, # spatial transcriptome seurat ob
 # 1) manually with SPATA2
 ########################################################
 ########################################################
-manual_selection_spots_image_Spata2 = function(aa, slice = 'Amex_d7')
+manual_selection_spots_image_Spata2 = function(st,
+                                               outDir = paste0(resDir, '/manual_borderZones_spata2/')
+                                               )
 {
   #dyn.load("/software/f2021/software/proj/7.2.1-gcccore-10.2.0/lib/libproj.so")
   #dyn.load("/software/f2021/software/gdal/3.2.1-foss-2020b/lib/libgdal.so") 
-  #library(rgdal)
+  
   require(SPATA2)
+  
   # slice = cc[n]
+  cat('-- check visium conditions -- \n')
+  print(table(st$condition))
+  cc = names(table(st$condition))
+  system(paste0('mkdir -p ', outDir))
   
-  aa <- ScaleData(aa, features = rownames(aa), assay = 'Spatial')
-  spata_obj = transformSeuratToSpata(aa, sample_name = unique(aa$condition), method = 'spatial', assay_name = 'Spatial', 
-                                     assay_slot = 'scale.data', 
-                                     image_name = slice, coords_from = 'umap')
+  for(n in 1:length(cc))
+  {
+    # n = 1
+    cat('slice -- ', cc[n], '\n')
+    slice = cc[n]
+    aa = st[, which(st$condition == slice)]
+    DefaultAssay(aa) = 'Spatial'
+    #aa@images = aa@images$Amex_d4
+    
+    resultsdir <- paste0(outDir, '', slice)
+    system(paste0('mkdir -p ', resultsdir))
+    
+    # reconstruct Seurat object with associated image; 
+    # because aa still have multiple images, doesnot work to transform to spata 
+    srat <- CreateSeuratObject(counts = GetAssayData(aa, slot = 'counts'), assay = "Spatial", 
+                               meta.data = aa@meta.data) 
+    #image <- image[Cells(x = srat)] # filter image by the spots
+    #DefaultAssay(object = image) <- "Spatial" # set default assay
+    srat[[slice]] <- eval(parse(text = paste0('aa@images$',  slice)))
+    
+    aa = srat; rm(srat)
+    aa <- NormalizeData(aa, normalization.method = "LogNormalize", scale.factor = 10000)
+    aa <- FindVariableFeatures(aa, selection.method = "vst", nfeatures = 1000)
+    
+    aa <- ScaleData(aa, features = rownames(aa), assay = 'Spatial')
+    aa <- RunPCA(aa, features = VariableFeatures(object = aa), verbose = FALSE)
+    
+    spata_obj = transformSeuratToSpata(aa, sample_name = slice, method = 'spatial', 
+                                       assay_name = 'Spatial', 
+                                       assay_slot = 'scale.data', 
+                                       image_name = slice)
+    
+    #setActiveExpressionMatrix(spata_obj, 'data')
+    spata_obj <- createSegmentation(object = spata_obj)
+    
+    plotSegmentation(object = spata_obj, pt_size = 1.9) +
+      ggplot2::scale_y_reverse()
+    
+    #coord_flip() + 
+    #ggplot2::scale_y_reverse() +
+    #  ggplot2::scale_x_reverse()  # flip first and reverse x to match seurat Spatial plots
+    
+    #getFeatureVariables(spata_obj, features = "segmentation", return = "data.frame")
+    
+    aa$segmentation = 'others'
+    aa$segmentation[match(getSegmentDf(spata_obj, segment_names = c('border_zone'))$barcodes, colnames(aa))] = 'border_zone'
+    aa$segmentation[match(getSegmentDf(spata_obj, segment_names = c('remote_zone1'))$barcodes, colnames(aa))] = 'remote_zone1'
+    aa$segmentation[match(getSegmentDf(spata_obj, segment_names = c('remote_zone2'))$barcodes, colnames(aa))] = 'remote_zone2'
+    
   
-  #setActiveExpressionMatrix(spata_obj, 'data')
-  
-  spata_obj <- createSegmentation(object = spata_obj)
-  
-  plotSegmentation(object = spata_obj, pt_size = 1.9) +
-    ggplot2::scale_y_reverse()
-  
-  #coord_flip() + 
-  #ggplot2::scale_y_reverse() +
-  #  ggplot2::scale_x_reverse()  # flip first and reverse x to match seurat Spatial plots
-  
-  #getFeatureVariables(spata_obj, features = "segmentation", return = "data.frame")
-  
-  aa$segmentation = 'others'
-  aa$segmentation[match(getSegmentDf(spata_obj, segment_names = c('border_zone'))$barcodes, colnames(aa))] = 'border_zone'
-  aa$segmentation[match(getSegmentDf(spata_obj, segment_names = c('remote_zone1'))$barcodes, colnames(aa))] = 'remote_zone1'
-  aa$segmentation[match(getSegmentDf(spata_obj, segment_names = c('remote_zone2'))$barcodes, colnames(aa))] = 'remote_zone2'
-  
-  return(aa)
-  
+  }
 }
 
 

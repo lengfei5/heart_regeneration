@@ -516,7 +516,6 @@ cat('visium conditions :\n')
 print(table(st$condition))
 cc = design$condition
 
-
 VlnPlot(st, features = 'nFeature_Spatial', group.by = 'condition') +
   geom_hline(yintercept = c(200, 500, 1000, 2000))
 

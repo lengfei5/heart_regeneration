@@ -184,7 +184,6 @@ srat_cr$condition = factor(srat_cr$condition, levels = levels)
 Idents(srat_cr) = srat_cr$condition
 
 
-
 srat_cr <- NucleosomeSignal(srat_cr)
 srat_cr <- TSSEnrichment(srat_cr, fast = FALSE)
 
