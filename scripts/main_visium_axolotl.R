@@ -508,9 +508,14 @@ source('analysis_RCTD_result.R')
 # 3) step: ligand-receptor analysis
 ########################################################
 ########################################################
+source('functions_Visium.R')
 load(file = paste0(RdataDir, 'seuratObject_design_variableGenes_umap.clustered', species, '.Rdata'))
-#st = Seurat::SplitObject(st, split.by = 'condition')
 st$condition = factor(st$condition, levels = design$condition)
+
+cat('visium conditions :\n')
+print(table(st$condition))
+cc = design$condition
+
 
 VlnPlot(st, features = 'nFeature_Spatial', group.by = 'condition') +
   geom_hline(yintercept = c(200, 500, 1000, 2000))
@@ -522,37 +527,39 @@ VlnPlot(st, features = 'nFeature_SCT', group.by = 'condition') +
 ggsave(paste0(resDir, '/QCs_nFeatures_SCT_mergedReseq.pdf'), width = 12, height = 8)
 
 
-cat('visium conditions :\n')
-print(table(st$condition))
-cc = design$condition
-
-source('functions_Visium.R')
-
 ##########################################
 # step 1) Spatial domain searching and potential define remote regions and border zone
 # here using computational methods to define regions of interest or cell niches
 ##########################################
 ## import manually defined spatial domains
-obj.list <- SplitObject(st, split.by = "condition")
-for(n in 1:nrow(design))
-{
-  # select day4
-  aa = obj.list[[2]]
-  aa$sampleID = design$sampleID[which(design$condition == names(table(aa$condition)))]
+
+Import.manual.spatial.domains = FALSE
+if(Import.manual.spatial.domains){
+  obj.list <- SplitObject(st, split.by = "condition")
   
-  # import manually defined spatial domain by Elad
-  sdomain = read.csv('/groups/tanaka/Collaborations/Jingkui-Elad/Mouse_Visium_annotations/Anno_166906.csv')
-  sdomain = sdomain[which(sdomain$Anno_1 != ''), ]
-  aa$spatial_domain_manual = NA
+  manual_selection_spots_image_Spata
   
-  cells = gsub('_2_1', '',  colnames(aa))
-  aa$spatial_domain_manual[match(sdomain$Barcode, cells)] = sdomain$Anno_1
+  for(n in 1:nrow(design))
+  {
+    # select day4
+    aa = obj.list[[2]]
+    aa$sampleID = design$sampleID[which(design$condition == names(table(aa$condition)))]
+    
+    # import manually defined spatial domain by Elad
+    sdomain = read.csv('/groups/tanaka/Collaborations/Jingkui-Elad/Mouse_Visium_annotations/Anno_166906.csv')
+    sdomain = sdomain[which(sdomain$Anno_1 != ''), ]
+    aa$spatial_domain_manual = NA
+    
+    cells = gsub('_2_1', '',  colnames(aa))
+    aa$spatial_domain_manual[match(sdomain$Barcode, cells)] = sdomain$Anno_1
+    
+  }
   
 }
 
 ## run bayesSpace to systematic spatial domain searching
+source('functions_Visium.R')
 run_bayesSpace(st, outDir = paste0(resDir, '/bayesSpace/'))
-
 
 ##########################################
 # step 2) cell proximity analysis 
@@ -586,14 +593,13 @@ run_LIANA()
 
 run_NicheNet()
 
-
 ########################################################
 ########################################################
 # Section IV: spatial organization of cell types and genes  
 # 
 ########################################################
 ########################################################
-source('functions_Visium.R')
-st = Find.SpatialDE(st)
+#source('functions_Visium.R')
+#st = Find.SpatialDE(st)
 
 
