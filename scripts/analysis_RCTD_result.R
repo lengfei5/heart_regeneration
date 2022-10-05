@@ -18,7 +18,8 @@ cc = names(table(st$condition))
 
 #RCTD_out = paste0(resDir, '/RCTD_coarse_out_v1')
 #RCTD_out = paste0(resDir, '/RCTD_subtype_out')
-RCTD_out = paste0(resDir, '/RCTD_subtype_out_v2')
+RCTD_out = paste0(resDir, '/RCTD_subtype_out_v3.5')
+cat('-- RCTD output folder -- ', RCTD_out, '\n')
 
 for(n in 1:length(cc))
 #for(n in c(1, 2, 4))

@@ -442,28 +442,30 @@ load(file = paste0(RdataDir, 'seuratObject_design_variableGenes_umap.clustered',
 st$condition = factor(st$condition, levels = design$condition)
 
 # refined subtypes by Elad
-refs = readRDS(file = paste0('../results/sc_multiome_R13591_intron.exon.20220729/Rdata/', 
-                             'aa_annotated_no_doublets_20220930.rds'))
+refs_file = '/groups/tanaka/Collaborations/Jingkui-Elad/scMultiome/aa_annotated_no_doublets_20221004_2.rds'
+refs = readRDS(file = refs_file)
+table(refs$subtypes)
 
+# refs0 = readRDS(file ='/groups/tanaka/Collaborations/Jingkui-Elad/scMultiome/aa_annotated_no_doublets_20221004.rds')
 ## NK.cells.or.doublets cluster is weired
 #refs = subset(refs, cells = colnames(refs)[grep('doubluets', refs$subtypes, invert = TRUE)])
 #refs = subset(refs, cells = colnames(refs)[grep('Neuronal', refs$subtypes, invert = TRUE)])
 
-refs$celltypes = as.character(refs$subtypes)
-
-refs$celltypes[grep('CM_|CMs_|_CM|_CM_', refs$subtypes)] = 'CM'
-refs$celltypes[grep('EC_|_EC', refs$subtypes)] = 'EC'
-refs$celltypes[grep('FB_', refs$subtypes)] = 'FB'
-refs$celltypes[grep('B_cells', refs$subtypes)] = 'Bcell'
-
-refs$celltypes[grep('Macrophages|_MF', refs$subtypes)] = 'Macrophages'
-refs$celltypes[grep('Megakeryocytes', refs$subtypes)] = 'Megakeryocytes'
-refs$celltypes[grep('RBC', refs$subtypes)] = 'RBC'
-
-
 ## prepare the parameters for RCTD coarse cell types
 Run.RCTD.coarse.celltypes = FALSE
 if(Run.RCTD.coarse.celltypes){
+  # define coarse clusters
+  refs$celltypes = as.character(refs$subtypes)
+  
+  refs$celltypes[grep('CM_|CMs_|_CM|_CM_', refs$subtypes)] = 'CM'
+  refs$celltypes[grep('EC_|_EC', refs$subtypes)] = 'EC'
+  refs$celltypes[grep('FB_', refs$subtypes)] = 'FB'
+  refs$celltypes[grep('B_cells', refs$subtypes)] = 'Bcell'
+  
+  refs$celltypes[grep('Macrophages|_MF', refs$subtypes)] = 'Macrophages'
+  refs$celltypes[grep('Megakeryocytes', refs$subtypes)] = 'Megakeryocytes'
+  refs$celltypes[grep('RBC', refs$subtypes)] = 'RBC'
+  
   refs$celltype_toUse = refs$celltypes
   DefaultAssay(refs) = 'RNA'
   DefaultAssay(st) = 'Spatial'
@@ -487,11 +489,12 @@ refs$celltype_toUse = refs$subtypes
 DefaultAssay(refs) = 'RNA'
 DefaultAssay(st) = 'Spatial'
 require_int_SpatialRNA = FALSE
-RCTD_out = paste0(resDir, '/RCTD_subtype_out_v2')
+RCTD_out = paste0(resDir, '/RCTD_subtype_out_v3.5')
 max_cores = 32
 
-source('functions_Visium.R')
+# st = subset(st, condition == 'Amex_d4')
 
+source('functions_Visium.R')
 Run.celltype.deconvolution.RCTD(st, refs, 
                                 require_int_SpatialRNA = require_int_SpatialRNA,
                                 max_cores = max_cores,
@@ -531,9 +534,9 @@ ggsave(paste0(resDir, '/QCs_nFeatures_SCT_mergedReseq.pdf'), width = 12, height 
 # here using computational methods to define regions of interest or cell niches
 ##########################################
 ## import manually defined spatial domains
-
 Import.manual.spatial.domains = FALSE
 if(Import.manual.spatial.domains){
+  
   obj.list <- SplitObject(st, split.by = "condition")
   
   manual_selection_spots_image_Spata

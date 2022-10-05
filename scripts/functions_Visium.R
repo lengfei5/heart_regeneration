@@ -590,13 +590,14 @@ Run.celltype.deconvolution.RCTD = function(st, # spatial transcriptome seurat ob
   # loop over all conditions of st for now
   ##########################################
   cat('-- check visium conditions -- \n')
+  st$condition = droplevels(st$condition)
   print(table(st$condition))
   cc = names(table(st$condition))
   
   for(n in 1:length(cc))
   #for(n in c(1, 2, 4))
   {
-    # n = 4
+    # n = 2
     cat('slice -- ', cc[n], '\n')
     slice = cc[n]
     stx = st[, which(st$condition == slice)]
