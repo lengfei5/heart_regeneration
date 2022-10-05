@@ -588,35 +588,19 @@ run_neighborhood_analysis(st,
 # step 3) ligand-receptor-target prediction 
 ##########################################
 source('functions_Visium.R')
-refs = readRDS(file = paste0('../results/sc_multiome_R13591_intron.exon.20220729/Rdata/', 
-                             'aa_annotated_no_doublets_Elad.rds'))
+
+refs_file = '/groups/tanaka/Collaborations/Jingkui-Elad/scMultiome/aa_annotated_no_doublets_20221004_2.rds'
+refs = readRDS(file = refs_file)
+table(refs$subtypes)
+
 
 ## NK.cells.or.doublets cluster is weired
-refs = subset(refs, cells = colnames(refs)[grep('doubluets', refs$subtypes, invert = TRUE)])
-refs = subset(refs, cells = colnames(refs)[grep('Neuronal', refs$subtypes, invert = TRUE)])
+#refs = subset(refs, cells = colnames(refs)[grep('doubluets', refs$subtypes, invert = TRUE)])
+#refs = subset(refs, cells = colnames(refs)[grep('Neuronal', refs$subtypes, invert = TRUE)])
 
 refs$celltypes = refs$subtypes
-
-refs$celltypes[grep('CM_|CMs_|_CMs', refs$subtypes)] = 'CM'
-refs$celltypes[grep('EC|EC_', refs$subtypes)] = 'EC'
-refs$celltypes[grep('FB_', refs$subtypes)] = 'FB'
-refs$celltypes[grep('B_cells', refs$subtypes)] = 'Bcell'
-refs$celltypes[grep('Macrophages|_MF', refs$subtypes)] = 'Macrophages'
-refs$celltypes[grep('Megakeryocytes', refs$subtypes)] = 'Megakeryocytes'
-refs$celltypes[grep('RBC', refs$subtypes)] = 'RBC'
-
 
 run_LIANA()
 
 run_NicheNet()
-
-########################################################
-########################################################
-# Section IV: spatial organization of cell types and genes  
-# 
-########################################################
-########################################################
-#source('functions_Visium.R')
-#st = Find.SpatialDE(st)
-
 

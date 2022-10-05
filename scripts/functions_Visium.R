@@ -1123,7 +1123,8 @@ run_bayesSpace = function(st,
 ########################################################
 run_neighborhood_analysis = function(st, 
                               outDir = '../results/neighborhood_test/',
-                              RCTD_out = '../results/visium_axolotl_R12830_resequenced_20220308/RCTD_subtype_out_v2'
+                              RCTD_out = '../results/visium_axolotl_R12830_resequenced_20220308/RCTD_subtype_out_v2',
+                              background = 'remote'
                               )
 {
   library(corrplot)
@@ -1163,14 +1164,28 @@ run_neighborhood_analysis = function(st,
     weights = norm_weights >= 0.1 
     
     index_border = match(colnames(stx)[which(stx$segmentation == 'BZ')], rownames(weights))
-    index_bg = match(colnames(stx)[grep('Remote', stx$segmentation)], rownames(weights))
+    
+    if(background == 'remote'){
+      index_bg = match(colnames(stx)[grep('Remote|remote', stx$segmentation)], rownames(weights))
+    }
+    if(background == 'remote.others'){
+      index_bg = match(colnames(stx)[unique(c(grep('Remote|remote', stx$segmentation), 
+                                              which(is.na(stx$segmentation))))], rownames(weights))
+    }
+    
+    if(background == 'whole.slice'){
+      index_bg = c(1:nrow(weights))
+    }
+    
+    cat(length(index_border), ' spots in BZ\n')
+    cat(length(index_bg), ' spots in background \n')
     
     border = weights[index_border, ]
     bg = weights[index_bg, ]
     
     # constrcut the co-localization matrix
     cell_type_names <- colnames(weights)
-    coc = matrix(0, nrow = length(cell_type_names), ncol = length(cell_type_names))
+    coc = matrix(NA, nrow = length(cell_type_names), ncol = length(cell_type_names))
     colnames(coc) = cell_type_names
     rownames(coc) = cell_type_names
     
@@ -1184,6 +1199,7 @@ run_neighborhood_analysis = function(st,
     for(m in 1:ncol(coc))
     {
       # m = 1
+      cat(colnames(coc)[m], '\n')
       
       # first compute the border
       jj = which(border[,m] == TRUE)
@@ -1192,7 +1208,6 @@ run_neighborhood_analysis = function(st,
       }else{
         cond_border = apply(border[jj,], 2, sum)
       }
-      score_border = cond_border/(expect_border + 1)
       
       # compute bg
       jj0 = which(bg[,m] == TRUE)
@@ -1201,25 +1216,44 @@ run_neighborhood_analysis = function(st,
       }else{
         cond_bg = apply(bg[jj0, ], 2, sum)
       }
-      score_bg = cond_bg/(expect_bg + 1)
       
-      coc[ ,m] = score_border/(score_bg+10^-3)
+      #score_border = cond_border/(expect_border)
+      #score_bg = cond_bg /expect_bg
+      #kk_score = which(!is.na(score_border) & !is.na(score_bg))
+      #coc[, m] = cond_border/(expect_border + 0.5) * expect_bg/(cond_bg + 0.5)
+      #coc[kk_score, m] = score_border[kk_score]/(score_bg[kk_score] + 0.1)
+      
+      for(k in 1:nrow(coc)){
+        # k = 2
+        dat <- data.frame(
+          "withHits" = c(cond_border[k], cond_bg[k]),
+          "noHits" =  c( expect_border[k] - cond_border[k], expect_bg[k] - cond_bg[k]),
+          row.names = c("forground", "background"),
+          stringsAsFactors = FALSE
+        )
+        
+        coc[k, m] = fisher.test(x = dat, 
+                                alternative = "greater")$p.value
+        
+      }
+      
       
     }
     
-    ss1 = apply(coc, 1, sum)
-    ss2 = apply(coc, 2, sum)
-    sels = which(ss1>0 & ss2>0)
-    coc = coc[sels, sels]
+    #ss1 = apply(coc, 1, sum)
+    #ss2 = apply(coc, 2, sum)
+    #sels = which(ss1>0 & ss2>0)
+    #coc = coc[sels, sels]
     
-    coc = log10(coc + 10^-3)
+    coc = -log10(coc)
     
     pdfname = paste0(outDir, "/cooccurence_score_BZ_subtypes_", slice, ".pdf")
     pdf(pdfname, width=12, height = 10)
     
     corrplot(coc, method = 'color', is.corr = FALSE, 
+             #col.lim = c(-2.5, 2.5),
              hclust.method = c("complete"),
-             col = colorRampPalette(rev(brewer.pal(n = 9, name = "RdYlBu")))(10))
+             col = colorRampPalette(rev(brewer.pal(n = 9, name = "RdYlBu")))(6))
     
     dev.off()
     
