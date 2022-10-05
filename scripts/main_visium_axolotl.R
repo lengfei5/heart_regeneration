@@ -536,28 +536,35 @@ ggsave(paste0(resDir, '/QCs_nFeatures_SCT_mergedReseq.pdf'), width = 12, height 
 ## import manually defined spatial domains
 Import.manual.spatial.domains = FALSE
 if(Import.manual.spatial.domains){
+  require(SPATA2) # installation https://themilolab.github.io/SPATA2/articles/spata-v2-installation.html
   
-  obj.list <- SplitObject(st, split.by = "condition")
+  st$segmentation = NA
   
-  manual_selection_spots_image_Spata
-  
-  for(n in 1:nrow(design))
+  inputDir = '/groups/tanaka/Collaborations/Jingkui-Elad/visium_axolotl_reseq/spata2_manual_regions/'
+  #manual_selection_spots_image_Spata
+  for(n in 1:length(cc))
   {
-    # select day4
-    aa = obj.list[[2]]
-    aa$sampleID = design$sampleID[which(design$condition == names(table(aa$condition)))]
+    # n = 1
+    cat('slice -- ', cc[n], '\n')
+    slice = cc[n]
     
-    # import manually defined spatial domain by Elad
-    sdomain = read.csv('/groups/tanaka/Collaborations/Jingkui-Elad/Mouse_Visium_annotations/Anno_166906.csv')
-    sdomain = sdomain[which(sdomain$Anno_1 != ''), ]
-    aa$spatial_domain_manual = NA
+    aa = readRDS(file = paste0(inputDir, 'visium_manual_segmentation_', slice, '.rds'))
+    Idents(aa) = as.factor(aa$segmentation)
+    SpatialDimPlot(aa)
     
-    cells = gsub('_2_1', '',  colnames(aa))
-    aa$spatial_domain_manual[match(sdomain$Barcode, cells)] = sdomain$Anno_1
-    
+    st$segmentation[match(colnames(aa), colnames(st))] = aa$segmentation
+        
   }
   
 }
+st$segmentation = as.factor(st$segmentation)
+Idents(st) = as.factor(st$segmentation)
+SpatialDimPlot(st)
+
+ggsave(paste0(resDir, '/Manual_segmentation_spata2_Elad.pdf'), width = 16, height = 6)
+
+save(st, design, file = paste0(RdataDir, 'seuratObject_design_variableGenes_umap.clustered_manualSegmentation', 
+                               species, '.Rdata'))
 
 ## run bayesSpace to systematic spatial domain searching
 source('functions_Visium.R')
@@ -566,7 +573,15 @@ run_bayesSpace(st, outDir = paste0(resDir, '/bayesSpace/'))
 ##########################################
 # step 2) cell proximity analysis 
 ##########################################
-run_neighborhood_analysis(aa)
+load(file = paste0(RdataDir, 'seuratObject_design_variableGenes_umap.clustered_manualSegmentation', 
+                   species, '.Rdata'))
+source('functions_Visium.R')
+outDir = paste0(resDir, '/neighborhood_test/')
+RCTD_out = '../results/visium_axolotl_R12830_resequenced_20220308/RCTD_subtype_out_v3.5'
+
+run_neighborhood_analysis(st, 
+                          outDir = outDir,
+                          RCTD_out = RCTD_out)
 
 
 ##########################################

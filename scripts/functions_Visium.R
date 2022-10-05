@@ -1121,82 +1121,109 @@ run_bayesSpace = function(st,
 # 
 ########################################################
 ########################################################
-run_neighborhood_analysis = function(aa)
+run_neighborhood_analysis = function(st, 
+                              outDir = '../results/neighborhood_test/',
+                              RCTD_out = '../results/visium_axolotl_R12830_resequenced_20220308/RCTD_subtype_out_v2'
+                              )
 {
-  # import the manual spatial domain or by bayesSpace
-  slice = "adult.day4"
-  q = 8
-  
-  aa =  readRDS(file = paste0(paste0(RdataDir, "/SeuratObj_spatialDomain_BayesSpace_", 
-                            species, '_', slice,  "_with.", q, "clusters.rds")))
-  
-  SpatialDimPlot(aa, group.by = 'spatial_domain_bayeSpace', images = slice, label = TRUE)
-  
-  # import the cell type deconvolution result
-  myRCTD = readRDS(file = paste0(RdataDir, 'RCTD_results_refCombined_Forte2020.Ren2020_doubletMode_rmSMC_', slice, '.rds'))
-  results <- myRCTD@results
-  
-  # normalize the cell type proportions to sum to 1.
-  norm_weights = sweep(results$weights, 1, rowSums(results$weights), '/') 
-  
-  # use a threshold to binarize weights
-  weights = norm_weights >= 0.05 
-  
-  index_ctl = match(colnames(aa)[which(aa$spatial_domain_bayeSpace == '4')], rownames(weights))
-  index_border = match(colnames(aa)[which(aa$spatial_domain_bayeSpace == '7')], rownames(weights))
-  
-  ctl = weights[index_ctl, -5]
-  border = weights[index_border, -5]
-  
-  ss1 = apply(ctl, 2, sum)
-  ss2 = apply(border, 2, sum)
-  
-  #bgs = bgs/sum(bgs)
-  #border = border[, which(bgs>0)]
-  #bgs = bgs[which(bgs>0)]
-  cell_type_names <- colnames(ctl)
-  
-  coc = matrix(0, nrow = length(cell_type_names), ncol = length(cell_type_names))
-  colnames(coc) = cell_type_names
-  rownames(coc) = cell_type_names
-  
-  for(m in 1:ncol(coc))
-  {
-    # m = 2
-    jj = which(border[,m] == TRUE)
-    jj0 = which(ctl[,m] == TRUE)
-    
-    if(length(jj) == 1){
-      xx = border[jj, ]
-    }
-    if(length(jj) > 1){
-      xx = apply(border[jj, ], 2, sum)
-    }
-    
-    if(length(jj0) == 1){
-      xx0 = ctl[jj0, ]
-    }
-    if(length(jj0) > 1){
-      xx0 = apply(ctl[jj0, ], 2, sum)
-    }
-    
-    #xx = xx/length(jj)
-    xx = xx/nrow(border)
-    xx0 = (xx0+0.1)/nrow(ctl)
-    #xx = xx/bgs[m]
-    coc[m,] = xx/xx0
-    
-  }
-  
-  coc = log10(coc + 10^-2)
   library(corrplot)
   require(RColorBrewer)
-  corrplot(coc, method = 'color', is.corr = FALSE, hclust.method = c("ward.D2"),
-           col = colorRampPalette(rev(brewer.pal(n = 7, name = "RdYlBu")))(10))
   
-  ggsave(filename =  paste0(resDir, "/celltype_cooccurence_score_border_vs_", species, '_', slice, ".pdf"), 
-         width = 12, height = 8)
+  system(paste0('mkdir -p ', outDir))
   
+  cat('-- check visium conditions -- \n')
+  st$condition = droplevels(as.factor(st$condition))
+  print(table(st$condition))
+  cc = names(table(st$condition))
+  
+  Idents(st) = st$condition
+  
+  for(n in 1:length(cc))
+  {
+    # n = 2
+    cat('slice -- ', cc[n], '\n')
+    slice = cc[n]
+    stx = subset(st, condition == slice)
+    DefaultAssay(stx) = 'Spatial'
+    
+    stx$segmentation = as.factor(stx$segmentation)
+    Idents(stx) = stx$segmentation
+    SpatialDimPlot(stx, images = slice)
+    
+    print(table(stx$segmentation))
+    
+    # import the cell type deconvolution result
+    myRCTD = readRDS(file = paste0(RCTD_out, '/', slice,  '/RCTD_out_doubletMode_', slice, '.rds'))
+    results <- myRCTD@results
+    
+    norm_weights = normalize_weights(results$weights) 
+    #cell_type_names <- myRCTD@cell_type_info$info[[2]] #list of cell type names
+    
+    # use a threshold to binarize weights
+    weights = norm_weights >= 0.1 
+    
+    index_border = match(colnames(stx)[which(stx$segmentation == 'BZ')], rownames(weights))
+    index_bg = match(colnames(stx)[grep('Remote', stx$segmentation)], rownames(weights))
+    
+    border = weights[index_border, ]
+    bg = weights[index_bg, ]
+    
+    # constrcut the co-localization matrix
+    cell_type_names <- colnames(weights)
+    coc = matrix(0, nrow = length(cell_type_names), ncol = length(cell_type_names))
+    colnames(coc) = cell_type_names
+    rownames(coc) = cell_type_names
+    
+    #ss1 = apply(bg, 2, sum)
+    #ss2 = apply(border, 2, sum)
+    nb.spots.border = nrow(border)
+    nb.spots.bg = nrow(bg)
+    expect_border = apply(border, 2, sum)
+    expect_bg = apply(bg, 2, sum)
+    
+    for(m in 1:ncol(coc))
+    {
+      # m = 1
+      
+      # first compute the border
+      jj = which(border[,m] == TRUE)
+      if(length(jj) == 1){
+        cond_border = border[jj, ]
+      }else{
+        cond_border = apply(border[jj,], 2, sum)
+      }
+      score_border = cond_border/(expect_border + 1)
+      
+      # compute bg
+      jj0 = which(bg[,m] == TRUE)
+      if(length(jj0) == 1){
+        cond_bg = bg[jj0, ]
+      }else{
+        cond_bg = apply(bg[jj0, ], 2, sum)
+      }
+      score_bg = cond_bg/(expect_bg + 1)
+      
+      coc[ ,m] = score_border/(score_bg+10^-3)
+      
+    }
+    
+    ss1 = apply(coc, 1, sum)
+    ss2 = apply(coc, 2, sum)
+    sels = which(ss1>0 & ss2>0)
+    coc = coc[sels, sels]
+    
+    coc = log10(coc + 10^-3)
+    
+    pdfname = paste0(outDir, "/cooccurence_score_BZ_subtypes_", slice, ".pdf")
+    pdf(pdfname, width=12, height = 10)
+    
+    corrplot(coc, method = 'color', is.corr = FALSE, 
+             hclust.method = c("complete"),
+             col = colorRampPalette(rev(brewer.pal(n = 9, name = "RdYlBu")))(10))
+    
+    dev.off()
+    
+  }
   
 }
 ##########################################
