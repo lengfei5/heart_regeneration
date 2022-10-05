@@ -1577,7 +1577,9 @@ Find.SpatialDE = function(aa, use.method = 'sparkX')
 # 
 ########################################################
 ########################################################
-run_LIANA = function() # original code from https://saezlab.github.io/liana/articles/liana_tutorial.html
+run_LIANA = function(refs,
+                     celltypes = c('Mono_Macrophages', 'Proliferating_CM', 'Neutrophil', 'Injury_specific_EC')
+                     ) # original code from https://saezlab.github.io/liana/articles/liana_tutorial.html
 {
   require(tidyverse)
   require(magrittr)
@@ -1592,7 +1594,6 @@ run_LIANA = function() # original code from https://saezlab.github.io/liana/arti
   
   # Resource currently included in OmniPathR (and hence `liana`) include:
   show_resources()
-  
   # Resource currently included in OmniPathR (and hence `liana`) include:
   show_methods()
   
@@ -1601,26 +1602,31 @@ run_LIANA = function() # original code from https://saezlab.github.io/liana/arti
   # 
   # testdata %>% glimpse()
   
-  sels =c(which(refs$celltypes == 'CM')[1:1000], 
-          which(refs$celltypes == 'FB')[1:1000], 
-          which(refs$celltypes == 'Macrophages')[1:1000], 
-          which(refs$celltypes == 'Neutrophil'))
+  Idents(refs) = as.factor(refs$celltypes)
+  subref = subset(refs, cells = colnames(refs)[!is.na(match(refs$celltypes, celltypes))])
+  subref$celltypes = droplevels(subref$celltypes)
   
-  subref = subset(refs, cells = colnames(refs)[sels])
+  cat('celltype to consider -- ', names(table(subref$celltypes)), '\n')
+  
+  # sels =c(which(refs$celltypes == 'CM')[1:1000], 
+  #         which(refs$celltypes == 'FB')[1:1000], 
+  #         which(refs$celltypes == 'Macrophages')[1:1000], 
+  #         which(refs$celltypes == 'Neutrophil'))
+  
+  #subref = subset(refs, cells = colnames(refs)[sels])
   
   #rownames(subref) = toupper(rownames(subref))
   
-  Idents(subref) = subref$celltype
+  Idents(subref) = subref$celltypes
   
   # Run liana
   # liana_test <- liana_wrap(testdata, method = 'cellphonedb', resource = 'CellPhoneDB')
   source('functions_scRNAseq.R')
   sce <- as.SingleCellExperiment(subref)
+  
   colLabels(sce) = as.factor(sce$celltypes)
   rownames(sce) = toupper(get_geneName(rownames(sce)))
-  
   raw = counts(sce)
-  
   expr = logcounts(sce)
   #logcounts(sce) = exp(expr)
   ss1 = apply(raw, 1, sum)
@@ -1643,7 +1649,7 @@ run_LIANA = function() # original code from https://saezlab.github.io/liana/arti
   
   # We can aggregate these results into a tibble with consensus ranks
   liana_test <- liana_test %>%
-    liana_aggregate(resource = 'Consensus')
+    liana_aggregate(resource = 'Consensus', idents_col = 'celltypes')
   
   liana_test %>%
     liana_dotplot(source_groups = c("FB"),
@@ -1710,8 +1716,7 @@ run_LIANA = function() # original code from https://saezlab.github.io/liana/arti
   # #> no counts!
   # 
   # complex_test %>% liana_aggregate()
-  # 
-  # 
+  
   
 }
 

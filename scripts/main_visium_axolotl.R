@@ -593,14 +593,12 @@ refs_file = '/groups/tanaka/Collaborations/Jingkui-Elad/scMultiome/aa_annotated_
 refs = readRDS(file = refs_file)
 table(refs$subtypes)
 
-
-## NK.cells.or.doublets cluster is weired
-#refs = subset(refs, cells = colnames(refs)[grep('doubluets', refs$subtypes, invert = TRUE)])
-#refs = subset(refs, cells = colnames(refs)[grep('Neuronal', refs$subtypes, invert = TRUE)])
-
+# set parameter for ligand-receptor analysis
 refs$celltypes = refs$subtypes
+celltypes = c('Mono_Macrophages', 'Proliferating_CM', 'Neutrophil', 'Injury_specific_EC')
 
-run_LIANA()
+run_LIANA(refs, celltypes = celltypes)
 
 run_NicheNet()
+
 
