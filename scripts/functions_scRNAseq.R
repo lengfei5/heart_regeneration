@@ -23,8 +23,15 @@ firstup <- function(x) {
 
 get_geneName = function(xx)
 {
-  return(sapply(xx, function(x) {test = unlist(strsplit(as.character(x), '-')); test = test[-length(test)]; 
-  paste0(test, collapse = '-')}))
+  return(sapply(xx, function(x) {test = unlist(strsplit(as.character(x), '-')); 
+  if(length(test) == 1) {
+    test
+  }else{
+    test = test[-length(test)]; 
+    paste0(test, collapse = '-')
+  }
+  }
+  ))
 }
 
 get_geneID = function(xx)

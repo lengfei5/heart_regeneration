@@ -1573,7 +1573,7 @@ Find.SpatialDE = function(aa, use.method = 'sparkX')
 
 ########################################################
 ########################################################
-# Section : functions of cell-cell interaction, ligand-receptor analysis
+# Section : ligand-receptor-TFs analysis
 # 
 ########################################################
 ########################################################
@@ -1592,11 +1592,6 @@ run_LIANA = function(refs,
   require(MatrixGenerics)
   require(sparseMatrixStats)
   
-  # Resource currently included in OmniPathR (and hence `liana`) include:
-  show_resources()
-  # Resource currently included in OmniPathR (and hence `liana`) include:
-  show_methods()
-  
   # liana_path <- system.file(package = "liana")
   # testdata <- readRDS(file.path(liana_path , "testdata", "input", "testdata.rds"))
   # 
@@ -1604,8 +1599,9 @@ run_LIANA = function(refs,
   
   Idents(refs) = as.factor(refs$celltypes)
   subref = subset(refs, cells = colnames(refs)[!is.na(match(refs$celltypes, celltypes))])
-  subref$celltypes = droplevels(subref$celltypes)
-  
+  subref$celltypes = droplevels(as.factor(subref$celltypes))
+  table(subref$celltypes)
+  #subref = subset(x = subref, downsample = 1000)
   cat('celltype to consider -- ', names(table(subref$celltypes)), '\n')
   
   # sels =c(which(refs$celltypes == 'CM')[1:1000], 
@@ -1618,28 +1614,40 @@ run_LIANA = function(refs,
   #rownames(subref) = toupper(rownames(subref))
   
   Idents(subref) = subref$celltypes
-  
+   
   # Run liana
   # liana_test <- liana_wrap(testdata, method = 'cellphonedb', resource = 'CellPhoneDB')
   source('functions_scRNAseq.R')
   sce <- as.SingleCellExperiment(subref)
-  
   colLabels(sce) = as.factor(sce$celltypes)
   rownames(sce) = toupper(get_geneName(rownames(sce)))
-  raw = counts(sce)
-  expr = logcounts(sce)
-  #logcounts(sce) = exp(expr)
-  ss1 = apply(raw, 1, sum)
-  ss2 = apply(expr, 1, sum)
-  cc1 = apply(raw, 2, sum)
-  cc2 = apply(expr, 2, sum)
   
-  sce = sce[which(ss1>10 & ss2> 10), which(cc1>10 & cc2 > 0)]
+  ave.counts <- calculateAverage(sce, assay.type = "counts")
+  
+  hist(log10(ave.counts), breaks=100, main="", col="grey80",
+       xlab=expression(Log[10]~"average count"))
+  
+  num.cells <- nexprs(sce, byrow=TRUE)
+  smoothScatter(log10(ave.counts), num.cells, ylab="Number of cells",
+                xlab=expression(Log[10]~"average count"))
+  
+  # detected in >= 5 cells, ave.counts >=5 but not too high
+  genes.to.keep <- num.cells > 50 & ave.counts >= 10^-2  & ave.counts <10^1  
+  summary(genes.to.keep)
+  
+  sce <- sce[genes.to.keep, ]
   
   ## !! not working 
+  # Resource currently included in OmniPathR (and hence `liana`) include:
+  show_resources()
+  # Resource currently included in OmniPathR (and hence `liana`) include:
+  show_methods()
+  
   liana_test <- liana_wrap(sce,  
-                           resource = c("Consensus", 'CellPhoneDB',  "CellChatDB",  "CellTalkDB"), 
-                           assay.type = "logcounts")
+                           resource = c("Consensus", 'CellPhoneDB', "OmniPath", "LRdb",
+                                        "CellChatDB",  "CellTalkDB"), 
+                           assay.type = "logcounts", 
+                           idents_col = 'celltypes')
   
   #> Warning in .filter_sce(sce): 3465 genes and/or 0 cells were removed as they had
   #> no counts!
