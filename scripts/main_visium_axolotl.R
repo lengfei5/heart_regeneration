@@ -600,6 +600,8 @@ outDir = paste0(resDir, '/Ligand_Receptor_analysis/')
 
 run_LIANA(refs, celltypes = celltypes, outDir = outDir)
 
+celltypes = c('Mono_Macrophages', 'Proliferating_CM', 'Neutrophil', 'Injury_specific_EC', 'Ventricular_CM_ROBO2+')
+
 run_NicheNet(refs, celltypes = celltypes, outDir = outDir)
 
 

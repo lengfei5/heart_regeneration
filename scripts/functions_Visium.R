@@ -1748,18 +1748,54 @@ run_LIANA = function(refs,
 # Nichenet for ligand-receptor analysis
 # original code from https://github.com/saeyslab/nichenetr/blob/master/vignettes/seurat_steps.md
 ##########################################
-run_NicheNet = function() 
+run_NicheNet = function(refs, celltypes = celltypes, outDir = outDir) 
 {
   library(nichenetr)
   library(Seurat) # please update to Seurat V4
   library(tidyverse)
   library(circlize)
+  require(scran)
+  require(scater)
+  source('functions_scRNAseq.R')
+  dataPath_nichenet = '../data/NicheNet/'
+  
+  system(paste0('mkdir -p ', outDir))
+  
+  ## subset seurat object and change names
+  Idents(refs) = as.factor(refs$celltypes)
+  subref = subset(refs, cells = colnames(refs)[!is.na(match(refs$celltypes, celltypes))])
+  subref$celltypes = droplevels(as.factor(subref$celltypes))
+  table(subref$celltypes)
+  #subref = subset(x = subref, downsample = 1000)
+  cat('celltype to consider -- ', names(table(subref$celltypes)), '\n')
+  
+  Idents(subref) = subref$celltypes
+  sce <- as.SingleCellExperiment(subref)
+  colLabels(sce) = as.factor(sce$celltypes)
+  rownames(sce) = get_geneName(rownames(sce))
+  
+  ave.counts <- calculateAverage(sce, assay.type = "counts")
+  
+  hist(log10(ave.counts), breaks=100, main="", col="grey80",
+       xlab=expression(Log[10]~"average count"))
+  
+  num.cells <- nexprs(sce, byrow=TRUE)
+  smoothScatter(log10(ave.counts), num.cells, ylab="Number of cells",
+                xlab=expression(Log[10]~"average count"))
+  
+  # detected in >= 5 cells, ave.counts >=5 but not too high
+  genes.to.keep <- num.cells > 50 & ave.counts >= 10^-2  & ave.counts <10^1  
+  summary(genes.to.keep)
+  sce <- sce[genes.to.keep, ]
+  rownames(sce) = make.names(rownames(sce), unique = TRUE)
+  subref = as.Seurat(sce, counts = "counts", data = "logcounts")
+  rm(sce)
+  Idents(subref) = as.factor(subref$celltypes)
   
   #Ligand-target model:
   # This model denotes the prior potential that a particular ligand might 
   # regulate the expression of a specific target gene
   ## import NicheNet’s ligand-target prior model, ligand-receptor network and weighted integrated networks
-  dataPath_nichenet = '../data/NicheNet/'
   ligand_target_matrix = readRDS(paste0(dataPath_nichenet,  "ligand_target_matrix.rds"))
   ligand_target_matrix[1:5,1:5] # target genes in rows, ligands in columns
   
@@ -1773,64 +1809,62 @@ run_NicheNet = function()
   
   # get the weights of the ligand-receptor interactions as used in the NicheNet model
   weighted_networks = readRDS(paste0(dataPath_nichenet,  "weighted_networks.rds"))
+  weighted_networks_lr = weighted_networks$lr_sig %>% 
+    inner_join(lr_network %>% 
+                 distinct(from,to), by = c("from","to"))
   head(weighted_networks$lr_sig) # interactions and their weights in the ligand-receptor + signaling network
   head(weighted_networks$gr) # interactions and their weights in the gene regulatory network
   
   ## example from https://github.com/saeyslab/nichenetr/blob/master/vignettes/ligand_activity_geneset.md
-  hnscc_expression = readRDS(url("https://zenodo.org/record/3260758/files/hnscc_expression.rds"))
-  expression = hnscc_expression$expression
-  sample_info = hnscc_expression$sample_info # contains meta-information about the cells
+  # hnscc_expression = readRDS(url("https://zenodo.org/record/3260758/files/hnscc_expression.rds"))
+  # expression = hnscc_expression$expression
+  # sample_info = hnscc_expression$sample_info # contains meta-information about the cells
   
   # Step 1: Define expressed genes in sender and receiver cell populations
-  tumors_remove = c("HN10","HN","HN12", "HN13", "HN24", "HN7", "HN8","HN23")
+  ## receiver
+  receiver = "Proliferating_CM"
+  expressed_genes_receiver = get_expressed_genes(receiver, subref, pct = 0.10)
+  background_expressed_genes = expressed_genes_receiver %>% .[. %in% rownames(ligand_target_matrix)]
   
-  CAF_ids = sample_info %>% filter(`Lymph node` == 0 & !(tumor %in% tumors_remove) & 
-                                     `non-cancer cell type` == "CAF") %>% pull(cell)
-  malignant_ids = sample_info %>% filter(`Lymph node` == 0 & !(tumor %in% tumors_remove) & 
-                                           `classified  as cancer cell` == 1) %>% pull(cell)
+  ## sender
+  sender_celltypes = c('Mono_Macrophages', 'Proliferating_CM', 'Neutrophil', 'Injury_specific_EC')
+  # lapply to get the expressed genes of every sender cell type separately here
+  list_expressed_genes_sender = sender_celltypes %>% unique() %>% lapply(get_expressed_genes, subref, 0.10) 
+  expressed_genes_sender = list_expressed_genes_sender %>% unlist() %>% unique()
   
-  expressed_genes_sender = expression[CAF_ids,] %>% 
-    apply(2,function(x){10*(2**x - 1)}) %>% 
-    apply(2,function(x){log2(mean(x) + 1)}) %>% .[. >= 4] %>% names()
+  # Step 2: Define the gene set of interest and a background of genes
+  seurat_obj_receiver= subset(subref, idents = c(receiver, "Ventricular_CM_ROBO2+"))
+  seurat_obj_receiver = SetIdent(seurat_obj_receiver, value = seurat_obj_receiver[["celltypes"]])
   
-  expressed_genes_receiver = expression[malignant_ids,] %>% 
-    apply(2,function(x){10*(2**x - 1)}) %>% 
-    apply(2,function(x){log2(mean(x) + 1)}) %>% .[. >= 4] %>% names()
+  # define target genes
+  condition_oi = "Proliferating_CM"
+  condition_reference = "Ventricular_CM_ROBO2+" 
+  
+  DE_table_receiver = FindMarkers(object = seurat_obj_receiver, 
+                                  ident.1 = condition_oi, 
+                                  ident.2 = condition_reference, 
+                                  min.pct = 0.10) %>% rownames_to_column("gene")
+  
+  geneset_oi = DE_table_receiver %>% filter(p_val_adj <= 0.05 & abs(avg_log2FC) >= 0.25) %>% pull(gene)
+  geneset_oi = geneset_oi %>% .[. %in% rownames(ligand_target_matrix)]
   
   # Check the number of expressed genes: should be a 'reasonable' number of 
   # total expressed genes in a cell type, e.g. between 5000-10000 (and not 500 or 20000)
-  length(expressed_genes_sender)
+  #length(expressed_genes_sender)
   ## [1] 6706
-  length(expressed_genes_receiver)
+  #length(expressed_genes_receiver)
   ## [1] 6351
-  
-  # Step 2: Define the gene set of interest and a background of genes
-  # only consider genes also present in the NicheNet model - this excludes genes from the gene list 
-  # for which the official HGNC symbol was not used by Puram et al.
-  geneset_oi = readr::read_tsv(url("https://zenodo.org/record/3260758/files/pemt_signature.txt"), 
-                               col_names = "gene") %>% 
-    pull(gene) %>% .[. %in% rownames(ligand_target_matrix)] 
-  head(geneset_oi)
-  ## [1] "SERPINE1" "TGFBI"    "MMP10"    "LAMC2"    "P4HA2"    "PDPN"
-  
-  background_expressed_genes = expressed_genes_receiver %>% .[. %in% rownames(ligand_target_matrix)]
-  head(background_expressed_genes)
-  ## [1] "RPS11"   "ELMO2"   "PNMA1"   "MMP2"    "TMEM216" "ERCC5"
   
   # Step 3: Define a set of potential ligands
   ligands = lr_network %>% pull(from) %>% unique()
-  expressed_ligands = intersect(ligands,expressed_genes_sender)
-  
   receptors = lr_network %>% pull(to) %>% unique()
+  
+  expressed_ligands = intersect(ligands,expressed_genes_sender)
   expressed_receptors = intersect(receptors,expressed_genes_receiver)
   
-  lr_network_expressed = lr_network %>% filter(from %in% expressed_ligands & to %in% expressed_receptors) 
-  head(lr_network_expressed)
+  potential_ligands = lr_network %>% 
+    filter(from %in% expressed_ligands & to %in% expressed_receptors) %>% pull(from) %>% unique()
   
-  # This ligand-receptor network contains the expressed ligand-receptor interactions. 
-  # As potentially active ligands for the NicheNet analysis, we will consider the ligands from this network.
-  potential_ligands = lr_network_expressed %>% pull(from) %>% unique()
-  head(potential_ligands)
   
   # Step 4: Perform NicheNet’s ligand activity analysis on the gene set of interest
   ligand_activities = predict_ligand_activities(geneset = geneset_oi, 
@@ -1838,15 +1872,17 @@ run_NicheNet = function()
                                                 ligand_target_matrix = ligand_target_matrix, 
                                                 potential_ligands = potential_ligands)
   
+  ligand_activities = ligand_activities %>% arrange(-pearson) %>% mutate(rank = rank(desc(pearson)))
+  ligand_activities
+  
+  best_upstream_ligands = ligand_activities %>% 
+    top_n(30, pearson) %>% arrange(-pearson) %>% pull(test_ligand) %>% unique()
+  DotPlot(subref, features = best_upstream_ligands %>% rev(), cols = "RdYlBu") + RotatedAxis()
   # Now, we want to rank the ligands based on their ligand activity. 
   # In our validation study, we showed that the pearson correlation coefficient (PCC) 
   # between a ligand’s target predictions and the observed transcriptional response was 
   # the most informative measure to define ligand activity. 
   # Therefore, we will rank the ligands based on their pearson correlation coefficient.
-  
-  ligand_activities %>% arrange(-pearson) 
-  best_upstream_ligands = ligand_activities %>% top_n(20, pearson) %>% arrange(-pearson) %>% pull(test_ligand)
-  head(best_upstream_ligands)
   
   # show histogram of ligand activity scores to check the selected cutoff 
   # by looking at the distribution of the ligand activity values. 
@@ -1855,45 +1891,43 @@ run_NicheNet = function()
   p_hist_lig_activity = ggplot(ligand_activities, aes(x=pearson)) + 
     geom_histogram(color="black", fill="darkorange")  + 
     # geom_density(alpha=.1, fill="orange") +
-    geom_vline(aes(xintercept=min(ligand_activities %>% top_n(20, pearson) %>% pull(pearson))), 
+    geom_vline(aes(xintercept=min(ligand_activities %>% top_n(30, pearson) %>% pull(pearson))), 
                color="red", linetype="dashed", size=1) + 
     labs(x="ligand activity (PCC)", y = "# ligands") +
     theme_classic()
   p_hist_lig_activity
   
+  
   # Step 5: Infer target genes of top-ranked ligands and visualize in a heatmap
   active_ligand_target_links_df = best_upstream_ligands %>% 
     lapply(get_weighted_ligand_target_links, 
-           geneset = geneset_oi, 
-           ligand_target_matrix = ligand_target_matrix, 
-           n = 250) %>% bind_rows()
+           geneset = geneset_oi, ligand_target_matrix = ligand_target_matrix, n = 200) %>% 
+    bind_rows() %>% drop_na()
   
-  nrow(active_ligand_target_links_df)
-  head(active_ligand_target_links_df)
-  
-  active_ligand_target_links = prepare_ligand_target_visualization(ligand_target_df = active_ligand_target_links_df, 
+  active_ligand_target_links = prepare_ligand_target_visualization(ligand_target_df = active_ligand_target_links_df,
                                                                    ligand_target_matrix = ligand_target_matrix, 
-                                                                   cutoff = 0.25)
+                                                                   cutoff = 0.33)
   
-  nrow(active_ligand_target_links)
-  head(active_ligand_target_links)
+  order_ligands = intersect(best_upstream_ligands, colnames(active_ligand_target_links)) %>% 
+    rev() %>% make.names()
+  order_targets = active_ligand_target_links_df$target %>% unique() %>% 
+    intersect(rownames(active_ligand_target_links)) %>% make.names()
+  rownames(active_ligand_target_links) = rownames(active_ligand_target_links) %>% make.names() 
+  # make.names() for heatmap visualization of genes like H2-T23
+  colnames(active_ligand_target_links) = colnames(active_ligand_target_links) %>% make.names() 
+  # make.names() for heatmap visualization of genes like H2-T23
   
-  #The putatively active ligand-target links will now be visualized in a heatmap. 
-  order_ligands = intersect(best_upstream_ligands, colnames(active_ligand_target_links)) %>% rev()
-  order_targets = active_ligand_target_links_df$target %>% unique()
   vis_ligand_target = active_ligand_target_links[order_targets,order_ligands] %>% t()
   
   p_ligand_target_network = vis_ligand_target %>% 
-    make_heatmap_ggplot("Prioritized CAF-ligands",
-                        "p-EMT genes in malignant cells", 
-                        color = "purple",
-                        legend_position = "top", 
+    make_heatmap_ggplot("Prioritized ligands","Predicted target genes", 
+                        color = "purple",legend_position = "top", 
                         x_axis_position = "top",
-                        legend_title = "Regulatory potential") + 
-    scale_fill_gradient2(low = "whitesmoke",  high = "purple", breaks = c(0,0.005,0.01)) + 
-    theme(axis.text.x = element_text(face = "italic"))
-  
+                        legend_title = "Regulatory potential")  + 
+    theme(axis.text.x = element_text(face = "italic")) + 
+    scale_fill_gradient2(low = "whitesmoke",  high = "purple", breaks = c(0,0.0045,0.0090))
   p_ligand_target_network
+  
   
   # Follow-up analysis 1: Ligand-receptor network inference for top-ranked ligands
   # get the ligand-receptor network of the top-ranked ligands
@@ -1901,17 +1935,13 @@ run_NicheNet = function()
     distinct(from,to)
   best_upstream_receptors = lr_network_top %>% pull(to) %>% unique()
   
-  # get the weights of the ligand-receptor interactions as used in the NicheNet model
-  #weighted_networks = readRDS(url("https://zenodo.org/record/3260758/files/weighted_networks.rds"))
-  lr_network_top_df = weighted_networks$lr_sig %>% 
+  lr_network_top_df_large = weighted_networks_lr %>% 
     filter(from %in% best_upstream_ligands & to %in% best_upstream_receptors)
   
-  # convert to a matrix
-  lr_network_top_df = lr_network_top_df %>% spread("from","weight",fill = 0)
-  lr_network_top_matrix = lr_network_top_df %>% 
-    select(-to) %>% as.matrix() %>% magrittr::set_rownames(lr_network_top_df$to)
+  lr_network_top_df = lr_network_top_df_large %>% spread("from","weight",fill = 0)
+  lr_network_top_matrix = lr_network_top_df %>% select(-to) %>% as.matrix() %>% 
+    magrittr::set_rownames(lr_network_top_df$to)
   
-  # perform hierarchical clustering to order the ligands and receptors
   dist_receptors = dist(lr_network_top_matrix, method = "binary")
   hclust_receptors = hclust(dist_receptors, method = "ward.D2")
   order_receptors = hclust_receptors$labels[hclust_receptors$order]
@@ -1920,12 +1950,86 @@ run_NicheNet = function()
   hclust_ligands = hclust(dist_ligands, method = "ward.D2")
   order_ligands_receptor = hclust_ligands$labels[hclust_ligands$order]
   
+  order_receptors = order_receptors %>% intersect(rownames(lr_network_top_matrix))
+  order_ligands_receptor = order_ligands_receptor %>% intersect(colnames(lr_network_top_matrix))
+  
   vis_ligand_receptor_network = lr_network_top_matrix[order_receptors, order_ligands_receptor]
+  rownames(vis_ligand_receptor_network) = order_receptors %>% make.names()
+  colnames(vis_ligand_receptor_network) = order_ligands_receptor %>% make.names()
   p_ligand_receptor_network = vis_ligand_receptor_network %>% t() %>% 
-    make_heatmap_ggplot("Prioritized CAF-ligands","Receptors expressed by malignant cells", 
-                        color = "mediumvioletred", x_axis_position = "top",
-                        legend_title = "Prior interaction potential")
+    make_heatmap_ggplot("Ligands","Receptors", color = "mediumvioletred", 
+                        x_axis_position = "top",legend_title = "Prior interaction potential")
   p_ligand_receptor_network
+  
+  # Receptors of top-ranked ligands, but after considering only bona fide ligand-receptor interactions documented 
+  # in literature and publicly available databases
+  lr_network_strict = lr_network %>% filter(database != "ppi_prediction_go" & database != "ppi_prediction")
+  ligands_bona_fide = lr_network_strict %>% pull(from) %>% unique()
+  receptors_bona_fide = lr_network_strict %>% pull(to) %>% unique()
+  
+  lr_network_top_df_large_strict = lr_network_top_df_large %>% distinct(from,to) %>% 
+    inner_join(lr_network_strict, by = c("from","to")) %>% distinct(from,to)
+  lr_network_top_df_large_strict = lr_network_top_df_large_strict %>% 
+    inner_join(lr_network_top_df_large, by = c("from","to"))
+  
+  lr_network_top_df_strict = lr_network_top_df_large_strict %>% spread("from","weight",fill = 0)
+  lr_network_top_matrix_strict = lr_network_top_df_strict %>% 
+    select(-to) %>% as.matrix() %>% magrittr::set_rownames(lr_network_top_df_strict$to)
+  
+  dist_receptors = dist(lr_network_top_matrix_strict, method = "binary")
+  hclust_receptors = hclust(dist_receptors, method = "ward.D2")
+  order_receptors = hclust_receptors$labels[hclust_receptors$order]
+  
+  dist_ligands = dist(lr_network_top_matrix_strict %>% t(), method = "binary")
+  hclust_ligands = hclust(dist_ligands, method = "ward.D2")
+  order_ligands_receptor = hclust_ligands$labels[hclust_ligands$order]
+  
+  order_receptors = order_receptors %>% intersect(rownames(lr_network_top_matrix_strict))
+  order_ligands_receptor = order_ligands_receptor %>% intersect(colnames(lr_network_top_matrix_strict))
+  
+  vis_ligand_receptor_network_strict = lr_network_top_matrix_strict[order_receptors, order_ligands_receptor]
+  rownames(vis_ligand_receptor_network_strict) = order_receptors %>% make.names()
+  colnames(vis_ligand_receptor_network_strict) = order_ligands_receptor %>% make.names()
+  
+  p_ligand_receptor_network_strict = vis_ligand_receptor_network_strict %>% t() %>% 
+    make_heatmap_ggplot("Ligands","Receptors", color = "mediumvioletred",
+                        x_axis_position = "top",legend_title = "Prior interaction potential\n(bona fide)")
+  p_ligand_receptor_network_strict
+  
+  
+  # Add log fold change information of ligands from sender cells
+  # DE analysis for each sender cell type
+  # this uses a new nichenetr function - reinstall nichenetr if necessary!
+  DE_table_all = Idents(subref) %>% levels() %>% 
+    intersect(sender_celltypes) %>% lapply(get_lfc_celltype, seurat_obj = subref, 
+                                           condition_colname = "celltypes", 
+                                           condition_oi = condition_oi, 
+                                           condition_reference = condition_reference, 
+                                           expression_pct = 0.10, celltype_col = NULL) %>% reduce(full_join) 
+  # use this if cell type labels are the identities of your Seurat object -- 
+  # if not: indicate the celltype_col properly
+  DE_table_all[is.na(DE_table_all)] = 0
+  
+  # Combine ligand activities with DE information
+  ligand_activities_de = ligand_activities %>% select(test_ligand, pearson) %>% rename(ligand = test_ligand) %>% left_join(DE_table_all %>% rename(ligand = gene))
+  ligand_activities_de[is.na(ligand_activities_de)] = 0
+  
+  # make LFC heatmap
+  lfc_matrix = ligand_activities_de  %>% select(-ligand, -pearson) %>% as.matrix() %>% magrittr::set_rownames(ligand_activities_de$ligand)
+  rownames(lfc_matrix) = rownames(lfc_matrix) %>% make.names()
+  
+  order_ligands = order_ligands[order_ligands %in% rownames(lfc_matrix)]
+  vis_ligand_lfc = lfc_matrix[order_ligands,]
+  
+  colnames(vis_ligand_lfc) = vis_ligand_lfc %>% colnames() %>% make.names()
+  
+  p_ligand_lfc = vis_ligand_lfc %>% make_threecolor_heatmap_ggplot("Prioritized ligands","LFC in Sender", low_color = "midnightblue",mid_color = "white", mid = median(vis_ligand_lfc), high_color = "red",legend_position = "top", x_axis_position = "top", legend_title = "LFC") + theme(axis.text.y = element_text(face = "italic"))
+  p_ligand_lfc
+  
+  # change colors a bit to make them more stand out
+  p_ligand_lfc = p_ligand_lfc + scale_fill_gradientn(colors = c("midnightblue","blue", "grey95", "grey99","firebrick1","red"),values = c(0,0.1,0.2,0.25, 0.40, 0.7,1), limits = c(vis_ligand_lfc %>% min() - 0.1, vis_ligand_lfc %>% max() + 0.1))
+  p_ligand_lfc
+  
   
   # Follow-up analysis 2: Visualize expression of top-predicted ligands and 
   # their target genes in a combined heatmap
