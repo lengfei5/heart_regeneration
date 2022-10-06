@@ -1579,6 +1579,7 @@ Find.SpatialDE = function(aa, use.method = 'sparkX')
 ########################################################
 run_LIANA = function(refs,
                      celltypes = c('Mono_Macrophages', 'Proliferating_CM', 'Neutrophil', 'Injury_specific_EC')
+                     outDir = '../results/Ligand_Receptor_analysis'
                      ) # original code from https://saezlab.github.io/liana/articles/liana_tutorial.html
 {
   require(tidyverse)
@@ -1592,6 +1593,7 @@ run_LIANA = function(refs,
   require(MatrixGenerics)
   require(sparseMatrixStats)
   
+  system(paste0('mkdir -p ', outDir))
   # liana_path <- system.file(package = "liana")
   # testdata <- readRDS(file.path(liana_path , "testdata", "input", "testdata.rds"))
   # 
@@ -1637,42 +1639,49 @@ run_LIANA = function(refs,
   
   sce <- sce[genes.to.keep, ]
   
-  ## !! not working 
+  ## run the liana wrap function by specifying resource and methods
   # Resource currently included in OmniPathR (and hence `liana`) include:
   show_resources()
   # Resource currently included in OmniPathR (and hence `liana`) include:
   show_methods()
   
   liana_test <- liana_wrap(sce,  
+                           method = c("natmi", "connectome", "logfc", "sca", "cytotalk",  
+                                       'cellphonedb'),
                            resource = c("Consensus", 'CellPhoneDB', "OmniPath", "LRdb",
                                         "CellChatDB",  "CellTalkDB"), 
                            assay.type = "logcounts", 
                            idents_col = 'celltypes')
-  
-  #> Warning in .filter_sce(sce): 3465 genes and/or 0 cells were removed as they had
-  #> no counts!
   
   # Liana returns a list of results, each element of which corresponds to a method
   liana_test %>% glimpse
   
   # We can aggregate these results into a tibble with consensus ranks
   liana_test <- liana_test %>%
-    liana_aggregate(resource = 'Consensus', idents_col = 'celltypes')
+    liana_aggregate(resource = 'Consensus')
   
-  liana_test %>%
-    liana_dotplot(source_groups = c("FB"),
-                  target_groups = c("CM", "Macrophages", "Neutrophil"),
-                  ntop = 20)
-  ggsave(filename = paste0(resDir, '/liana_LR_prediction_FB_to_CM_.pdf'), width = 12, height = 8)
+  for(n in 1:length(celltypes)){
+    # n = 1
+    liana_test %>%
+      liana_dotplot(source_groups = celltypes[n],
+                    target_groups = celltypes[-n],
+                    ntop = 20)
+    ggsave(filename = paste0(outDir, '/liana_LR_prediction_senderCell_', celltypes[n], '.pdf'), 
+           width = 14, height = 10)
+    
+  }
   
+  pdfname = paste0(outDir, 'liana_celltype_communication_freqHeatmap.pdf')
+  pdf(pdfname, width=12, height = 8)
   
-  liana_test %>% 
-    filter(source =="CM") %>%
-    #top_n(25,  desc(aggregate_rank)) %>%
-    liana_dotplot(source_groups = c("CM"),
-                  target_groups = c("FB", "Macrophages", "Neutrophil"),
-                  ntop = 20)
-  ggsave(filename = paste0(resDir, '/liana_LR_prediction_CM_to_FB_prolife.Mphage.pdf'), width = 12, height = 8)
+  liana_trunc <- liana_test %>%
+    # only keep interactions concordant between methods
+    filter(aggregate_rank <= 0.01) # this can be FDR-corr if n is too high
+  
+  heat_freq(liana_trunc)
+  
+  dev.off()
+  
   
   # liana_test %>% 
   #   filter(source =="prolife.Mphage") %>%
@@ -1682,53 +1691,64 @@ run_LIANA = function(refs,
   # ggsave(filename = paste0(resDir, '/liana_LR_prediction_prolife.Mphage_to_FB_CM.pdf'), width = 12, height = 8)
   # 
   
-  liana_trunc <- liana_test %>%
-    # only keep interactions concordant between methods
-    filter(aggregate_rank <= 0.01) # this can be FDR-corr if n is too high
+  # p <- chord_freq(liana_trunc,
+  #                 source_groups = c("CM", "FB", "Macrophages", "Neutrophil"),
+  #                 target_groups = c("CM", "FB", "Macrophages", "Neutrophil"))
   
-  heat_freq(liana_trunc)
   
-  p <- chord_freq(liana_trunc,
-                  source_groups = c("CM", "FB", "Macrophages", "Neutrophil"),
-                  target_groups = c("CM", "FB", "Macrophages", "Neutrophil"))
+  # RUN CPDB alone
+  cpdb_test <- liana_wrap(sce,
+                          method = 'cellphonedb',
+                          resource = c('CellPhoneDB'),
+                          permutation.params = list(nperms=1000,
+                                                    parallelize=FALSE,
+                                                    workers=4), 
+                          expr_prop=0.05)
+
+  # Plot toy results
+  # identify interactions of interest
+  cpdb_int <- cpdb_test %>%
+    # only keep interactions with p-val <= 0.05
+    filter(pvalue <= 0.05) %>% # this reflects interactions `specificity`
+    # then rank according to `magnitude` (lr_mean in this case)
+    rank_method(method_name = "cellphonedb",
+                mode = "magnitude") %>%
+    # keep top 20 interactions (regardless of cell type)
+    distinct_at(c("ligand.complex", "receptor.complex")) %>%
+    head(20)
   
-  # run any method of choice
-  # Load Sce testdata
-  # sce <- readRDS(file.path(liana_path , "testdata", "input", "testsce.rds"))
-  # 
-  # # RUN CPDB alone
-  # cpdb_test <- liana_wrap(sce,
-  #                         method = 'cellphonedb',
-  #                         resource = c('CellPhoneDB'),
-  #                         permutation.params = list(nperms=100,
-  #                                                   parallelize=FALSE,
-  #                                                   workers=4))
-  # 
-  # # Plot toy results
-  # cpdb_test %>%
-  #   # filter(pvalue <= 0.05) %>% # only keep interactions with p-val <= 0.05
-  #   # invert size (low p-value/high specificity = larger dot size)
-  #   # + add a small value to avoid Infinity for 0s
-  #   mutate(pvalue = -log10(pvalue + 1e-10)) %>% 
-  #   liana_dotplot(source_groups = c("c"),
-  #                 target_groups = c("c", "a", "b"),
-  #                 specificity = "pvalue",
-  #                 magnitude = "lr.mean",
-  #                 show_complex = TRUE)
-  # 
-  # # Run liana re-implementations with the CellPhoneDB resource
-  # complex_test <- liana_wrap(testdata,
-  #                            method = c('natmi', 'sca', 'logfc'),
-  #                            resource = c('CellPhoneDB'))
-  # #> Warning in .filter_sce(sce): 3465 genes and/or 0 cells were removed as they had
-  # #> no counts!
-  # 
-  # complex_test %>% liana_aggregate()
+  # Plot toy results
+  cpdp_res = cpdb_test %>%
+    # keep only the interactions of interest
+    inner_join(cpdb_int, 
+               by = c("ligand.complex", "receptor.complex")) %>%
+    # invert size (low p-value/high specificity = larger dot size)
+    # + add a small value to avoid Infinity for 0s
+    mutate(pvalue = -log10(pvalue + 1e-10)) 
+  
+  for(n in 1:length(celltypes)){
+    # n = 1
+    cpdp_res %>%
+      liana_dotplot(source_groups = celltypes[n],
+                    target_groups = celltypes[-n],
+                    specificity = "pvalue",
+                    magnitude = "lr.mean",
+                    show_complex = TRUE,
+                    size.label = "-log10(p-value)")
+                    
+    ggsave(filename = paste0(outDir, '/CellPhoneDB_LR_prediction_senderCell_', celltypes[n], '.pdf'), 
+           width = 14, height = 10)
+    
+  }
   
   
 }
 
-run_NicheNet = function() # original code from https://github.com/saeyslab/nichenetr/blob/master/vignettes/seurat_steps.md
+##########################################
+# Nichenet for ligand-receptor analysis
+# original code from https://github.com/saeyslab/nichenetr/blob/master/vignettes/seurat_steps.md
+##########################################
+run_NicheNet = function() 
 {
   library(nichenetr)
   library(Seurat) # please update to Seurat V4
@@ -1802,11 +1822,12 @@ run_NicheNet = function() # original code from https://github.com/saeyslab/niche
   nichenet_output$ligand_activity_target_heatmap
   
 }
-
-# original code from https://saezlab.github.io/liana/articles/liana_nichenet.html
+##########################################
+# Combine Liana and NicheNet  
+# # original code from https://saezlab.github.io/liana/articles/liana_nichenet.html
+##########################################
 run_liana_nitchenet = function()
 {
-  
   library(tidyverse)
   library(liana)
   library(nichenetr)

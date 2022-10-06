@@ -596,9 +596,10 @@ table(refs$subtypes)
 # set parameter for ligand-receptor analysis
 refs$celltypes = refs$subtypes
 celltypes = c('Mono_Macrophages', 'Proliferating_CM', 'Neutrophil', 'Injury_specific_EC')
+outDir = paste0(resDir, '/Ligand_Receptor_analysis/')
 
-run_LIANA(refs, celltypes = celltypes)
+run_LIANA(refs, celltypes = celltypes, outDir = outDir)
 
-run_NicheNet()
+run_NicheNet(refs, celltypes = celltypes, outDir = outDir)
 
 
