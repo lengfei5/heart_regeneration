@@ -1578,7 +1578,7 @@ Find.SpatialDE = function(aa, use.method = 'sparkX')
 ########################################################
 ########################################################
 run_LIANA = function(refs,
-                     celltypes = c('Mono_Macrophages', 'Proliferating_CM', 'Neutrophil', 'Injury_specific_EC')
+                     celltypes = c('Mono_Macrophages', 'Proliferating_CM', 'Neutrophil', 'Injury_specific_EC'),
                      outDir = '../results/Ligand_Receptor_analysis'
                      ) # original code from https://saezlab.github.io/liana/articles/liana_tutorial.html
 {
@@ -1995,6 +1995,7 @@ run_NicheNet = function(refs, celltypes = celltypes, outDir = outDir)
     make_heatmap_ggplot("Ligands","Receptors", color = "mediumvioletred",
                         x_axis_position = "top",legend_title = "Prior interaction potential\n(bona fide)")
   p_ligand_receptor_network_strict
+  
   
   
   # Add log fold change information of ligands from sender cells

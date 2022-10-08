@@ -588,6 +588,8 @@ run_neighborhood_analysis(st,
 # step 3) ligand-receptor-target prediction 
 ##########################################
 source('functions_Visium.R')
+load(file = paste0(RdataDir, 'seuratObject_design_variableGenes_umap.clustered_manualSegmentation', 
+                   species, '.Rdata'))
 
 refs_file = '/groups/tanaka/Collaborations/Jingkui-Elad/scMultiome/aa_annotated_no_doublets_20221004_2.rds'
 refs = readRDS(file = refs_file)
@@ -603,5 +605,11 @@ run_LIANA(refs, celltypes = celltypes, outDir = outDir)
 celltypes = c('Mono_Macrophages', 'Proliferating_CM', 'Neutrophil', 'Injury_specific_EC', 'Ventricular_CM_ROBO2+')
 
 run_NicheNet(refs, celltypes = celltypes, outDir = outDir)
+
+features = rownames(st)[grep('BMP7', rownames(st))]
+SpatialFeaturePlot(st,  features = features)
+
+FeaturePlot(refs, features = rownames(refs)[grep('BMP7', rownames(refs))])
+
 
 
