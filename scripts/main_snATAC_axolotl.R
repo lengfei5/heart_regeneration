@@ -76,6 +76,7 @@ design$timepoint = gsub('Amex_scATAC_', '', design$condition)
 source('functions_scRNAseq.R')
 library(future)
 
+
 ########################################################
 ########################################################
 # Section I: merge all cellranger peaks as peak consensus
@@ -83,6 +84,11 @@ library(future)
 # 
 ########################################################
 ########################################################
+## import scRNA seq data as reference to select cells
+scRNA_file = '/groups/tanaka/Collaborations/Jingkui-Elad/scMultiome/aa_annotated_no_doublets_20221004_2.rds'
+refs = readRDS(file = scRNA_file)
+table(refs$subtypes)
+
 # merge the peak first 
 for(n in 1:nrow(design))
 {
@@ -101,14 +107,15 @@ for(n in 1:nrow(design))
     peaks = union(peaks, p)
   }
 }
+
 length(peaks)
+combined.peaks = peaks
+rm(peaks)
+
 
 ##########################################
 # combine peaks filtering
 ##########################################
-combined.peaks = peaks
-rm(peaks)
-
 peakwidths = width(combined.peaks)
 combined.peaks = combined.peaks[peakwidths > 50]
 # there is a problem with coordinates starting at 0 for some reason...
@@ -116,22 +123,40 @@ combined.peaks = restrict(combined.peaks, start = 1)
 cat(length(combined.peaks), ' combined peaks \n')
 
 srat_cr = list()
-for(n in 1:nrow(design))
+
+#for(n in 1:nrow(design))
+for(n in 2:nrow(design))
 {
   # n = 1
   cat('----------- : ', n, ':',  design$condition[n], '-------------\n')
   
   # load nf output and process
   topdir = paste0(dataDir, '/multiome_', design$timepoint[n], '/outs')
-  counts <- Read10X_h5(filename = paste0(topdir, "/filtered_feature_bc_matrix.h5"))
+  #counts <- Read10X_h5(filename = paste0(topdir, "/filtered_feature_bc_matrix.h5"))
+  counts <- Read10X_h5(filename = paste0(topdir, "/raw_feature_bc_matrix.h5"))
   fragpath <- paste0(topdir, "/atac_fragments.tsv.gz")
-  frags_l = CreateFragmentObject(path = fragpath, cells = colnames(counts$Peaks))
+  
+  bc_rna = colnames(refs)[which(refs$condition == paste0("Amex_scRNA_", design$timepoint[n]))]
+  cells_rna = sapply(bc_rna, function(x) {test = unlist(strsplit(as.character(x), '-'))[1]; paste0(test, '-1')})
+  cells_rna = as.character(cells_rna)
+  
+  cells_peak = colnames(counts$Peaks)
+  cat(length(cells_peak), ' cells from atac \n')
+  cat(length(cells_rna), ' cell from rna \n')
+  sum(!is.na(match(cells_rna, cells_peak)))
+  
+  #frags_l = CreateFragmentObject(path = fragpath, cells = colnames(counts$Peaks))
+  frags_l = CreateFragmentObject(path = fragpath, cells = cells_rna)
   
   # slow step takes 16 mins without parall computation
   tic()
-  feat = FeatureMatrix(fragments = frags_l, features = combined.peaks, 
-                       cells = colnames(counts$Peaks))
+  feat = FeatureMatrix(fragments = frags_l, features = combined.peaks, cells = cells_rna)
+  saveRDS(feat, file = paste0(RdataDir, 'snATAC_FeatureMatrix_', design$condition[n], '.rds'))
   toc()
+  
+  # Do not change the atac-seq barcode names, because fragment file is still connected with the cell bc;
+  # so it is easier to change the cell barcodes of RNA assay
+  # colnames(feat) = bc_rna 
   
   chrom_assay <- CreateChromatinAssay(
     counts = feat,
@@ -155,10 +180,12 @@ for(n in 1:nrow(design))
     row.names = 1
   )
   
-  bb$condition = design$condition[n]
+  bb$cell_bc = colnames(bb)
+  bb$condition = gsub('_scATAC', '', design$condition[n])
   
-  mm = match(colnames(bb), metadata$gex_barcode)
-  metadata = metadata[, c(1,2, 3, 21:30)]
+  mm = match(bb$cell_bc, metadata$gex_barcode)
+  metadata = metadata[mm, c(1,2, 3, 21:30)]
+  #rownames(metadata) = colnames(bb)
   
   bb = AddMetaData(bb, metadata = metadata)
   
@@ -167,22 +194,37 @@ for(n in 1:nrow(design))
   
   DefaultAssay(bb) <- "ATAC"
   
+  bb = NucleosomeSignal(bb)
+  bb = TSSEnrichment(bb, fast = FALSE)
+  
   srat_cr[[n]] = bb
   
 }
 
-srat_cr = Reduce(merge, srat_cr)
+saveRDS(srat_cr, file = (paste0(RdataDir, 'seuratObj_scATAC_beforeMerged.peaks.cellranger.441K_v2.rds')))
 
-saveRDS(srat_cr, file = (paste0(RdataDir, 'seuratObj_scATAC_merged.peaks.cellranger.441K.rds')))
+srat_reduced = Reduce(merge, srat_cr)
+
+saveRDS(srat_reduced, file = (paste0(RdataDir, 'seuratObj_scATAC_merged.peaks.cellranger.441K_v2.rds')))
+
 
 ##########################################
 # filtering and normalization
 ##########################################
-srat_cr = readRDS(file = (paste0(RdataDir, 'seuratObj_scATAC_merged.peaks.cellranger.441K.rds')))
+srat_cr = readRDS(file = (paste0(RdataDir, 'seuratObj_scATAC_merged.peaks.cellranger.441K_v2.rds')))
 levels = design$condition
 srat_cr$condition = factor(srat_cr$condition, levels = levels)
 Idents(srat_cr) = srat_cr$condition
 
+
+# refs[['ATAC']] = srat_cr[['ATAC']]
+# refs = AddMetaData(refs, metadata = srat_cr@meta.data)
+# saveRDS(refs, file = (paste0(RdataDir, 'seuratObj_snRNA_annotated_scATAC_merged.peaks.cellranger.441K_v0.rds')))
+
+# refs = readRDS(file = (paste0(RdataDir, 'seuratObj_snRNA_annotated_scATAC_merged.peaks.cellranger.441K_v0.rds')))
+
+DefaultAssay(refs)  = 'ATAC'
+refs = NucleosomeSignal(refs)
 
 srat_cr <- NucleosomeSignal(srat_cr)
 srat_cr <- TSSEnrichment(srat_cr, fast = FALSE)
