@@ -1671,7 +1671,7 @@ run_LIANA = function(refs,
     
   }
   
-  pdfname = paste0(outDir, 'liana_celltype_communication_freqHeatmap.pdf')
+  pdfname = paste0(outDir, '/liana_celltype_communication_freqHeatmap.pdf')
   pdf(pdfname, width=12, height = 8)
   
   liana_trunc <- liana_test %>%

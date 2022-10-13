@@ -207,24 +207,43 @@ srat_reduced = Reduce(merge, srat_cr)
 
 saveRDS(srat_reduced, file = (paste0(RdataDir, 'seuratObj_scATAC_merged.peaks.cellranger.441K_v2.rds')))
 
-
 ##########################################
 # filtering and normalization
 ##########################################
 srat_cr = readRDS(file = (paste0(RdataDir, 'seuratObj_scATAC_merged.peaks.cellranger.441K_v2.rds')))
+design$condition = gsub('_scATAC', '', design$condition)
+
 levels = design$condition
 srat_cr$condition = factor(srat_cr$condition, levels = levels)
 Idents(srat_cr) = srat_cr$condition
 
-
-# refs[['ATAC']] = srat_cr[['ATAC']]
-# refs = AddMetaData(refs, metadata = srat_cr@meta.data)
-# saveRDS(refs, file = (paste0(RdataDir, 'seuratObj_snRNA_annotated_scATAC_merged.peaks.cellranger.441K_v0.rds')))
-
-# refs = readRDS(file = (paste0(RdataDir, 'seuratObj_snRNA_annotated_scATAC_merged.peaks.cellranger.441K_v0.rds')))
-
-DefaultAssay(refs)  = 'ATAC'
-refs = NucleosomeSignal(refs)
+Merge_scATAC_snRNA = FALSE
+if(Merge_scATAC_snRNA){
+  
+  xx <- RenameCells(
+    refs,
+    new.names = colnames(x = srat_cr[["ATAC"]])
+  )
+  
+  srat_cr[['RNA']] = xx[['RNA']]
+  
+  # refs[['ATAC']] = srat_cr[['ATAC']]
+  # refs = AddMetaData(refs, metadata = srat_cr@meta.data)
+  # saveRDS(refs, file = (paste0(RdataDir, 'seuratObj_snRNA_annotated_scATAC_merged.peaks.cellranger.441K_v0.rds')))
+  # refs = readRDS(file = (paste0(RdataDir, 'seuratObj_snRNA_annotated_scATAC_merged.peaks.cellranger.441K_v0.rds')))
+  
+  metadata = refs@meta.data
+  metadata = metadata[, grep('DF.classifications|pANN_', colnames(metadata), invert = TRUE)]
+  metadata = metadata[, -1]
+  colnames(metadata)[-c(1:2)] = paste0(colnames(metadata)[-c(1,2)], '_RNA')
+  
+  srat_cr = AddMetaData(srat_cr, metadata = metadata)
+  saveRDS(srat_cr, file = paste0(RdataDir, 
+                                 'seuratObj_multiome_snRNA.annotated_scATAC.merged.peaks.cellranger.441K_v2.rds'))
+  
+  #DefaultAssay(refs)  = 'ATAC'
+  #refs = NucleosomeSignal(refs)
+}
 
 srat_cr <- NucleosomeSignal(srat_cr)
 srat_cr <- TSSEnrichment(srat_cr, fast = FALSE)

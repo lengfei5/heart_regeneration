@@ -7,20 +7,40 @@
 # Date of creation: Tue Oct 11 13:43:45 2022
 ##########################################################################
 ##########################################################################
+rm(list = ls())
+
+species = 'axolotl'
+version.analysis = '_R12830_resequenced_20220308'
+dataDir = '../R12830_visium_reseqenced/nf_out'
+resDir = paste0("../results/visium_axolotl", version.analysis)
+RdataDir = paste0('../results/Rdata/')
+
+if(!dir.exists(resDir)) dir.create(resDir)
+if(!dir.exists(RdataDir)) dir.create(RdataDir)
+
+
+library(pryr) # monitor the memory usage
+require(ggplot2)
 library(nichenetr)
 library(Seurat) # please update to Seurat V4
 library(tidyverse)
 library(circlize)
+library(RColorBrewer)
 require(scran)
 require(scater)
 source('functions_scRNAseq.R')
 source('functions_Visium.R')
 dataPath_nichenet = '../data/NicheNet/'
 
-# load processed scRNA-seq and visium data
-load(file = paste0(RdataDir, 'seuratObject_design_variableGenes_umap.clustered_manualSegmentation', 
-                   species, '.Rdata'))
+mem_used()
 
+##########################################
+# load processed scRNA-seq and visium data
+##########################################
+load(file = paste0(RdataDir, 'seuratObject_design_variableGenes_umap.clustered_manualSegmentation', 
+                   species, '.Rdata')) # visium data
+
+## snRNA-seq 
 refs_file = '/groups/tanaka/Collaborations/Jingkui-Elad/scMultiome/aa_annotated_no_doublets_20221004_2.rds'
 refs = readRDS(file = refs_file)
 table(refs$subtypes)
@@ -29,10 +49,12 @@ table(refs$subtypes)
 # run LIANA 
 ##########################################
 # set parameter for ligand-receptor analysis
+outDir = paste0(resDir, '/Ligand_Receptor_analysis/LIANA')
+
 refs$celltypes = refs$subtypes
 celltypes = c('Mono_Macrophages', 'Proliferating_CM', 'FB_1', 'Injury_specific_EC')
-outDir = paste0(resDir, '/Ligand_Receptor_analysis/')
 
+source('functions_Visium.R')
 run_LIANA(refs, celltypes = celltypes, outDir = outDir)
 
 
@@ -42,52 +64,108 @@ run_LIANA(refs, celltypes = celltypes, outDir = outDir)
 # original code from https://github.com/saeyslab/nichenetr/blob/master/vignettes/seurat_steps.md
 ########################################################
 ########################################################
-outDir = paste0(resDir, '/Ligand_Receptor_analysis/')
+outDir = paste0(resDir, '/Ligand_Receptor_analysis/NicheNet')
 system(paste0('mkdir -p ', outDir))
 
-celltypes = c('Mono_Macrophages', 'Proliferating_CM', 'Neutrophil', 'Injury_specific_EC', 'Ventricular_CM_ROBO2+')
+##########################################
+# preprocess seurat data with selected cell types
+##########################################
+celltypes_BZ = c('Mono_Macrophages', 'Proliferating_CM', 'Injury_specific_EC', 'FB_1')
+celltypes_sel = c('CM', 'EC', 'FB', 'MP')
 
-#run_NicheNet(refs, celltypes = celltypes, outDir = outDir)
+## select first CM, EC, FB, MP cell types
+refs$celltypes = as.character(refs$subtypes)
+refs$celltypes[grep('CM_|CMs_|_CM|_CM_', refs$subtypes)] = 'CM'
+refs$celltypes[grep('EC_|_EC', refs$subtypes)] = 'EC'
+refs$celltypes[grep('FB_', refs$subtypes)] = 'FB'
+refs$celltypes[grep('Macrophages|_MF', refs$subtypes)] = 'MP'
+
+table(refs$celltypes)
+refs$celltypes[grep('CM|EC|FB|MP', refs$celltypes, invert = TRUE)] = NA
 
 ## subset seurat object and change names
 Idents(refs) = as.factor(refs$celltypes)
-subref = subset(refs, cells = colnames(refs)[!is.na(match(refs$celltypes, celltypes))])
+subref = subset(refs, cells = colnames(refs)[!is.na(match(refs$celltypes, celltypes_sel))])
 subref$celltypes = droplevels(as.factor(subref$celltypes))
 table(subref$celltypes)
-#subref = subset(x = subref, downsample = 1000)
+
+## define BZ subpopution and non-BZ ones
+subref$celltypes = as.character(subref$celltypes)
+subref$celltypes[which(subref$subtypes == 'Mono_Macrophages')] = 'MP_BZ'
+subref$celltypes[which(subref$subtypes == 'Proliferating_CM')] = 'CM_BZ'
+subref$celltypes[which(subref$subtypes == 'Injury_specific_EC')] = 'EC_BZ'
+subref$celltypes[which(subref$subtypes == 'FB_1')] = 'FB_BZ'
+
+
 cat('celltype to consider -- ', names(table(subref$celltypes)), '\n')
-
-Idents(subref) = subref$celltypes
-sce <- as.SingleCellExperiment(subref)
-colLabels(sce) = as.factor(sce$celltypes)
-rownames(sce) = get_geneName(rownames(sce))
-
-ave.counts <- calculateAverage(sce, assay.type = "counts")
-
-hist(log10(ave.counts), breaks=100, main="", col="grey80",
-     xlab=expression(Log[10]~"average count"))
-
-num.cells <- nexprs(sce, byrow=TRUE)
-smoothScatter(log10(ave.counts), num.cells, ylab="Number of cells",
-              xlab=expression(Log[10]~"average count"))
-
-# detected in >= 5 cells, ave.counts >=5 but not too high
-genes.to.keep <- num.cells > 50 & ave.counts >= 10^-2  & ave.counts <10^1  
-summary(genes.to.keep)
-sce <- sce[genes.to.keep, ]
-rownames(sce) = make.names(rownames(sce), unique = TRUE)
-subref = as.Seurat(sce, counts = "counts", data = "logcounts")
-rm(sce)
 Idents(subref) = as.factor(subref$celltypes)
+subref = subset(x = subref, downsample = 3000) # downsample the CM and EC for the sake of speed
+table(subref$celltypes)
 
-#Ligand-target model:
-# This model denotes the prior potential that a particular ligand might 
-# regulate the expression of a specific target gene
-## import NicheNet’s ligand-target prior model, ligand-receptor network and weighted integrated networks
+##########################################
+# Gene filtering, in particular filtering gene without UMI counts or lowly expressed genes
+##########################################
+Gene.filtering.preprocessing = TRUE
+if(Gene.filtering.preprocessing){
+  sce <- as.SingleCellExperiment(subref)
+  colLabels(sce) = as.factor(sce$celltypes)
+  rownames(sce) = get_geneName(rownames(sce))
+  
+  ave.counts <- calculateAverage(sce, assay.type = "counts")
+  
+  hist(log10(ave.counts), breaks=100, main="", col="grey80",
+       xlab=expression(Log[10]~"average count"))
+  
+  num.cells <- nexprs(sce, byrow=TRUE)
+  smoothScatter(log10(ave.counts), num.cells, ylab="Number of cells",
+                xlab=expression(Log[10]~"average count"))
+  
+  # detected in >= 5 cells, ave.counts >=5 but not too high
+  genes.to.keep <- num.cells > 50 & ave.counts >= 10^-2  & ave.counts <10^1  
+  summary(genes.to.keep)
+  sce <- sce[genes.to.keep, ]
+  rownames(sce) = make.names(rownames(sce), unique = TRUE)
+  subref = as.Seurat(sce, counts = "counts", data = "logcounts")
+  rm(sce)
+  Idents(subref) = as.factor(subref$celltypes)
+  
+}
+
+##########################################
+# overview of scRNA-seq data 
+##########################################
+
+rm(refs)
+subref$celltype = subref$celltypes
+
+# rerun the processing and umap
+subref <- FindVariableFeatures(subref, selection.method = "vst", nfeatures = 3000)
+subref <- ScaleData(subref)
+
+subref <- RunPCA(subref, verbose = FALSE, features = VariableFeatures(object = subref), weight.by.var = TRUE,
+                 reduction.key = 'pca_')
+ElbowPlot(subref, ndims = 30)
+
+subref <- RunUMAP(subref, dims = 1:30, n.neighbors = 30, min.dist = 0.1, reduction = 'pca', reduction.key = 'umap_')
+DimPlot(subref, group.by = "celltype", label = TRUE, reduction = 'umap') 
+
+saveRDS(subref, file = paste0(RdataDir, 'seuratObject_snRNAseq_subset_for_NicheNet_', species, '.Rdata')) 
+
+
+# reload the processed seurat object
+subref = readRDS(file = paste0(RdataDir, 'seuratObject_snRNAseq_subset_for_NicheNet_', species, '.Rdata')) 
+seurat_obj = SetIdent(subref, value = "celltype")
+DimPlot(seurat_obj, group.by = "celltype", label = TRUE, reduction = 'umap') 
+
+table(seurat_obj$celltype)
+##########################################
+# step 0):  load the Nichenet data 
+##########################################
+# NicheNet’s ligand-target prior model
 ligand_target_matrix = readRDS(paste0(dataPath_nichenet,  "ligand_target_matrix.rds"))
 ligand_target_matrix[1:5,1:5] # target genes in rows, ligands in columns
 
-# Putative ligand-receptor links were gathered from NicheNet’s ligand-receptor data sources.  
+# ligand-receptor network, Putative ligand-receptor links from NicheNet
 lr_network = readRDS(paste0(dataPath_nichenet, "lr_network.rds"))
 # If wanted, users can remove ligand-receptor interactions that were predicted based on 
 # protein-protein interactions and 
@@ -95,30 +173,47 @@ lr_network = readRDS(paste0(dataPath_nichenet, "lr_network.rds"))
 # lr_network = lr_network %>% filter(database != "ppi_prediction_go" & database != "ppi_prediction")
 head(lr_network)
 
-# get the weights of the ligand-receptor interactions as used in the NicheNet model
+# ## weighted integrated networks 
 weighted_networks = readRDS(paste0(dataPath_nichenet,  "weighted_networks.rds"))
-weighted_networks_lr = weighted_networks$lr_sig %>% 
-  inner_join(lr_network %>% 
-               distinct(from,to), by = c("from","to"))
 head(weighted_networks$lr_sig) # interactions and their weights in the ligand-receptor + signaling network
 head(weighted_networks$gr) # interactions and their weights in the gene regulatory network
 
-## example from https://github.com/saeyslab/nichenetr/blob/master/vignettes/ligand_activity_geneset.md
-# hnscc_expression = readRDS(url("https://zenodo.org/record/3260758/files/hnscc_expression.rds"))
-# expression = hnscc_expression$expression
-# sample_info = hnscc_expression$sample_info # contains meta-information about the cells
+weighted_networks_lr = weighted_networks$lr_sig %>% 
+  inner_join(lr_network %>% 
+               distinct(from,to), by = c("from","to"))
 
-# Step 1: Define expressed genes in sender and receiver cell populations
-## receiver
-receiver = "Proliferating_CM"
-expressed_genes_receiver = get_expressed_genes(receiver, subref, pct = 0.10)
-background_expressed_genes = expressed_genes_receiver %>% .[. %in% rownames(ligand_target_matrix)]
+##########################################
+# Step 1:  Define the niches/microenvironments of interest
+##########################################
+seurat_obj$celltype = as.factor(seurat_obj$celltype)
+table(seurat_obj$celltype)
+celltypes_all = levels(seurat_obj$celltype)
+celltypes_BZ = celltypes_all[grep('_BZ', celltypes_all)]
+celltype_noBZ = setdiff(celltypes_all, celltypes_BZ)
+rm(celltypes_all)
 
-## sender
-sender_celltypes = c('Mono_Macrophages', 'Proliferating_CM', 'Neutrophil', 'Injury_specific_EC')
-# lapply to get the expressed genes of every sender cell type separately here
-list_expressed_genes_sender = sender_celltypes %>% unique() %>% lapply(get_expressed_genes, subref, 0.10) 
-expressed_genes_sender = list_expressed_genes_sender %>% unlist() %>% unique()
+receiver_cells = 'CM_BZ'
+
+niches = list(
+  "BZ_niche" = list(
+    "sender" = setdiff(celltypes_BZ, receiver_cells),
+    "receiver" = receiver_cells),
+  "pEMT_Low_niche" = list(
+    "sender" = setdiff(celltype_noBZ, gsub('_BZ',  '', receiver_cells)),
+    "receiver" = gsub('_BZ',  '', receiver_cells))
+) # user adaptation required on own dataset
+
+
+# ## receiver
+# receiver = "Proliferating_CM"
+# expressed_genes_receiver = get_expressed_genes(receiver, subref, pct = 0.10)
+# background_expressed_genes = expressed_genes_receiver %>% .[. %in% rownames(ligand_target_matrix)]
+# 
+# ## sender
+# sender_celltypes = c('Mono_Macrophages', 'Proliferating_CM', 'Neutrophil', 'Injury_specific_EC')
+# # lapply to get the expressed genes of every sender cell type separately here
+# list_expressed_genes_sender = sender_celltypes %>% unique() %>% lapply(get_expressed_genes, subref, 0.10) 
+# expressed_genes_sender = list_expressed_genes_sender %>% unlist() %>% unique()
 
 # Step 2: Define the gene set of interest and a background of genes
 seurat_obj_receiver= subset(subref, idents = c(receiver, "Ventricular_CM_ROBO2+"))
