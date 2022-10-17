@@ -172,6 +172,7 @@ for(n in 2:nrow(design))
     assay = "ATAC",
     
   )
+  
   rm(chrom_assay)
   
   metadata <- read.csv(
