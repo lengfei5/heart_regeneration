@@ -450,9 +450,6 @@ refs = readRDS(file = refs_file)
 table(refs$subtypes)
 
 # refs0 = readRDS(file ='/groups/tanaka/Collaborations/Jingkui-Elad/scMultiome/aa_annotated_no_doublets_20221004.rds')
-## NK.cells.or.doublets cluster is weired
-#refs = subset(refs, cells = colnames(refs)[grep('doubluets', refs$subtypes, invert = TRUE)])
-#refs = subset(refs, cells = colnames(refs)[grep('Neuronal', refs$subtypes, invert = TRUE)])
 
 ## prepare the parameters for RCTD coarse cell types
 Run.RCTD.coarse.celltypes = FALSE
@@ -495,7 +492,7 @@ require_int_SpatialRNA = FALSE
 RCTD_out = paste0(resDir, '/RCTD_subtype_out_v4_FBsubtypes')
 max_cores = 32
 
-st = subset(st, condition == 'Amex_d4')
+# st = subset(st, condition == 'Amex_d4')
 
 source('functions_Visium.R')
 Run.celltype.deconvolution.RCTD(st, refs, 

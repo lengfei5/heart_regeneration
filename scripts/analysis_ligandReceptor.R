@@ -40,7 +40,7 @@ mem_used()
 load(file = paste0(RdataDir, 'seuratObject_design_variableGenes_umap.clustered_manualSegmentation', 
                    species, '.Rdata')) # visium data
 
-## snRNA-seq 
+## snRNA-seq as reference
 refs_file = '/groups/tanaka/Collaborations/Jingkui-Elad/scMultiome/aa_annotated_no_doublets_20221004_2.rds'
 refs = readRDS(file = refs_file)
 table(refs$subtypes)
@@ -129,6 +129,7 @@ if(Gene.filtering.preprocessing){
   rm(sce)
   Idents(subref) = as.factor(subref$celltypes)
   
+  
 }
 
 ##########################################
@@ -159,6 +160,7 @@ seurat_obj = SetIdent(subref, value = "celltype")
 DimPlot(seurat_obj, group.by = "celltype", label = TRUE, reduction = 'umap') 
 
 table(seurat_obj$celltype)
+
 ##########################################
 # step 0):  load the Nichenet data 
 ##########################################
@@ -210,23 +212,12 @@ niches = list(
     "receiver" = gsub('_BZ',  '', receiver_cells))
 ) 
 
-# ## receiver
-# receiver = "Proliferating_CM"
-# expressed_genes_receiver = get_expressed_genes(receiver, subref, pct = 0.10)
-# background_expressed_genes = expressed_genes_receiver %>% .[. %in% rownames(ligand_target_matrix)]
-# 
-# ## sender
-# sender_celltypes = c('Mono_Macrophages', 'Proliferating_CM', 'Neutrophil', 'Injury_specific_EC')
-# # lapply to get the expressed genes of every sender cell type separately here
-# list_expressed_genes_sender = sender_celltypes %>% unique() %>% lapply(get_expressed_genes, subref, 0.10) 
-# expressed_genes_sender = list_expressed_genes_sender %>% unlist() %>% unique()
-
 ##########################################
 # step 2. Calculate differential expression between the niches 
-# for unknown reasons, this DE step takes really long time to finish
-# issue sovled because find markers for all genes, should run only for receptors and ligands
+# issue solved because find markers for all genes, should run only for receptors and ligands
 ##########################################
 assay_oi = "RNA" 
+
 # only ligands important for sender cell types
 DE_sender = calculate_niche_de(seurat_obj = seurat_obj %>% subset(features = lr_network$ligand %>% unique()), 
                                niches = niches, 
@@ -239,9 +230,6 @@ DE_receiver = calculate_niche_de(seurat_obj = seurat_obj %>% subset(features = l
                                  type = "receiver", 
                                  assay_oi = assay_oi)
 
-#save(DE_sender, DE_receiver, 
-#     file = paste0(RdataDir, 'seuratObject_snRNAseq_subset_for_NicheNet_DE_sender_receiver_', 
-#                                 species, '.Rdata')) 
 
 DE_sender = DE_sender %>% 
   mutate(avg_log2FC = ifelse(avg_log2FC == Inf, max(avg_log2FC[is.finite(avg_log2FC)]), 
@@ -250,7 +238,8 @@ DE_receiver = DE_receiver %>%
   mutate(avg_log2FC = ifelse(avg_log2FC == Inf, max(avg_log2FC[is.finite(avg_log2FC)]), 
                              ifelse(avg_log2FC == -Inf, min(avg_log2FC[is.finite(avg_log2FC)]), avg_log2FC)))
 
-expression_pct = 0.10 # expected percentage of cells expressing the genes 
+# expected percentage of cells expressing the genes 
+expression_pct = 0.10 
 DE_sender_processed = process_niche_de(DE_table = DE_sender, 
                                        niches = niches, 
                                        expression_pct = expression_pct, 
@@ -278,10 +267,9 @@ DE_sender_receiver = combine_sender_receiver_de(DE_sender_processed,
 ##########################################
 # Step 3) Optional: Calculate differential expression between the different spatial regions 
 ##########################################
+# if not spatial info to include: put this to false 
 include_spatial_info_sender = FALSE 
-# if not spatial info to include: put this to false # user adaptation required on own dataset
-include_spatial_info_receiver = FALSE 
-# if spatial info to include: put this to true # user adaptation required on own dataset
+include_spatial_info_receiver = FALSE
 
 # user adaptation required on own dataset
 spatial_info = tibble(celltype_region_oi = "CAF_High", 
@@ -289,9 +277,7 @@ spatial_info = tibble(celltype_region_oi = "CAF_High",
                       niche =  "pEMT_High_niche", celltype_type = "sender") 
 specificity_score_spatial = "lfc"
 
-# this is how this should be defined if you don't have spatial info
-# mock spatial info
-
+# this is how this should be defined if you don't have spatial info (mock spatial info)
 if(include_spatial_info_sender == FALSE & include_spatial_info_receiver == FALSE){
   spatial_info = tibble(celltype_region_oi = NA, celltype_other_region = NA) %>% 
     mutate(niche =  niches %>% names() %>% head(1), celltype_type = "sender")
@@ -319,7 +305,7 @@ if(include_spatial_info_sender == TRUE){
     mutate(scaled_ligand_score_spatial = scale_quantile_adapted(ligand_score_spatial))
   
 }else{
-  # # add a neutral spatial score for all sender celltypes (for none of them, spatial is relevant in this case)
+  #add a neutral spatial score for all sender celltypes (for none of them, spatial is relevant in this case)
   sender_spatial_DE_processed = get_non_spatial_de(niches = niches, spatial_info = spatial_info, 
                                                    type = "sender", lr_network = lr_network)
   sender_spatial_DE_processed = sender_spatial_DE_processed %>% 
@@ -348,7 +334,7 @@ if(include_spatial_info_receiver == TRUE){
   receiver_spatial_DE_processed = receiver_spatial_DE_processed %>% 
     mutate(scaled_receptor_score_spatial = scale_quantile_adapted(receptor_score_spatial))
   
-} else {
+}else{
   # # add a neutral spatial score for all receiver celltypes (for none of them, spatial is relevant in this case)
   receiver_spatial_DE_processed = get_non_spatial_de(niches = niches, 
                                                      spatial_info = spatial_info, 
@@ -361,6 +347,18 @@ if(include_spatial_info_receiver == TRUE){
 ##########################################
 # Step 4). Calculate ligand activities and infer active ligand-target links 
 ##########################################
+# It is always useful to check the number of genes in the geneset before doing the ligand activity analysis. 
+# We recommend having between 20 and 1000 genes in the geneset of interest, 
+# and a background of at least 5000 genes for a proper ligand activity analysis. 
+# If you retrieve too many DE genes, it is recommended to use a higher lfc_cutoff threshold. 
+# We recommend using a cutoff of 0.15 if you have > 2 receiver cells/niches to compare and 
+# use the min_lfc as specificity score. 
+# If you have only 2 receivers/niche, we recommend using a higher threshold (such as using 0.25). 
+# If you have single-cell data like Smart-seq2 with high sequencing depth, 
+#we recommend to also use higher threshold.
+# Smart-seq2 data and only 2 niches to compare, 
+# so we will use a stronger LFC threshold to keep less DE genes, but more trustworthy ones.
+
 lfc_cutoff = 0.15 # recommended for 10x as min_lfc cutoff. 
 specificity_score_targets = "min_lfc"
 
@@ -389,14 +387,12 @@ geneset_niche2 = DE_receiver_processed_targets %>%
 # If many genes are left out, this might point to some issue in the gene naming 
 # (eg gene aliases and old gene symbols, bad human-mouse mapping)
 geneset_niche1 %>% setdiff(rownames(ligand_target_matrix))
-
 geneset_niche2 %>% setdiff(rownames(ligand_target_matrix))
 
 length(geneset_niche1)
 length(geneset_niche2)
 
-top_n_target = 500
-
+top_n_target = 250
 niche_geneset_list = list(
   "BZ_niche" = list(
     "receiver" = niches[[1]]$receiver,
@@ -415,7 +411,9 @@ ligand_activities_targets = get_ligand_activities_targets(niche_geneset_list = n
 
 ##########################################
 # step 5. Calculate (scaled) expression of ligands, receptors and targets 
-# across cell types of interest (log expression values and expression fractions) 
+# across cell types of interest (log expression values and expression fractions)
+# we will calculate average (scaled) expression, and fraction of expression, of 
+# ligands, receptors, and target genes across all cell types of interest
 ##########################################
 features_oi = union(lr_network$ligand, lr_network$receptor) %>% 
   union(ligand_activities_targets$target) %>% setdiff(NA)
@@ -424,11 +422,10 @@ features_oi = union(lr_network$ligand, lr_network$receptor) %>%
 dotplot = suppressWarnings(Seurat::DotPlot(seurat_obj %>% subset(idents = niches %>% unlist() %>% unique()), 
                                            features = features_oi, assay = assay_oi))
 
-dotplot_data  = dotplot$data
-colnames(dotplot_data) = c('expression', 'fraction', 'gene', 'celltype', 'expression_scaled')
-
-exprs_tbl = dotplot_data %>% as_tibble()
+exprs_tbl = dotplot$data %>% as_tibble()
 exprs_tbl = exprs_tbl %>% 
+  dplyr::rename(celltype = id, gene = features.plot, expression = avg.exp, 
+                expression_scaled = avg.exp.scaled, fraction = pct.exp) %>%
   mutate(fraction = fraction/100) %>% as_tibble() %>% 
   select(celltype, gene, expression, expression_scaled, fraction) %>% 
   distinct() %>% arrange(gene) %>% mutate(gene = as.character(gene))
@@ -461,6 +458,12 @@ exprs_tbl_receptor = exprs_tbl_receptor %>%
 
 ##########################################
 # step 6. Expression fraction and receptor
+# score ligand-receptor interactions based on expression strength of the receptor, 
+# in such a way that we give higher scores to the most strongly expressed receptor of a certain ligand, 
+# in a certain celltype. 
+# This will not effect the rank of individual ligands later on, 
+# but will help in prioritizing the most important receptors per ligand 
+# (next to other factors regarding the receptor - see later).
 ##########################################
 exprs_sender_receiver = lr_network %>% 
   inner_join(exprs_tbl_ligand, by = c("ligand")) %>% 
@@ -480,18 +483,31 @@ ligand_scaled_receptor_expression_fraction_df = exprs_sender_receiver %>%
 ##########################################
 # step 7. Prioritization of ligand-receptor and ligand-target links 
 ##########################################
-prioritizing_weights = c("scaled_ligand_score" = 2,
-                         "scaled_ligand_expression_scaled" = 1,
-                         "ligand_fraction" = 1,
-                         "scaled_ligand_score_spatial" = 2, 
-                         "scaled_receptor_score" = 0.5,
-                         "scaled_receptor_expression_scaled" = 0.5,
-                         "receptor_fraction" = 1, 
-                         "ligand_scaled_receptor_expression_fraction" = 1,
-                         "scaled_receptor_score_spatial" = 0,
-                         "scaled_activity" = 0,
-                         "scaled_activity_normalized" = 2,
-                         "bona_fide" = 1)
+prioritizing_weights = c(
+  "scaled_ligand_score" = 5, # # niche-specific expression of the ligand: Recommended 5 (between 1-5)
+  # scaled ligand expression in one sender compared to the other cell types in the dataset]
+  "scaled_ligand_expression_scaled" = 1,
+  "ligand_fraction" = 1, # Ligands expressed in a smaller fraction of cells of cell type than cutoff (default: 0.10)
+  "scaled_ligand_score_spatial" = 0, 
+  # receptor DE score: niche-specific expression, Recommended 0.5 (>=0.5 and lower than "scaled_ligand_score")
+  "scaled_receptor_score" = 0.5, 
+  "scaled_receptor_expression_scaled" = 0.5, # Recommended weight: 0.5
+  # Receptors that are expressed in a smaller fraction of cells of a cell type than exprs_cutoff(default: 0.10) 
+  # will get a lower ranking, proportional to their fraction, Recommended weight: 1. 
+  "receptor_fraction" = 1, 
+  # this factor let us give higher weights to the most highly expressed receptor of a ligand in the receiver.
+  # Recommended value: 1 (minimum: 0.5)
+  "ligand_scaled_receptor_expression_fraction" = 1,
+  "scaled_receptor_score_spatial" = 0,
+  # Absolute ligand activity: to further prioritize ligand-receptor pairs based on their predicted effect of 
+  # the ligand-receptor interaction on the gene expression in the receiver cell type - 
+  # prioritizing_weights argument: "scaled_activity". Recommended weight: 0, 
+  # unless absolute enrichment of target genes is of specific interest.
+  "scaled_activity" = 0, 
+  # Normalized ligand activity: to further prioritize ligand-receptor pairs based on their predicted effect of
+  # the ligand-receptor interaction on the gene expression in the receiver cell type, Recommended weight: >=1.
+  "scaled_activity_normalized" = 1,
+  "bona_fide" = 1)
 
 output = list(DE_sender_receiver = DE_sender_receiver, 
               ligand_scaled_receptor_expression_fraction_df = ligand_scaled_receptor_expression_fraction_df, 
@@ -566,7 +582,8 @@ lfc_plot = make_ligand_receptor_lfc_plot(receiver_oi,
                                          heights = NULL, widths = NULL)
 lfc_plot
 
-ggsave(paste0(outDir, '/Ligand_receptors_LFC.pdf'), width = 10, height = 12)
+ggsave(paste0(outDir, '/Ligand_receptors_LFC_receiver.cells_', receiver_cells,  '.pdf'), 
+       width = 10, height = 12)
 
 
 exprs_activity_target_plot = make_ligand_activity_target_exprs_plot(receiver_oi, 
@@ -579,7 +596,11 @@ exprs_activity_target_plot = make_ligand_activity_target_exprs_plot(receiver_oi,
                                                 plot_legend = FALSE, 
                                                 heights = NULL, widths = NULL)
 exprs_activity_target_plot$combined_plot
+ggsave(paste0(outDir, '/Combined_plots_ligand_noFiltering_receiverCells_', receiver_cells, '.pdf'), 
+       width = 35, height = 12)
 
+
+## select only top 20 ligands
 filtered_ligands = ligand_prioritized_tbl_oi %>% 
   filter(receiver == receiver_oi) %>% 
   top_n(20, prioritization_score) %>% 
@@ -602,18 +623,32 @@ exprs_activity_target_plot = make_ligand_activity_target_exprs_plot(receiver_oi,
                                       ligand_target_matrix, 
                                       plot_legend = FALSE, 
                                       heights = NULL, widths = NULL)
+
 exprs_activity_target_plot$combined_plot
 
-ggsave(paste0(outDir, '/Combined_plots_top20_ligand.pdf'), width = 45, height = 12)
+ggsave(paste0(outDir, '/Combined_plots_ligand_top20_receiverCells_', receiver_cells, '.pdf'), 
+       width = 25, height = 12)
+
 
 ## Circos plot of prioritized ligand-receptor pairs
-filtered_ligands = ligand_prioritized_tbl_oi %>% filter(receiver == receiver_oi) %>% top_n(15, prioritization_score) %>% pull(ligand) %>% unique()
-
-prioritized_tbl_oi = prioritization_tables$prioritization_tbl_ligand_receptor %>% filter(ligand %in% filtered_ligands) %>% select(niche, sender, receiver, ligand,  receptor, ligand_receptor, prioritization_score) %>% distinct() %>% inner_join(top_ligand_receptor_niche_df) %>% group_by(ligand) %>% filter(receiver == receiver_oi) %>% top_n(2, prioritization_score) %>% ungroup() 
-
-colors_sender = brewer.pal(n = prioritized_tbl_oi$sender %>% unique() %>% sort() %>% length(), name = 'Spectral') %>% magrittr::set_names(prioritized_tbl_oi$sender %>% unique() %>% sort())
-colors_receiver = c("lavender")  %>% magrittr::set_names(prioritized_tbl_oi$receiver %>% unique() %>% sort())
-
-circos_output = make_circos_lr(prioritized_tbl_oi, colors_sender, colors_receiver)
+Make.Circos.plot = FALSE
+if(Make.Circos.plot){
+  filtered_ligands = ligand_prioritized_tbl_oi %>% filter(receiver == receiver_oi) %>% 
+    top_n(15, prioritization_score) %>% pull(ligand) %>% unique()
+  
+  prioritized_tbl_oi = prioritization_tables$prioritization_tbl_ligand_receptor %>% 
+    filter(ligand %in% filtered_ligands) %>% 
+    select(niche, sender, receiver, ligand,  receptor, ligand_receptor, prioritization_score) %>% 
+    distinct() %>% inner_join(top_ligand_receptor_niche_df) %>% 
+    group_by(ligand) %>% filter(receiver == receiver_oi) %>% top_n(2, prioritization_score) %>% ungroup() 
+  
+  colors_sender = brewer.pal(n = prioritized_tbl_oi$sender %>% unique() %>% sort() %>% 
+                               length(), name = 'Spectral') %>% 
+    magrittr::set_names(prioritized_tbl_oi$sender %>% unique() %>% sort())
+  colors_receiver = c("lavender")  %>% magrittr::set_names(prioritized_tbl_oi$receiver %>% unique() %>% sort())
+  
+  circos_output = make_circos_lr(prioritized_tbl_oi, colors_sender, colors_receiver)
+  
+}
 
 
