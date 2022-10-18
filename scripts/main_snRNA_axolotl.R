@@ -516,14 +516,36 @@ p1 = DimPlot(sub.obj, group.by = 'clusters', reduction = 'umap', label = TRUE, l
 
 
 sub.obj <- FindNeighbors(sub.obj, dims = 1:20)
-sub.obj <- FindClusters(sub.obj, verbose = FALSE, algorithm = 3, resolution = 0.5)
+sub.obj <- FindClusters(sub.obj, verbose = FALSE, algorithm = 3, resolution = 0.3)
 
-p2 = DimPlot(sub.obj, reduction = 'umap', label = TRUE, label.size = 5) +
+DimPlot(sub.obj, reduction = 'umap', label = TRUE, label.size = 5) +
   ggtitle(paste0(celltype.sels, ' -- subclusters'))
+DimPlot(sub.obj, split.by = 'condition')
 
-p1 + p2
+ggsave(paste0(resDir, "/FB_subclusters_injury.specific.pdf"),  width = 16, height = 6)
 
-markers = FindAllMarkers(sub.obj, only.pos = TRUE, min.pct = 0.25, logfc.threshold = 0.3)
+## save the subclusters to test RCTD
+FB.cluster.ids <- paste0('FB_', c(0:6))
+FB.cluster.ids[2] = 'FB_1.injury'
+FB.cluster.ids[6] = 'FB_5.injury'
+FB.cluster.ids[5] = 'FB_4.d1' 
+
+names(FB.cluster.ids) <- levels(sub.obj)
+sub.obj <- RenameIdents(sub.obj, FB.cluster.ids)
+
+sub.obj$subtypes = Idents(sub.obj)
+
+cell.sels = colnames(sub.obj)
+mm = match(cell.sels, colnames(refs))
+cat(length(which(is.na(cell.sels))), '--', length(mm), '\n')
+
+refs$subtypes = as.character(refs$subtypes)
+refs$subtypes[mm] <- as.character(sub.obj$subtypes)
+refs$subtypes = as.factor(refs$subtypes)
+
+saveRDS(refs, file = paste0(RdataDir, 'aa_annotated_no_doublets_Elad_JK_FB_20221018.rds'))
 
 
+#p1 + p2
+#markers = FindAllMarkers(sub.obj, only.pos = TRUE, min.pct = 0.25, logfc.threshold = 0.3)
 

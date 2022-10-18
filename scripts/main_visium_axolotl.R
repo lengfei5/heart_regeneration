@@ -442,7 +442,10 @@ load(file = paste0(RdataDir, 'seuratObject_design_variableGenes_umap.clustered',
 st$condition = factor(st$condition, levels = design$condition)
 
 # refined subtypes by Elad
-refs_file = '/groups/tanaka/Collaborations/Jingkui-Elad/scMultiome/aa_annotated_no_doublets_20221004_2.rds'
+refs_file = paste0('/groups/tanaka/People/current/jiwang/projects/heart_regeneration/', 
+                   'results/sc_multiome_R13591_intron.exon.20220729/Rdata/',
+                   'aa_annotated_no_doublets_Elad_JK_FB_20221018.rds')
+
 refs = readRDS(file = refs_file)
 table(refs$subtypes)
 
@@ -489,10 +492,10 @@ refs$celltype_toUse = refs$subtypes
 DefaultAssay(refs) = 'RNA'
 DefaultAssay(st) = 'Spatial'
 require_int_SpatialRNA = FALSE
-RCTD_out = paste0(resDir, '/RCTD_subtype_out_v3.5')
+RCTD_out = paste0(resDir, '/RCTD_subtype_out_v4_FBsubtypes')
 max_cores = 32
 
-# st = subset(st, condition == 'Amex_d4')
+st = subset(st, condition == 'Amex_d4')
 
 source('functions_Visium.R')
 Run.celltype.deconvolution.RCTD(st, refs, 
