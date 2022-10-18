@@ -404,8 +404,6 @@ saveRDS(aa, file = paste0(RdataDir, 'aa_annotated_no_doublets_Elad.rds'))
 ##########################################
 # double check the TF and ligand-repceptor coverage by snRNA-seq 
 ##########################################
-
-
 counts = data.frame(table(aa$subtypes), stringsAsFactors = FALSE)
 colnames(counts) = c('subtype', 'cell.number')
 
@@ -462,5 +460,70 @@ write.csv(x = colnames(gbm), file = "../data/snRNAseq_countMatrix_barcodes.csv",
 
 write.csv(x = refs@meta.data, file = '../data/snRNAseq_countMatrix_metadata.csv', row.names = TRUE, 
           quote = TRUE)
+
+
+########################################################
+########################################################
+# Section : double check the clustering results
+# to double check the FB subclusters
+########################################################
+########################################################
+# refined subtypes by Elad 
+refs_file = '/groups/tanaka/Collaborations/Jingkui-Elad/scMultiome/aa_annotated_no_doublets_2022_10_17.rds'
+refs = readRDS(file = refs_file)
+table(refs$subtypes)
+
+refs$celltypes = as.character(refs$subtypes)
+
+refs$celltypes[grep('CM_|CMs_|_CM|_CM_', refs$subtypes)] = 'CM'
+refs$celltypes[grep('EC_|_EC', refs$subtypes)] = 'EC'
+refs$celltypes[grep('FB_', refs$subtypes)] = 'FB'
+refs$celltypes[grep('B_cells', refs$subtypes)] = 'Bcell'
+
+refs$celltypes[grep('Macrophages|_MF', refs$subtypes)] = 'Macrophages'
+refs$celltypes[grep('Megakeryocytes', refs$subtypes)] = 'Megakeryocytes'
+refs$celltypes[grep('RBC', refs$subtypes)] = 'RBC'
+
+DimPlot(refs, group.by = 'celltypes')
+
+##########################################
+# FB subseting
+##########################################
+celltype.sels = 'FB'
+sub.obj = subset(refs, cells = colnames(refs)[!is.na(match(refs$celltypes, celltype.sels))])
+
+sub.obj <- FindVariableFeatures(sub.obj, selection.method = "vst", nfeatures = 3000)
+sub.obj = ScaleData(sub.obj)
+sub.obj <- RunPCA(object = sub.obj, features = VariableFeatures(sub.obj), verbose = FALSE)
+ElbowPlot(sub.obj, ndims = 30)
+
+nb.pcs = 30 # nb of pcs depends on the considered clusters or ids
+n.neighbors = 30; min.dist = 0.1;
+sub.obj <- RunUMAP(object = sub.obj, reduction = 'pca', reduction.name = "umap", dims = 1:nb.pcs, 
+                   n.neighbors = n.neighbors,
+                   min.dist = min.dist)
+
+
+# sub.obj$clusters = sub.obj$seurat_clusters
+features = rownames(refs)[grep('VIM|COL1A2|FSTL1|POSTN', rownames(refs))]
+FeaturePlot(sub.obj, features = features, cols = c('gray', 'red'))
+
+DimPlot(sub.obj, group.by = 'subtypes', label = TRUE, repel = TRUE)
+DimPlot(sub.obj, split.by = 'condition')
+
+p1 = DimPlot(sub.obj, group.by = 'clusters', reduction = 'umap', label = TRUE, label.size = 5) +
+  ggtitle(celltype.sels)
+
+
+sub.obj <- FindNeighbors(sub.obj, dims = 1:20)
+sub.obj <- FindClusters(sub.obj, verbose = FALSE, algorithm = 3, resolution = 0.5)
+
+p2 = DimPlot(sub.obj, reduction = 'umap', label = TRUE, label.size = 5) +
+  ggtitle(paste0(celltype.sels, ' -- subclusters'))
+
+p1 + p2
+
+markers = FindAllMarkers(sub.obj, only.pos = TRUE, min.pct = 0.25, logfc.threshold = 0.3)
+
 
 
