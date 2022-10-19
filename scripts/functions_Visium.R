@@ -1129,6 +1129,13 @@ run_neighborhood_analysis = function(st,
 {
   library(corrplot)
   require(RColorBrewer)
+  require(spacexr)
+  library(ggplot2)
+  library(SPOTlight)
+  library(SingleCellExperiment)
+  library(SpatialExperiment)
+  library(scater)
+  library(scran)
   
   system(paste0('mkdir -p ', outDir))
   
@@ -1160,10 +1167,22 @@ run_neighborhood_analysis = function(st,
     norm_weights = normalize_weights(results$weights) 
     #cell_type_names <- myRCTD@cell_type_info$info[[2]] #list of cell type names
     
+    SPOTlight::plotCorrelationMatrix(as.matrix(norm_weights))
+    ggsave(paste0(outDir, '/CorrelationMatrix_allRegions', slice, '.pdf'), width = 10, height = 10)
+    
+    #plotInteractions(as.matrix(norm_weights), which = "heatmap", metric = "jaccard")
+    #plotInteractions(as.matrix(norm_weights), which = "network")
+    
+    
     # use a threshold to binarize weights
     weights = norm_weights >= 0.1 
-    
     index_border = match(colnames(stx)[which(stx$segmentation == 'BZ')], rownames(weights))
+    
+    SPOTlight::plotCorrelationMatrix(as.matrix(norm_weights[index_border, ]))
+    ggsave(paste0(outDir, '/CorrelationMatrix_BZ_', slice, '.pdf'), width = 10, height = 10)
+    
+    #plotInteractions(as.matrix(norm_weights[index_border, ]), which = "network")
+    #ggsave(paste0(outDir, '/InteractionNetwork_BZ_', slice, '.pdf'), width = 14, height = 14)
     
     if(background == 'remote'){
       index_bg = match(colnames(stx)[grep('Remote|remote', stx$segmentation)], rownames(weights))
