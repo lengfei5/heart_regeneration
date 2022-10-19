@@ -156,7 +156,6 @@ if(Gene.filtering.preprocessing){
 rm(refs)
 subref$celltype = subref$celltypes
 
-
 # rerun the processing and umap
 subref <- FindVariableFeatures(subref, selection.method = "vst", nfeatures = 3000)
 subref <- ScaleData(subref)
@@ -169,10 +168,28 @@ subref <- RunUMAP(subref, dims = 1:30, n.neighbors = 30, min.dist = 0.1, reducti
                   reduction.key = 'umap_')
 DimPlot(subref, group.by = "celltype", label = TRUE, reduction = 'umap') 
 
+
+geneDup = readRDS(paste0(RdataDir, 'geneSymbol_duplication_inLRanalysis.rds'))
+kk = which(geneDup$geneSymbol != geneDup$gg.uniq)
+ggs = unique(geneDup$geneSymbol[kk])
+cat(length(ggs), ' genes have symbols issue \n')
+ligand_dup = ggs[ggs %in% lr_network$ligand]
+receptor_dup = ggs[ggs %in% lr_network$receptor]
+
+ligand_dup = geneDup[!is.na(match(geneDup$geneSymbol, ligand_dup)), ]
+ligand_dup = ligand_dup[order(ligand_dup$geneSymbol), ]
+
+receptor_dup = geneDup[!is.na(match(geneDup$geneSymbol, receptor_dup)), ]
+receptor_dup = receptor_dup[order(receptor_dup$geneSymbol), ]
+
+write.csv2(ligand_dup, file = paste0(outDir, '/geneDuplication_issue_ligands.csv'))
+write.csv2(receptor_dup, file = paste0(outDir, '/geneDuplication_issue_receptors.csv'))
+
 saveRDS(subref, file = paste0(RdataDir, 'seuratObject_snRNAseq_subset_for_NicheNet_', species, '.rds')) 
 
-
-# reload the processed seurat object
+##########################################
+# # reload the processed seurat object
+##########################################
 subref = readRDS(file = paste0(RdataDir, 'seuratObject_snRNAseq_subset_for_NicheNet_', species, '.rds')) 
 #subref = subset(x = subref, downsample = 1000) # downsample the CM and EC for the sake of speed
 table(subref$celltypes)
@@ -218,22 +235,27 @@ seurat_obj$celltype = as.factor(seurat_obj$celltype)
 table(seurat_obj$celltype)
 celltypes_all = levels(seurat_obj$celltype)
 celltypes_BZ = celltypes_all[grep('_BZ', celltypes_all)]
-celltype_noBZ = setdiff(celltypes_all, celltypes_BZ)
+celltypes_noBZ = setdiff(celltypes_all, celltypes_BZ)
 rm(celltypes_all)
 
-receiver_cells = 'CM_BZ'
+cat('cell types in BZ : ', celltypes_BZ, '\n')
 
-for(receiver_cells in celltypes_all)
+cat('cell types in other regions : ', celltypes_noBZ, '\n')
+
+for(receiver_cells in celltypes_BZ)
 {
+  
+  #receiver_cells = 'CM_BZ'
+  cat('--- receiver cells : ', receiver_cells, ' ---\n')
+  
   # define the niches
   niches = list(
     "BZ_niche" = list(
       "sender" = setdiff(celltypes_BZ, receiver_cells),
       "receiver" = receiver_cells),
     "noBZ_niche" = list(
-      "sender" = setdiff(celltype_noBZ, gsub('_BZ',  '', receiver_cells)),
+      "sender" = setdiff(celltypes_noBZ, gsub('_BZ',  '', receiver_cells)),
       "receiver" = gsub('_BZ',  '', receiver_cells))
-    
   ) 
   
   ##########################################
@@ -253,7 +275,6 @@ for(receiver_cells in celltypes_all)
                                    niches = niches, 
                                    type = "receiver", 
                                    assay_oi = assay_oi)
-  
   
   DE_sender = DE_sender %>% 
     mutate(avg_log2FC = ifelse(avg_log2FC == Inf, max(avg_log2FC[is.finite(avg_log2FC)]), 
@@ -369,8 +390,9 @@ for(receiver_cells in celltypes_all)
   }
   
   ##########################################
-  # Step 4). Calculate ligand activities and infer active ligand-target links 
+  # Step 4). Calculate ligand activities and infer active ligand-target links
   ##########################################
+  ## first define the target genes by DE
   # It is always useful to check the number of genes in the geneset before doing the ligand activity analysis. 
   # We recommend having between 20 and 1000 genes in the geneset of interest, 
   # and a background of at least 5000 genes for a proper ligand activity analysis. 
@@ -386,7 +408,7 @@ for(receiver_cells in celltypes_all)
   lfc_cutoff = 0.15 # recommended for 10x as min_lfc cutoff. 
   specificity_score_targets = "min_lfc"
   
-  # here DE all genes, not only for ligand and receptors as before
+  # here DE all genes in the receiver cells, not only for ligand and receptors as before
   DE_receiver_targets = calculate_niche_de_targets(seurat_obj = seurat_obj, 
                                                    niches = niches, 
                                                    lfc_cutoff = lfc_cutoff, 
@@ -428,9 +450,13 @@ for(receiver_cells in celltypes_all)
       "background" = background)
   )
   
+  # get_ligand_activites_targets calling the function predict_ligand_activities for each niche
   ligand_activities_targets = get_ligand_activities_targets(niche_geneset_list = niche_geneset_list, 
                                                             ligand_target_matrix = ligand_target_matrix, 
                                                             top_n_target = top_n_target)
+  
+  head(ligand_activities_targets)
+  ligand_activities_targets %>% arrange(-activity) %>% filter(receiver %in% niches$BZ_niche$receiver)
   
   
   ##########################################
@@ -514,7 +540,7 @@ for(receiver_cells in celltypes_all)
     "ligand_fraction" = 1, # Ligands expressed in a smaller fraction of cells of cell type than cutoff (default: 0.10)
     "scaled_ligand_score_spatial" = 0, 
     # receptor DE score: niche-specific expression, Recommended 0.5 (>=0.5 and lower than "scaled_ligand_score")
-    "scaled_receptor_score" = 0.5, 
+    "scaled_receptor_score" = 1, 
     "scaled_receptor_expression_scaled" = 0.5, # Recommended weight: 0.5
     # Receptors that are expressed in a smaller fraction of cells of a cell type than exprs_cutoff(default: 0.10) 
     # will get a lower ranking, proportional to their fraction, Recommended weight: 1. 
@@ -584,7 +610,7 @@ for(receiver_cells in celltypes_all)
     top_n(50, prioritization_score) %>% 
     ungroup() # get the top50 ligands per niche
   
-  receiver_oi = "CM_BZ" 
+  receiver_oi = receiver_cells
   
   filtered_ligands = ligand_prioritized_tbl_oi %>% 
     filter(receiver == receiver_oi) %>% 
@@ -607,21 +633,24 @@ for(receiver_cells in celltypes_all)
   lfc_plot
   
   ggsave(paste0(outDir, '/Ligand_receptors_LFC_receiver.cells_', receiver_cells,  '.pdf'), 
-         width = 10, height = 12)
+         width = 10, height = 14)
   
   
-  exprs_activity_target_plot = make_ligand_activity_target_exprs_plot(receiver_oi, 
-                                                                      prioritized_tbl_oi,  
-                                                                      prioritization_tables$prioritization_tbl_ligand_receptor,  
-                                                                      prioritization_tables$prioritization_tbl_ligand_target, 
-                                                                      output$exprs_tbl_ligand,  
-                                                                      output$exprs_tbl_target, 
-                                                                      lfc_cutoff, ligand_target_matrix, 
-                                                                      plot_legend = FALSE, 
-                                                                      heights = NULL, widths = NULL)
+  exprs_activity_target_plot = 
+    make_ligand_activity_target_exprs_plot(receiver_oi, 
+                                           prioritized_tbl_oi,  
+                                           prioritization_tables$prioritization_tbl_ligand_receptor,  
+                                           prioritization_tables$prioritization_tbl_ligand_target, 
+                                           output$exprs_tbl_ligand,  
+                                           output$exprs_tbl_target, 
+                                           lfc_cutoff, 
+                                           ligand_target_matrix, 
+                                           plot_legend = FALSE, 
+                                           heights = NULL, widths = NULL)
+  
   exprs_activity_target_plot$combined_plot
   ggsave(paste0(outDir, '/Combined_plots_ligand_noFiltering_receiverCells_', receiver_cells, '.pdf'), 
-         width = 35, height = 12)
+         width = 40, height = 18)
   
   
   ## select only top 20 ligands
@@ -637,24 +666,26 @@ for(receiver_cells in celltypes_all)
     group_by(ligand) %>% filter(receiver == receiver_oi) %>% 
     top_n(2, prioritization_score) %>% ungroup() 
   
-  exprs_activity_target_plot = make_ligand_activity_target_exprs_plot(receiver_oi, 
-                                                                      prioritized_tbl_oi,  
-                                                                      prioritization_tables$prioritization_tbl_ligand_receptor,  
-                                                                      prioritization_tables$prioritization_tbl_ligand_target, 
-                                                                      output$exprs_tbl_ligand,  
-                                                                      output$exprs_tbl_target, 
-                                                                      lfc_cutoff, 
-                                                                      ligand_target_matrix, 
-                                                                      plot_legend = FALSE, 
-                                                                      heights = NULL, widths = NULL)
+  exprs_activity_target_plot = 
+    make_ligand_activity_target_exprs_plot(receiver_oi, 
+                                           prioritized_tbl_oi,  
+                                           prioritization_tables$prioritization_tbl_ligand_receptor,  
+                                           prioritization_tables$prioritization_tbl_ligand_target, 
+                                           output$exprs_tbl_ligand,  
+                                           output$exprs_tbl_target, 
+                                           lfc_cutoff, 
+                                           ligand_target_matrix, 
+                                           plot_legend = FALSE, 
+                                           heights = NULL, widths = NULL)
   
   exprs_activity_target_plot$combined_plot
   
   ggsave(paste0(outDir, '/Combined_plots_ligand_top20_receiverCells_', receiver_cells, '.pdf'), 
-         width = 25, height = 12)
+         width = 30, height = 14)
   
   
 }
+
 
 ## Circos plot of prioritized ligand-receptor pairs
 Make.Circos.plot = FALSE
