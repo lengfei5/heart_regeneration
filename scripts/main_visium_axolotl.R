@@ -21,6 +21,7 @@ if(!dir.exists(RdataDir)) dir.create(RdataDir)
 source('functions_Visium.R')
 library(pryr) # monitor the memory usage
 require(ggplot2)
+
 mem_used()
 
 ########################################################

@@ -283,7 +283,6 @@ annotation = aa@assays$ATAC@annotation
 DefaultAssay(aa) <- "RNA"
 ggs = rownames(aa)
 
-
 ########
 #get_geneName = function(aa)
 #{
@@ -310,6 +309,8 @@ get_geneID = function(aa)
 # https://github.com/stuart-lab/signac/issues/1159
 #annotation$tx_id = annotation$transcript_id
 #aa@assays$ATAC@annotation = annotation
+
+## instead of rerun the annotation modification, I load the one I run before
 annotation = readRDS(paste0('/groups/tanaka/People/current/jiwang/projects/heart_regeneration/results/', 
                             'sc_multiome_R13591_intron.exon.20220729/Rdata/modified_Amex47_annotation_multiome.rds'))
 #annotation = readRDS("/groups/tanaka/Collaborations/Jingkui-Elad/scMultiome/snATACseq/Annotation_atac.rds")
@@ -336,14 +337,6 @@ aa <- subset(
 
 
 DefaultAssay(aa) <- "RNA"
-#aa <- SCTransform(aa)
-# aa <- RunPCA(aa)
-# aa <- FindNeighbors(aa, dims = 1:30)
-# aa <- FindClusters(aa, resolution = 0.5)
-# 
-# aa <- RunUMAP(aa, dims = 1:30)
-# DimPlot(aa, group.by = "subtypes_RNA")
-
 aa$subtypes = aa$subtypes_RNA
 aa$celltypes = as.character(aa$subtypes)
 
@@ -357,10 +350,12 @@ aa$celltypes[grep('Megakeryocytes', aa$subtypes)] = 'Megakeryocytes'
 aa$celltypes[grep('RBC', aa$subtypes)] = 'RBC'
 
 
-saveRDS(aa, paste0("/groups/tanaka/Collaborations/Jingkui-Elad/scMultiome/snATACseq/",
-                    "seuratObj_multiome_snRNA.annotated_scATAC.merged.peaks.cellranger.441K_v3_testByJK.rds"))
+# saveRDS(aa, paste0("/groups/tanaka/Collaborations/Jingkui-Elad/scMultiome/snATACseq/",
+#                     "seuratObj_multiome_snRNA.annotated_scATAC.merged.peaks.cellranger.441K_v3_testByJK.rds"))
+
 
 DefaultAssay(aa) = 'RNA'
+# renormalize the RNA data
 aa <- NormalizeData(aa, normalization.method = "LogNormalize", scale.factor = 10000)
 
 aa <- FindVariableFeatures(aa, selection.method = "vst", nfeatures = 8000)
@@ -377,6 +372,7 @@ DimPlot(aa, label = TRUE, group.by = 'celltypes', repel = TRUE, reduction = 'uma
 
 DimPlot(aa, label = TRUE, group.by = 'celltypes', repel = TRUE, reduction = 'umap_lsi') + NoLegend()
 
+# normalize ATAC and UMAP
 DefaultAssay(aa) <- "ATAC"
 aa <- FindTopFeatures(aa, min.cutoff = 5)
 aa <- RunTFIDF(aa)
@@ -415,20 +411,17 @@ saveRDS(aa, paste0("/groups/tanaka/Collaborations/Jingkui-Elad/scMultiome/snATAC
 # link peaks and coveragePlots
 #
 ##########################################
-aa = readRDS(paste0("/groups/tanaka/Collaborations/Jingkui-Elad/scMultiome/snATACseq/",
-                    "seuratObj_multiome_snRNA.annotated_scATAC.merged.peaks.cellranger.441K_v3_testByJK.rds"))
-
+DefaultAssay(aa) = 'ATAC'
 aa <- RegionStats(aa, genome = BSgenome.Amexicanum.axolotlomics.AmexGv6cut500M)
 
-aa <- LinkPeaks(
-  object = aa,
-  peak.assay = "ATAC",
-  expression.assay = "RNA",
-  
-  genes.use = c("CD68-AMEX60DD012740")
-  
-)
-
+# aa <- LinkPeaks(
+#   object = aa,
+#   peak.assay = "ATAC",
+#   expression.assay = "RNA",
+#   
+#   genes.use = c("CD68-AMEX60DD012740")
+#   
+# )
 
 features = rownames(aa@assays$RNA)[grep('ITGAM', rownames(aa@assays$RNA))]
 
@@ -436,6 +429,8 @@ DefaultAssay(aa) <- "RNA"
 FeaturePlot(aa, features = features[1], order = TRUE, cols = c('gray', 'red'))
 
 features = features[1]
+
+## SCT normalization doesn't seem to be as good as lognormal normalizaiton, so use the 'RNA' rather 'SCT'
 DefaultAssay(aa) <- "ATAC"
 aa <- LinkPeaks(
   object = aa,
