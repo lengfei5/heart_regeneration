@@ -207,34 +207,30 @@ all.genes <- rownames(aa)
 aa <- ScaleData(aa, features = all.genes)
 aa <- RunPCA(aa, features = VariableFeatures(object = aa), verbose = FALSE)
 
-DimPlot(aa, reduction = '')
+ElbowPlot(aa, ndims = 50)
+aa <- RunUMAP(aa, dims = 1:30, n.neighbors = 30, min.dist = 0.1)
+DimPlot(aa, label = TRUE, repel = TRUE) + NoLegend()
 
-bb <- readRDS("/groups/tanaka/Collaborations/Jingkui-Elad/scMultiome/aa_annotated_no_doublets_20221004_2.rds")
-
-aa$subtypes_RNA -> Idents(aa)
-
+# bb <- readRDS("/groups/tanaka/Collaborations/Jingkui-Elad/scMultiome/aa_annotated_no_doublets_20221004_2.rds")
+Idents(aa) = aa$subtypes_RNA
+#aa$subtypes_RNA -> Idents(aa)
 FB_subset <- subset(aa,  subtypes_RNA %in% c("FB_1", "FB_2", "FB_3"))
 
-FB_subset <- FindVariableFeatures(FB_subset, selection.method = "vst", nfeatures = 2000)
+FB_subset <- FindVariableFeatures(FB_subset, selection.method = "vst", nfeatures = 3000)
 
-all.genes <- rownames(FB_subset)
-FB_subset <- ScaleData(FB_subset, features = all.genes)
+FB_subset <- ScaleData(FB_subset)
 
 FB_subset <- RunPCA(FB_subset, features = VariableFeatures(object = FB_subset))
+ElbowPlot(FB_subset, ndims = 50)
 
+FB_subset <- FindNeighbors(FB_subset, dims = 1:20)
 
-FB_subset <- FindNeighbors(FB_subset, dims = 1:10)
+FB_subset <- FindClusters(FB_subset, resolution = 0.3)
 
-
-FB_subset <- FindClusters(FB_subset, resolution = 0.1)
-
-
-FB_subset <- RunUMAP(FB_subset, dims = 1:10)
-
-
+FB_subset <- RunUMAP(FB_subset, dims = 1:30, n.neighbors = 30, min.dist = 0.1)
 
 DimPlot(FB_subset, reduction = "umap", label = TRUE, pt.size = 0.5)
-DimPlot(FB_subset, reduction = "umap", label = TRUE, pt.size = 0.5, group.by = "subtypes")
+DimPlot(FB_subset, reduction = "umap", label = TRUE, pt.size = 0.5, group.by = "subtypes_RNA")
 DimPlot(FB_subset, reduction = "umap", label = TRUE, pt.size = 0.5, split.by = "condition")
 DimPlot(FB_subset, reduction = "umap", label = TRUE, pt.size = 0.5, group.by = "seurat_clusters")
 DimPlot(FB_subset, reduction = "umap", label = TRUE, pt.size = 0.5, group.by = "newId")
@@ -268,7 +264,7 @@ aa$subtypes_RNA = as.factor(aa$subtypes_RNA)
 
 aa$subtypes_RNA <- Idents(aa)
 
-saveRDS(aa , "/groups/tanaka/Collaborations/Jingkui-Elad/scMultiome/snATACseq/seuratObj_multiome_snRNA.annotated_scATAC.merged.peaks.cellranger.441K_v3.rds")
+#saveRDS(aa , "/groups/tanaka/Collaborations/Jingkui-Elad/scMultiome/snATACseq/seuratObj_multiome_snRNA.annotated_scATAC.merged.peaks.cellranger.441K_v3.rds")
 
 
 ##########################################
@@ -287,6 +283,7 @@ annotation = aa@assays$ATAC@annotation
 DefaultAssay(aa) <- "RNA"
 ggs = rownames(aa)
 
+
 ########
 #get_geneName = function(aa)
 #{
@@ -301,22 +298,24 @@ get_geneID = function(aa)
 }
 
 ########
-geneids = get_geneID(ggs)
-
-for(n in 1:length(geneids))
-{
-  cat(n, '\n')
-  annotation$gene_name[which(annotation$gene_id == geneids[n])] = ggs[n]
-}
+# geneids = get_geneID(ggs)
+# 
+# for(n in 1:length(geneids))
+# {
+#   cat(n, '\n')
+#   annotation$gene_name[which(annotation$gene_id == geneids[n])] = ggs[n]
+# }
 
 # tx_id required for the annotation plot in CoveragePlot
 # https://github.com/stuart-lab/signac/issues/1159
 #annotation$tx_id = annotation$transcript_id
 #aa@assays$ATAC@annotation = annotation
-
-annotation = readRDS("/groups/tanaka/Collaborations/Jingkui-Elad/scMultiome/snATACseq/Annotation_atac.rds")
+annotation = readRDS(paste0('/groups/tanaka/People/current/jiwang/projects/heart_regeneration/results/', 
+                            'sc_multiome_R13591_intron.exon.20220729/Rdata/modified_Amex47_annotation_multiome.rds'))
+#annotation = readRDS("/groups/tanaka/Collaborations/Jingkui-Elad/scMultiome/snATACseq/Annotation_atac.rds")
 #saveRDS(annotation , "/groups/tanaka/Collaborations/Jingkui-Elad/scMultiome/snATACseq/Annotation_atac.rds")
 aa@assays$ATAC@annotation <- annotation
+
 ## continue with analysis
 VlnPlot(
   object = aa,
@@ -338,24 +337,88 @@ aa <- subset(
 
 DefaultAssay(aa) <- "RNA"
 #aa <- SCTransform(aa)
-aa <- RunPCA(aa)
-aa <- FindNeighbors(aa, dims = 1:30)
+# aa <- RunPCA(aa)
+# aa <- FindNeighbors(aa, dims = 1:30)
+# aa <- FindClusters(aa, resolution = 0.5)
+# 
+# aa <- RunUMAP(aa, dims = 1:30)
+# DimPlot(aa, group.by = "subtypes_RNA")
+
+aa$subtypes = aa$subtypes_RNA
+aa$celltypes = as.character(aa$subtypes)
+
+aa$celltypes[grep('CM_|CMs_|_CM|_CM_', aa$subtypes)] = 'CM'
+aa$celltypes[grep('EC_|_EC', aa$subtypes)] = 'EC'
+aa$celltypes[grep('FB_', aa$subtypes)] = 'FB'
+aa$celltypes[grep('B_cells', aa$subtypes)] = 'Bcell'
+
+aa$celltypes[grep('Macrophages|_MF', aa$subtypes)] = 'Macrophages'
+aa$celltypes[grep('Megakeryocytes', aa$subtypes)] = 'Megakeryocytes'
+aa$celltypes[grep('RBC', aa$subtypes)] = 'RBC'
 
 
-aa <- FindClusters(aa, resolution = 0.5)
+saveRDS(aa, paste0("/groups/tanaka/Collaborations/Jingkui-Elad/scMultiome/snATACseq/",
+                    "seuratObj_multiome_snRNA.annotated_scATAC.merged.peaks.cellranger.441K_v3_testByJK.rds"))
 
-aa <- RunUMAP(aa, dims = 1:30)
-DimPlot(aa, group.by = "subtypes_RNA")
+DefaultAssay(aa) = 'RNA'
+aa <- NormalizeData(aa, normalization.method = "LogNormalize", scale.factor = 10000)
 
+aa <- FindVariableFeatures(aa, selection.method = "vst", nfeatures = 8000)
+aa <- ScaleData(aa)
+aa <- RunPCA(aa, features = VariableFeatures(object = aa), verbose = FALSE)
+
+ElbowPlot(aa, ndims = 50)
+aa <- RunUMAP(aa, dims = 1:30, n.neighbors = 30, min.dist = 0.1, 
+              reduction.name = "umap")
+
+DimPlot(aa, label = TRUE, repel = TRUE, reduction = 'umap') + NoLegend()
+
+DimPlot(aa, label = TRUE, group.by = 'celltypes', repel = TRUE, reduction = 'umap') + NoLegend()
+
+DimPlot(aa, label = TRUE, group.by = 'celltypes', repel = TRUE, reduction = 'umap_lsi') + NoLegend()
 
 DefaultAssay(aa) <- "ATAC"
 aa <- FindTopFeatures(aa, min.cutoff = 5)
 aa <- RunTFIDF(aa)
 aa <- RunSVD(aa)
 
-aa <- RegionStats(aa, genome = BSgenome.Amexicanum.axolotlomics.AmexGv6cut500M)
+DepthCor(aa)
 
-#saveRDS(aa , "/groups/tanaka/Collaborations/Jingkui-Elad/scMultiome/snATACseq/seuratObj_multiome_snRNA.annotated_scATAC.merged.peaks.cellranger.441K_v3.rds")
+aa <- RunUMAP(object = aa, reduction = 'lsi', dims = 2:50, n.neighbors = 30, min.dist = 0.1, 
+              reduction.name = "umap_lsi")
+
+DimPlot(object = aa, label = TRUE, group.by = 'celltypes', reduction = 'umap_lsi') + NoLegend()
+
+
+DefaultAssay(aa) = 'RNA'
+
+library(tictoc)
+tic()
+aa <- SCTransform(aa, ncells = 3000, assay = "RNA", verbose = TRUE, 
+                    variable.features.n = 5000, 
+                  return.only.var.genes = TRUE, vst.flavor = "v2")
+toc()
+
+aa <- RunPCA(aa, verbose = FALSE, weight.by.var = TRUE)
+ElbowPlot(aa, ndims = 30)
+
+aa <- RunUMAP(aa, dims = 1:40, n.neighbors = 50, min.dist = 0.3,  reduction.name = "umap_sct")
+DimPlot(aa, label = TRUE, repel = TRUE, group.by = 'celltypes', reduction = 'umap_sct') + NoLegend()
+
+DimPlot(aa, label = TRUE, repel = TRUE, group.by = 'subtypes', reduction = 'umap_sct') + NoLegend()
+
+saveRDS(aa, paste0("/groups/tanaka/Collaborations/Jingkui-Elad/scMultiome/snATACseq/",
+                   "seuratObj_multiome_snRNA.annotated_scATAC.merged.peaks.cellranger.441K_v4_testByJK_", 
+                   "logNormal_SCT_umap_lsiUmap_sctUmap.rds"))
+
+##########################################
+# link peaks and coveragePlots
+#
+##########################################
+aa = readRDS(paste0("/groups/tanaka/Collaborations/Jingkui-Elad/scMultiome/snATACseq/",
+                    "seuratObj_multiome_snRNA.annotated_scATAC.merged.peaks.cellranger.441K_v3_testByJK.rds"))
+
+aa <- RegionStats(aa, genome = BSgenome.Amexicanum.axolotlomics.AmexGv6cut500M)
 
 aa <- LinkPeaks(
   object = aa,
@@ -363,39 +426,37 @@ aa <- LinkPeaks(
   expression.assay = "RNA",
   
   genes.use = c("CD68-AMEX60DD012740")
+  
 )
 
 
-##########################################
-# try to modify the ATAC annotation to have the same gene names in both RNA and ATAC
-# it worked
-##########################################
-features = rownames(bb)[grep('TOP2A', rownames(bb))]
-FeaturePlot(bb, features = features, order = TRUE, cols = c('gray', 'red'))
+features = rownames(aa@assays$RNA)[grep('ITGAM', rownames(aa@assays$RNA))]
 
+DefaultAssay(aa) <- "RNA"
+FeaturePlot(aa, features = features[1], order = TRUE, cols = c('gray', 'red'))
+
+features = features[1]
 DefaultAssay(aa) <- "ATAC"
 aa <- LinkPeaks(
   object = aa,
   peak.assay = "ATAC",
-  expression.assay = "SCT",
-  
+  expression.assay = "RNA",
   genes.use = features
 )
 
 #bb$subtypes -> Idents(aa)
-
-idents.plot <- c("Proliferating_CM", "Mono_Macrophages", "B_cells", "EC")
-
+idents.plot <- c("Proliferating_CM",'CM_Atria', 'CM_OFT', "Mono_Macrophages", "B_cells", "EC")
 
 p1 <- CoveragePlot(
   object = aa,
   region = features,
   features = features,
-  expression.assay = "SCT",
+  expression.assay = "RNA",
   idents = idents.plot ,
   extend.upstream = 500,
   extend.downstream = 10000
 )
+
 
 patchwork::wrap_plots(p1)
 
