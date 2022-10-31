@@ -70,7 +70,7 @@ refs_file = '/groups/tanaka/Collaborations/Jingkui-Elad/scMultiome/aa_annotated_
 refs = readRDS(file = refs_file)
 table(refs$subtypes)
 
-outDir = paste0(resDir, '/Ligand_Receptor_analysis/NicheNet')
+outDir = paste0(resDir, '/Ligand_Receptor_analysis/NicheNet_v2')
 system(paste0('mkdir -p ', outDir))
 
 ##########################################
@@ -78,6 +78,7 @@ system(paste0('mkdir -p ', outDir))
 ##########################################
 celltypes_BZ = c('Mono_Macrophages', 'Proliferating_CM', 'Injury_specific_EC', 'FB_1')
 celltypes_sel = c('CM', 'EC', 'FB', 'MP')
+
 
 ## select first CM, EC, FB, MP cell types
 refs$celltypes = as.character(refs$subtypes)
@@ -87,7 +88,13 @@ refs$celltypes[grep('FB_', refs$subtypes)] = 'FB'
 refs$celltypes[grep('Macrophages|_MF', refs$subtypes)] = 'MP'
 
 table(refs$celltypes)
+
+refs$celltypes[which(refs$celltypes == 'CM' & refs$subtypes != 'Proliferating_CM' & 
+                       refs$subtypes != 'Ventricular_CM_ROBO2+')] = NA
+table(refs$celltypes)
+
 refs$celltypes[grep('CM|EC|FB|MP', refs$celltypes, invert = TRUE)] = NA
+table(refs$celltypes)
 
 ## subset seurat object and change names
 Idents(refs) = as.factor(refs$celltypes)
@@ -147,7 +154,7 @@ if(Gene.filtering.preprocessing){
   rm(sce)
   Idents(subref) = as.factor(subref$celltypes)
   
-  saveRDS(geneDup, paste0(RdataDir, 'geneSymbol_duplication_inLRanalysis.rds'))
+  saveRDS(geneDup, paste0(outDir, '/geneSymbol_duplication_inLRanalysis.rds'))
   
 }
 
@@ -170,7 +177,7 @@ subref <- RunUMAP(subref, dims = 1:30, n.neighbors = 30, min.dist = 0.1, reducti
 DimPlot(subref, group.by = "celltype", label = TRUE, reduction = 'umap') 
 
 
-geneDup = readRDS(paste0(RdataDir, 'geneSymbol_duplication_inLRanalysis.rds'))
+geneDup = readRDS(paste0(outDir, '/geneSymbol_duplication_inLRanalysis.rds'))
 kk = which(geneDup$geneSymbol != geneDup$gg.uniq)
 ggs = unique(geneDup$geneSymbol[kk])
 cat(length(ggs), ' genes have symbols issue \n')
@@ -186,13 +193,14 @@ receptor_dup = receptor_dup[order(receptor_dup$geneSymbol), ]
 write.csv2(ligand_dup, file = paste0(outDir, '/geneDuplication_issue_ligands.csv'))
 write.csv2(receptor_dup, file = paste0(outDir, '/geneDuplication_issue_receptors.csv'))
 
-saveRDS(subref, file = paste0(RdataDir, 'seuratObject_snRNAseq_subset_for_NicheNet_', species, '.rds')) 
+saveRDS(subref, file = paste0(outDir, '/seuratObject_snRNAseq_subset_for_NicheNet.rds')) 
 
 ##########################################
 # # reload the processed seurat object
 ##########################################
-subref = readRDS(file = paste0(RdataDir, 'seuratObject_snRNAseq_subset_for_NicheNet_', species, '.rds')) 
-#subref = subset(x = subref, downsample = 1000) # downsample the CM and EC for the sake of speed
+subref = readRDS(file = paste0(outDir, '/seuratObject_snRNAseq_subset_for_NicheNet.rds'))
+
+#subref = subset(x = subref, downsample = 1000) 
 table(subref$celltypes)
 
 seurat_obj = SetIdent(subref, value = "celltype")

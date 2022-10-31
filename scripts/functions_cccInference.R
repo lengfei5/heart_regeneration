@@ -98,6 +98,8 @@ run_LIANA = function(refs,
   liana_test <- liana_test %>%
     liana_aggregate(resource = 'Consensus')
   
+  saveRDS(liana_test, file = paste0(outDir, 'res_lianaTest_Consensus.rds'))
+  
   for(n in 1:length(celltypes)){
     # n = 1
     liana_test %>%
