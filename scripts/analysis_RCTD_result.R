@@ -19,14 +19,14 @@ cc = names(nb_cells[which(nb_cells>0)])
 
 #RCTD_out = paste0(resDir, '/RCTD_coarse_out_v1')
 #RCTD_out = paste0(resDir, '/RCTD_subtype_out')
-#RCTD_out = paste0(resDir, '/RCTD_subtype_out_v3.5')
-RCTD_out = paste0(resDir, '/RCTD_subtype_out_v4_FBsubtypes')
+RCTD_out = paste0(resDir, '/RCTD_subtype_out_v3.5')
+#RCTD_out = paste0(resDir, '/RCTD_subtype_out_v4_FBsubtypes')
 cat('-- RCTD output folder -- ', RCTD_out, '\n')
 
 for(n in 1:length(cc))
 #for(n in c(1, 2, 4))
 {
-  # n = 2
+  # n = 1
   cat('slice -- ', cc[n], '\n')
   slice = cc[n]
   #stx = st[, which(st$condition == slice)]
@@ -124,6 +124,8 @@ for(n in 1:length(cc))
     require(scatterpie)
     require(cowplot)
     library(RColorBrewer)
+    # set color vector
+    getPalette <- colorRampPalette(brewer.pal(9, "Set1"))
     
     # set the color vectors for all cell types
     # n <- 60
@@ -133,8 +135,7 @@ for(n in 1:length(cc))
     # use a panel of colors from https://gotellilab.github.io/GotelliLabMeetingHacks/NickGotelli/ColorPalettes.html
     #tol10qualitative=c("#332288", "#88CCEE", "#44AA99", "#117733", "#999933", "#DDCC77",
     #                   "#661100", "#CC6677", "#882255", "#AA4499")
-    # set color vector
-    getPalette <- colorRampPalette(brewer.pal(9, "Set1"))
+    
     
     ## Preprocess coordinates 
     spatial_coord <-  spatialRNA@coords %>%
@@ -169,7 +170,7 @@ for(n in 1:length(cc))
         }
       }
     }else{ # clean the weight: force to be 0 if lower than certain threshold, e.g. 0.05 or 0.1
-      cutoff_weight = 0.05
+      cutoff_weight = 0.01
       weights_processed = as.matrix(weights)
       weights_processed[which(weights_processed < cutoff_weight)] = 0
       weights_processed = normalize_weights(weights_processed)
@@ -223,7 +224,7 @@ for(n in 1:length(cc))
     pdf(pdfname, width=16, height = 10)
     
     for(m in 1:length(cell_types_plt)){
-      # m = 5
+      # m = 8
       sub.spatial = spatial_coord[,c(1:3, (3+m))]
       colnames(sub.spatial)[ncol(sub.spatial)] = 'celltype'
       sub.spatial$celltype = as.numeric(as.character(sub.spatial$celltype))
@@ -246,6 +247,15 @@ for(n in 1:length(cc))
         ggplot2::guides(fill = guide_legend(ncol = 1))
       
       plot(p1)
+      
+      make_special_plot = FALSE
+      if(make_special_plot){
+        p1
+        
+        ggsave(paste0(resDir, '/RCTD_res_', slice, '_', cell_types_plt[m],  '.pdf'),
+               width = 10, height = 8)
+        
+      }
       
     }
     

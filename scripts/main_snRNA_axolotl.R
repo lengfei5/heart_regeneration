@@ -484,7 +484,58 @@ refs$celltypes[grep('Macrophages|_MF', refs$subtypes)] = 'Macrophages'
 refs$celltypes[grep('Megakeryocytes', refs$subtypes)] = 'Megakeryocytes'
 refs$celltypes[grep('RBC', refs$subtypes)] = 'RBC'
 
-DimPlot(refs, group.by = 'celltypes')
+DimPlot(refs, group.by = 'celltypes', label = TRUE, repel = TRUE) + NoLegend()
+ggsave(paste0(resDir, "/snRNAseq_umap_celltypes_overview.pdf"),  width = 10, height = 8)
+
+
+DimPlot(refs, group.by = 'subtypes', label = TRUE, repel = TRUE) + NoLegend()
+ggsave(paste0(resDir, "/snRNAseq_umap_subtypes_overview.pdf"),  width = 12, height = 8)
+
+
+aa = refs
+rm(refs)
+
+aa <- NormalizeData(aa, normalization.method = "LogNormalize", scale.factor = 10000)
+
+aa <- FindVariableFeatures(aa, selection.method = "vst", nfeatures = 8000)
+all.genes <- rownames(aa)
+
+aa <- ScaleData(aa, features = all.genes)
+aa <- RunPCA(aa, features = VariableFeatures(object = aa), verbose = FALSE)
+ElbowPlot(aa, ndims = 30)
+
+aa <- FindNeighbors(aa, dims = 1:30)
+aa <- FindClusters(aa, verbose = FALSE, algorithm = 3, resolution = 0.7)
+
+aa <- RunUMAP(aa, dims = 1:30, n.neighbors = 30, min.dist = 0.1)
+
+DimPlot(aa, label = TRUE, group.by = 'subtypes',  repel = TRUE) + NoLegend()
+
+ggsave(filename = paste0(resDir, '/umap_Elad_doubletRM_cleaned_manualAnnot.pdf'), width = 10, height = 8)
+
+##########################################
+# macrophage subseting 
+##########################################
+celltype.sels = 'Macrophages'
+sub.obj = subset(aa, cells = colnames(aa)[!is.na(match(aa$celltypes, celltype.sels))])
+
+DimPlot(sub.obj, split.by = 'condition', group.by = 'subtypes')
+
+sub.obj <- FindVariableFeatures(sub.obj, selection.method = "vst", nfeatures = 3000)
+sub.obj = ScaleData(sub.obj)
+sub.obj <- RunPCA(object = sub.obj, features = VariableFeatures(sub.obj), verbose = FALSE)
+ElbowPlot(sub.obj, ndims = 30)
+
+nb.pcs = 30 # nb of pcs depends on the considered clusters or ids
+n.neighbors = 30; min.dist = 0.1;
+sub.obj <- RunUMAP(object = sub.obj, reduction = 'pca', reduction.name = "umap", dims = 1:nb.pcs, 
+                   n.neighbors = n.neighbors,
+                   min.dist = min.dist)
+
+DimPlot(sub.obj, split.by = 'condition', group.by = 'subtypes', repel = TRUE, label = FALSE) +
+  ggtitle(label = '')
+
+ggsave(filename = paste0(resDir, '/umap_macrophages_perTimepoint.pdf'), width = 18, height = 4)
 
 ##########################################
 # FB subseting
@@ -502,7 +553,6 @@ n.neighbors = 30; min.dist = 0.1;
 sub.obj <- RunUMAP(object = sub.obj, reduction = 'pca', reduction.name = "umap", dims = 1:nb.pcs, 
                    n.neighbors = n.neighbors,
                    min.dist = min.dist)
-
 
 # sub.obj$clusters = sub.obj$seurat_clusters
 features = rownames(refs)[grep('VIM|COL1A2|FSTL1|POSTN', rownames(refs))]

@@ -49,13 +49,14 @@ table(refs$subtypes)
 # run LIANA 
 ##########################################
 # set parameter for ligand-receptor analysis
-outDir = paste0(resDir, '/Ligand_Receptor_analysis/LIANA')
+outDir = paste0(resDir, '/Ligand_Receptor_analysis/LIANA_v2')
 
 refs$celltypes = refs$subtypes
 celltypes = c('Mono_Macrophages', 'Proliferating_CM', 'FB_1', 'Injury_specific_EC')
+ntop = 100
 
-source('functions_Visium.R')
-run_LIANA(refs, celltypes = celltypes, outDir = outDir)
+source('functions_cccInference.R')
+run_LIANA(refs, celltypes = celltypes, outDir = outDir, ntop = ntop)
 
 
 ########################################################

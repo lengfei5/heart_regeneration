@@ -15,7 +15,9 @@
 ########################################################
 run_LIANA = function(refs,
                      celltypes = c('Mono_Macrophages', 'Proliferating_CM', 'Neutrophil', 'Injury_specific_EC'),
-                     outDir = '../results/Ligand_Receptor_analysis'
+                     outDir = '../results/Ligand_Receptor_analysis',
+                     ntop = 50,
+                     RUN.CPDB.alone = FALSE
 ) # original code from https://saezlab.github.io/liana/articles/liana_tutorial.html
 {
   require(tidyverse)
@@ -70,7 +72,7 @@ run_LIANA = function(refs,
                 xlab=expression(Log[10]~"average count"))
   
   # detected in >= 5 cells, ave.counts >=5 but not too high
-  genes.to.keep <- num.cells > 50 & ave.counts >= 10^-2  & ave.counts <10^1  
+  genes.to.keep <- num.cells > 20 & ave.counts >= 10^-4  & ave.counts <10^2  
   summary(genes.to.keep)
   
   sce <- sce[genes.to.keep, ]
@@ -100,10 +102,10 @@ run_LIANA = function(refs,
     # n = 1
     liana_test %>%
       liana_dotplot(source_groups = celltypes[n],
-                    target_groups = celltypes[-n],
-                    ntop = 20)
+                    target_groups = celltypes,
+                    ntop = ntop)
     ggsave(filename = paste0(outDir, '/liana_LR_prediction_senderCell_', celltypes[n], '.pdf'), 
-           width = 14, height = 10)
+           width = 16, height = min(c(10*ntop/20, 50)), limitsize = FALSE)
     
   }
   
@@ -118,65 +120,53 @@ run_LIANA = function(refs,
   
   dev.off()
   
-  
-  # liana_test %>% 
-  #   filter(source =="prolife.Mphage") %>%
-  #   top_n(25,  desc(aggregate_rank)) %>%
-  #   liana_dotplot(source_groups = c("prolife.Mphage"),
-  #                 target_groups = c("FB", "CM"))
-  # ggsave(filename = paste0(resDir, '/liana_LR_prediction_prolife.Mphage_to_FB_CM.pdf'), width = 12, height = 8)
-  # 
-  
-  # p <- chord_freq(liana_trunc,
-  #                 source_groups = c("CM", "FB", "Macrophages", "Neutrophil"),
-  #                 target_groups = c("CM", "FB", "Macrophages", "Neutrophil"))
-  
-  
   # RUN CPDB alone
-  cpdb_test <- liana_wrap(sce,
-                          method = 'cellphonedb',
-                          resource = c('CellPhoneDB'),
-                          permutation.params = list(nperms=1000,
-                                                    parallelize=FALSE,
-                                                    workers=4), 
-                          expr_prop=0.05)
-  
-  # Plot toy results
-  # identify interactions of interest
-  cpdb_int <- cpdb_test %>%
-    # only keep interactions with p-val <= 0.05
-    filter(pvalue <= 0.05) %>% # this reflects interactions `specificity`
-    # then rank according to `magnitude` (lr_mean in this case)
-    rank_method(method_name = "cellphonedb",
-                mode = "magnitude") %>%
-    # keep top 20 interactions (regardless of cell type)
-    distinct_at(c("ligand.complex", "receptor.complex")) %>%
-    head(20)
-  
-  # Plot toy results
-  cpdp_res = cpdb_test %>%
-    # keep only the interactions of interest
-    inner_join(cpdb_int, 
-               by = c("ligand.complex", "receptor.complex")) %>%
-    # invert size (low p-value/high specificity = larger dot size)
-    # + add a small value to avoid Infinity for 0s
-    mutate(pvalue = -log10(pvalue + 1e-10)) 
-  
-  for(n in 1:length(celltypes)){
-    # n = 1
-    cpdp_res %>%
-      liana_dotplot(source_groups = celltypes[n],
-                    target_groups = celltypes[-n],
-                    specificity = "pvalue",
-                    magnitude = "lr.mean",
-                    show_complex = TRUE,
-                    size.label = "-log10(p-value)")
+  if(RUN.CPDB.alone){
+    cpdb_test <- liana_wrap(sce,
+                            method = 'cellphonedb',
+                            resource = c('CellPhoneDB'),
+                            permutation.params = list(nperms=1000,
+                                                      parallelize=FALSE,
+                                                      workers=4), 
+                            expr_prop=0.05)
     
-    ggsave(filename = paste0(outDir, '/CellPhoneDB_LR_prediction_senderCell_', celltypes[n], '.pdf'), 
-           width = 14, height = 10)
+    # Plot toy results
+    # identify interactions of interest
+    cpdb_int <- cpdb_test %>%
+      # only keep interactions with p-val <= 0.05
+      filter(pvalue <= 0.05) %>% # this reflects interactions `specificity`
+      # then rank according to `magnitude` (lr_mean in this case)
+      rank_method(method_name = "cellphonedb",
+                  mode = "magnitude") %>%
+      # keep top 20 interactions (regardless of cell type)
+      distinct_at(c("ligand.complex", "receptor.complex")) %>%
+      head(ntop)
     
+    # Plot toy results
+    cpdp_res = cpdb_test %>%
+      # keep only the interactions of interest
+      inner_join(cpdb_int, 
+                 by = c("ligand.complex", "receptor.complex")) %>%
+      # invert size (low p-value/high specificity = larger dot size)
+      # + add a small value to avoid Infinity for 0s
+      mutate(pvalue = -log10(pvalue + 1e-10)) 
+    
+    for(n in 1:length(celltypes)){
+      # n = 1
+      cpdp_res %>% 
+        liana_dotplot(source_groups = celltypes[n],
+                      target_groups = celltypes,
+                      specificity = "pvalue",
+                      magnitude = "lr.mean",
+                      show_complex = TRUE,
+                      size.label = "-log10(p-value)", 
+                      ntop = ntop)
+      
+      ggsave(filename = paste0(outDir, '/CellPhoneDB_LR_prediction_senderCell_', celltypes[n], '.pdf'), 
+             width = 14, height = min(c(10*ntop/20, 50)), limitsize = FALSE)
+      
+    }
   }
-  
   
 }
 
