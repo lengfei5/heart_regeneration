@@ -9,7 +9,7 @@
 ##########################################################################
 rm(list = ls())
 
-version.analysis = '_R13591_atac.20220825'
+version.analysis = '_R13591_atac_reseq_20221115'
 
 resDir = paste0("../results/sc_multiome", version.analysis)
 RdataDir = paste0(resDir, '/Rdata/')
@@ -18,7 +18,7 @@ RdataDir = paste0(resDir, '/Rdata/')
 if(!dir.exists(resDir)) dir.create(resDir)
 if(!dir.exists(RdataDir)) dir.create(RdataDir)
 
-dataDir = '../R13591_axolotl_multiome'
+dataDir = '../R14353_ax_snATAC_reseq'
 
 source('functions_scATAC.R')
 source('functions_scRNAseq.R')
@@ -124,8 +124,8 @@ cat(length(combined.peaks), ' combined peaks \n')
 
 srat_cr = list()
 
-#for(n in 1:nrow(design))
-for(n in 2:nrow(design))
+for(n in 1:nrow(design))
+#for(n in 2:nrow(design))
 {
   # n = 1
   cat('----------- : ', n, ':',  design$condition[n], '-------------\n')
@@ -202,16 +202,17 @@ for(n in 2:nrow(design))
   
 }
 
-saveRDS(srat_cr, file = (paste0(RdataDir, 'seuratObj_scATAC_beforeMerged.peaks.cellranger.441K_v2.rds')))
+saveRDS(srat_cr, file = (paste0(RdataDir, 'seuratObj_scATAC_beforeMerged.peaks.cellranger.584K_v1.rds')))
 
+srat_cr = readRDS(file = paste0(RdataDir, 'seuratObj_scATAC_beforeMerged.peaks.cellranger.584K_v1.rds'))
 srat_reduced = Reduce(merge, srat_cr)
 
-saveRDS(srat_reduced, file = (paste0(RdataDir, 'seuratObj_scATAC_merged.peaks.cellranger.441K_v2.rds')))
+saveRDS(srat_reduced, file = (paste0(RdataDir, 'seuratObj_scATAC_merged.peaks.cellranger.584K_v1.rds')))
 
 ##########################################
 # filtering and normalization
 ##########################################
-srat_cr = readRDS(file = (paste0(RdataDir, 'seuratObj_scATAC_merged.peaks.cellranger.441K_v2.rds')))
+srat_cr = readRDS(file = paste0(RdataDir, 'seuratObj_scATAC_merged.peaks.cellranger.584K_v1.rds'))
 design$condition = gsub('_scATAC', '', design$condition)
 
 levels = design$condition
@@ -251,21 +252,28 @@ srat_cr <- TSSEnrichment(srat_cr, fast = FALSE)
 
 srat_cr$high.tss <- ifelse(srat_cr$TSS.enrichment > 5, 'High', 'Low')
 
-saveRDS(srat_cr, file = (paste0(RdataDir, 'seuratObj_scATAC_merged.peaks.cellranger.441K_QCs.rds')))
+saveRDS(srat_cr, file = (paste0(RdataDir, 'seuratObj_scATAC_merged.peaks.cellranger_QCs.rds')))
 
 
 TSSPlot(srat_cr, group.by = 'high.tss') + NoLegend()
 
 VlnPlot(srat_cr, features = "nCount_ATAC", ncol = 1, y.max = 10000, group.by = 'condition', pt.size = 0., log = TRUE) +
-  geom_hline(yintercept = c(200, 500, 1000, 2000))
+  geom_hline(yintercept = c(1000, 1500, 2000))
 
-ggsave(filename = paste0(resDir, '/QCs_nCount_ATAC_cellRangerPeaks.pdf'), height =8, width = 12 )
+ggsave(filename = paste0(resDir, '/QCs_nCount_ATAC_cellRangerPeaks.pdf'), height =8, width = 12)
 
-VlnPlot(srat_cr, features = c("atac_fragments"), y.max = 10^5)
-ggsave(filename = paste0(resDir, '/QCs_atac_fragments_cellRangerPeaks.pdf'), height =8, width = 12 )
+VlnPlot(srat_cr, features = c("atac_fragments"), y.max = 10^6, group.by = 'condition', pt.size = 0, log = TRUE) +
+  geom_hline(yintercept = c(10000, 20000))
+ggsave(filename = paste0(resDir, '/QCs_atac_fragments_cellRangerPeaks_20k.pdf'), height =8, width = 12)
+
+VlnPlot(srat_cr, features = c("atac_raw_reads"), y.max = 10^6, group.by = 'condition', pt.size = 0, log = TRUE) +
+  geom_hline(yintercept = c(10000, 50000))
+ggsave(filename = paste0(resDir, '/QCs_atac_rawReads_cellRangerPeaks_50k.pdf'), height =8, width = 12)
+
 
 VlnPlot(srat_cr, features = c("pct_reads_in_peaks"))
 ggsave(filename = paste0(resDir, '/QCs_pct_readsWithinPeaks_cellRangerPeaks.pdf'), height =8, width = 12 )
+
 
 VlnPlot(object = srat_cr, features = c("TSS.enrichment"), pt.size = 0, y.max = 10) +
   geom_hline(yintercept = c(1, 2))
@@ -295,7 +303,7 @@ DepthCor(srat_cr, n = 30)
 cordat = DepthCor(srat_cr, reduction = "lsi", n = 30)$data
 dims_use = cordat$Component[abs(cordat$counts)<0.3]
 
-#dims_use = c(2:30)
+dims_use = c(2:30)
 print(dims_use)
 
 srat_cr = FindNeighbors(object = srat_cr, reduction = 'lsi', dims = dims_use, 
@@ -309,6 +317,7 @@ DimPlot(object = srat_cr, label = TRUE, repel = TRUE) + NoLegend()
 ggsave(filename = paste0(resDir, '/cellRangerPeaks_umap_v1.pdf'), height =8, width = 12 )
 
 DimPlot(object = srat_cr, label = TRUE, repel = TRUE, split.by = 'condition') + NoLegend()
+
 ggsave(filename = paste0(resDir, '/cellRangerPeaks_umap_perCondition_v1.pdf'), height =8, width = 30 )
 
 

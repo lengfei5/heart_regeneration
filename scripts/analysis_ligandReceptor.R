@@ -49,7 +49,7 @@ table(refs$subtypes)
 # run LIANA 
 ##########################################
 # set parameter for ligand-receptor analysis
-outDir = paste0(resDir, '/Ligand_Receptor_analysis/LIANA_v2')
+outDir = paste0(resDir, '/Ligand_Receptor_analysis/LIANA_v2_test')
 
 refs$celltypes = refs$subtypes
 celltypes = c('Mono_Macrophages', 'Proliferating_CM', 'FB_1', 'Injury_specific_EC')
@@ -254,16 +254,18 @@ cat('cell types in other regions : ', celltypes_noBZ, '\n')
 for(receiver_cells in celltypes_BZ)
 {
   
-  #receiver_cells = 'CM_BZ'
+  # receiver_cells = 'CM_BZ'
   cat('--- receiver cells : ', receiver_cells, ' ---\n')
   
   # define the niches
   niches = list(
     "BZ_niche" = list(
-      "sender" = setdiff(celltypes_BZ, receiver_cells),
+      #"sender" = setdiff(celltypes_BZ, receiver_cells),
+      "sender" = celltypes_BZ, # including autocrine
       "receiver" = receiver_cells),
     "noBZ_niche" = list(
-      "sender" = setdiff(celltypes_noBZ, gsub('_BZ',  '', receiver_cells)),
+      #"sender" = setdiff(celltypes_noBZ, gsub('_BZ',  '', receiver_cells)),
+      "sender" = celltypes_noBZ, 
       "receiver" = gsub('_BZ',  '', receiver_cells))
   ) 
   
@@ -544,7 +546,7 @@ for(receiver_cells in celltypes_BZ)
   ##########################################
   prioritizing_weights = c(
     "scaled_ligand_score" = 5, # # niche-specific expression of the ligand: Recommended 5 (between 1-5)
-    # scaled ligand expression in one sender compared to the other cell types in the dataset]
+    # scaled ligand expression in one sender compared to the other cell types in the dataset
     "scaled_ligand_expression_scaled" = 1,
     "ligand_fraction" = 1, # Ligands expressed in a smaller fraction of cells of cell type than cutoff (default: 0.10)
     "scaled_ligand_score_spatial" = 0, 
@@ -565,7 +567,7 @@ for(receiver_cells in celltypes_BZ)
     "scaled_activity" = 0, 
     # Normalized ligand activity: to further prioritize ligand-receptor pairs based on their predicted effect of
     # the ligand-receptor interaction on the gene expression in the receiver cell type, Recommended weight: >=1.
-    "scaled_activity_normalized" = 1,
+    "scaled_activity_normalized" = 4,
     "bona_fide" = 1)
   
   output = list(DE_sender_receiver = DE_sender_receiver, 
@@ -589,7 +591,8 @@ for(receiver_cells in celltypes_BZ)
     filter(receiver == niches[[1]]$receiver) %>% 
     head(10)
   
-  
+  saveRDS(prioritization_tables, 
+          file = paste0(outDir, '/nichenet_prioritization_tables_receiver_', receiver_cells, '.rds'))
   ##########################################
   # 8). Visualization of the Differential NicheNet output 
   ##########################################
@@ -609,90 +612,177 @@ for(receiver_cells in celltypes_BZ)
     select(ligand, receptor, niche) %>% 
     dplyr::rename(top_niche = niche)
   
-  ligand_prioritized_tbl_oi = prioritization_tables$prioritization_tbl_ligand_receptor %>% 
-    select(niche, sender, receiver, ligand, prioritization_score) %>% 
-    group_by(ligand, niche) %>% top_n(1, prioritization_score) %>% 
-    ungroup() %>% distinct() %>% 
-    inner_join(top_ligand_niche_df) %>% 
-    filter(niche == top_niche) %>% 
-    group_by(niche) %>% 
-    top_n(50, prioritization_score) %>% 
-    ungroup() # get the top50 ligands per niche
+  for(ntop in c(50, 100, 150, 200)){
+    
+    cat('ntop -- ', ntop, '\n')
+    ligand_prioritized_tbl_oi = prioritization_tables$prioritization_tbl_ligand_receptor %>% 
+      select(niche, sender, receiver, ligand, prioritization_score) %>% 
+      group_by(ligand, niche) %>% top_n(1, prioritization_score) %>% 
+      ungroup() %>% distinct() %>% 
+      inner_join(top_ligand_niche_df) %>% 
+      filter(niche == top_niche) %>% 
+      group_by(niche) %>% 
+      top_n(n = ntop, prioritization_score) %>% 
+      ungroup() # get the top50 ligands per niche
+    
+    receiver_oi = receiver_cells
+    
+    filtered_ligands = ligand_prioritized_tbl_oi %>% 
+      filter(receiver == receiver_oi) %>% 
+      pull(ligand) %>% unique()
+    
+    prioritized_tbl_oi = prioritization_tables$prioritization_tbl_ligand_receptor %>% 
+      filter(ligand %in% filtered_ligands) %>% 
+      select(niche, sender, receiver, ligand,  receptor, ligand_receptor, prioritization_score) %>% 
+      distinct() %>% 
+      inner_join(top_ligand_receptor_niche_df) %>% 
+      group_by(ligand) %>% 
+      filter(receiver == receiver_oi) %>% 
+      top_n(2, prioritization_score) %>% ungroup() 
+    
+    lfc_plot = make_ligand_receptor_lfc_plot(receiver_oi, 
+                                             prioritized_tbl_oi, 
+                                             prioritization_tables$prioritization_tbl_ligand_receptor, 
+                                             plot_legend = FALSE, 
+                                             heights = NULL, widths = NULL)
+    lfc_plot
+    
+    ggsave(paste0(outDir, '/Ligand_receptors_LFC_receiver.cells_', receiver_cells,  '_ntop', ntop, '.pdf'), 
+           width = 12, height = 12*ntop/50, limitsize = FALSE)
+    
+    
+    exprs_activity_target_plot = 
+      make_ligand_activity_target_exprs_plot(receiver_oi, 
+                                             prioritized_tbl_oi,  
+                                             prioritization_tables$prioritization_tbl_ligand_receptor,  
+                                             prioritization_tables$prioritization_tbl_ligand_target, 
+                                             output$exprs_tbl_ligand,  
+                                             output$exprs_tbl_target, 
+                                             lfc_cutoff, 
+                                             ligand_target_matrix, 
+                                             plot_legend = FALSE, 
+                                             heights = NULL, widths = NULL)
+    
+    exprs_activity_target_plot$combined_plot
+    ggsave(paste0(outDir, '/Combined_plots_ligand_noFiltering_receiverCells_', receiver_cells,  '_ntop', ntop,  
+                  '.pdf'), 
+           width = 60, height = 12*ntop/50, limitsize = FALSE)
+    
+  }
   
-  receiver_oi = receiver_cells
+}
+
+Combine_NicheNet_Plots = FALSE
+if(Combine_NicheNet_Plots){
+   prioritization_tables = readRDS(file = paste0(outDir, 
+                                                 '/nichenet_prioritization_tables_receiver_', 
+                                                 receiver_cells, '.rds'))
   
-  filtered_ligands = ligand_prioritized_tbl_oi %>% 
-    filter(receiver == receiver_oi) %>% 
+   top_ligand_niche_df = prioritization_tables$prioritization_tbl_ligand_receptor %>% 
+     select(niche, sender, receiver, ligand, receptor, prioritization_score) %>% 
+     group_by(ligand) %>% 
+     top_n(1, prioritization_score) %>% 
+     ungroup() %>% 
+     select(ligand, receptor, niche) %>% 
+     dplyr::rename(top_niche = niche)
+   
+   top_ligand_receptor_niche_df = prioritization_tables$prioritization_tbl_ligand_receptor %>% 
+     select(niche, sender, receiver, ligand, receptor, prioritization_score) %>% 
+     group_by(ligand, receptor) %>% 
+     top_n(1, prioritization_score) %>% 
+     ungroup() %>% 
+     select(ligand, receptor, niche) %>% 
+     dplyr::rename(top_niche = niche)
+   
+   for(ntop in c(50, 100, 150, 200)){
+     
+     # ntop = 100
+     cat('ntop -- ', ntop, '\n')
+     ligand_prioritized_tbl_oi = prioritization_tables$prioritization_tbl_ligand_receptor %>% 
+       select(niche, sender, receiver, ligand, prioritization_score) %>% 
+       group_by(ligand, niche) %>% top_n(1, prioritization_score) %>% 
+       ungroup() %>% distinct() %>% 
+       inner_join(top_ligand_niche_df) %>% 
+       filter(niche == top_niche) %>% 
+       group_by(niche) %>% 
+       top_n(n = ntop, prioritization_score) %>% 
+       ungroup() # get the top50 ligands per niche
+     
+     receiver_oi = receiver_cells
+     
+     filtered_ligands = ligand_prioritized_tbl_oi %>% 
+       filter(receiver == receiver_oi) %>% 
+       pull(ligand) %>% unique()
+     
+     prioritized_tbl_oi = prioritization_tables$prioritization_tbl_ligand_receptor %>% 
+       filter(ligand %in% filtered_ligands) %>% 
+       select(niche, sender, receiver, ligand,  receptor, ligand_receptor, prioritization_score) %>% 
+       distinct() %>% 
+       inner_join(top_ligand_receptor_niche_df) %>% 
+       group_by(ligand) %>% 
+       filter(receiver == receiver_oi) %>% 
+       top_n(2, prioritization_score) %>% ungroup() 
+     
+     lfc_plot = make_ligand_receptor_lfc_plot(receiver_oi, 
+                                              prioritized_tbl_oi, 
+                                              prioritization_tables$prioritization_tbl_ligand_receptor, 
+                                              plot_legend = FALSE, 
+                                              heights = NULL, widths = NULL)
+     lfc_plot
+     
+     ggsave(paste0(outDir, '/Ligand_receptors_LFC_receiver.cells_', receiver_cells,  '_ntop', ntop, '.pdf'), 
+            width = 12, height = 12*ntop/50, limitsize = FALSE)
+     
+     
+     exprs_activity_target_plot = 
+       make_ligand_activity_target_exprs_plot(receiver_oi, 
+                                              prioritized_tbl_oi,  
+                                              prioritization_tables$prioritization_tbl_ligand_receptor,  
+                                              prioritization_tables$prioritization_tbl_ligand_target, 
+                                              output$exprs_tbl_ligand,  
+                                              output$exprs_tbl_target, 
+                                              lfc_cutoff, 
+                                              ligand_target_matrix, 
+                                              plot_legend = FALSE, 
+                                              heights = NULL, widths = NULL)
+     
+     exprs_activity_target_plot$combined_plot
+     ggsave(paste0(outDir, '/Combined_plots_ligand_noFiltering_receiverCells_', receiver_cells,  '_ntop', ntop,  
+                   '.pdf'), 
+            width = 80, height = 8*ntop/50, limitsize = FALSE)
+     
+   }
+   
+   
+  # ## select only top 20 ligands
+  filtered_ligands = ligand_prioritized_tbl_oi %>%
+    filter(receiver == receiver_oi) %>%
+    top_n(50, prioritization_score) %>%
     pull(ligand) %>% unique()
-  
-  prioritized_tbl_oi = prioritization_tables$prioritization_tbl_ligand_receptor %>% 
-    filter(ligand %in% filtered_ligands) %>% 
-    select(niche, sender, receiver, ligand,  receptor, ligand_receptor, prioritization_score) %>% 
-    distinct() %>% 
-    inner_join(top_ligand_receptor_niche_df) %>% 
-    group_by(ligand) %>% 
-    filter(receiver == receiver_oi) %>% 
-    top_n(2, prioritization_score) %>% ungroup() 
-  
-  lfc_plot = make_ligand_receptor_lfc_plot(receiver_oi, 
-                                           prioritized_tbl_oi, 
-                                           prioritization_tables$prioritization_tbl_ligand_receptor, 
-                                           plot_legend = FALSE, 
+
+  prioritized_tbl_oi = prioritization_tables$prioritization_tbl_ligand_receptor %>%
+    filter(ligand %in% filtered_ligands) %>%
+    select(niche, sender, receiver, ligand,  receptor, ligand_receptor, prioritization_score) %>%
+    distinct() %>% inner_join(top_ligand_receptor_niche_df) %>%
+    group_by(ligand) %>% filter(receiver == receiver_oi) %>%
+    top_n(2, prioritization_score) %>% ungroup()
+
+  exprs_activity_target_plot =
+    make_ligand_activity_target_exprs_plot(receiver_oi,
+                                           prioritized_tbl_oi,
+                                           prioritization_tables$prioritization_tbl_ligand_receptor,
+                                           prioritization_tables$prioritization_tbl_ligand_target,
+                                           output$exprs_tbl_ligand,
+                                           output$exprs_tbl_target,
+                                           lfc_cutoff,
+                                           ligand_target_matrix,
+                                           plot_legend = FALSE,
                                            heights = NULL, widths = NULL)
-  lfc_plot
-  
-  ggsave(paste0(outDir, '/Ligand_receptors_LFC_receiver.cells_', receiver_cells,  '.pdf'), 
-         width = 10, height = 14)
-  
-  
-  exprs_activity_target_plot = 
-    make_ligand_activity_target_exprs_plot(receiver_oi, 
-                                           prioritized_tbl_oi,  
-                                           prioritization_tables$prioritization_tbl_ligand_receptor,  
-                                           prioritization_tables$prioritization_tbl_ligand_target, 
-                                           output$exprs_tbl_ligand,  
-                                           output$exprs_tbl_target, 
-                                           lfc_cutoff, 
-                                           ligand_target_matrix, 
-                                           plot_legend = FALSE, 
-                                           heights = NULL, widths = NULL)
-  
+
   exprs_activity_target_plot$combined_plot
-  ggsave(paste0(outDir, '/Combined_plots_ligand_noFiltering_receiverCells_', receiver_cells, '.pdf'), 
-         width = 40, height = 18)
-  
-  
-  ## select only top 20 ligands
-  filtered_ligands = ligand_prioritized_tbl_oi %>% 
-    filter(receiver == receiver_oi) %>% 
-    top_n(20, prioritization_score) %>% 
-    pull(ligand) %>% unique()
-  
-  prioritized_tbl_oi = prioritization_tables$prioritization_tbl_ligand_receptor %>% 
-    filter(ligand %in% filtered_ligands) %>% 
-    select(niche, sender, receiver, ligand,  receptor, ligand_receptor, prioritization_score) %>% 
-    distinct() %>% inner_join(top_ligand_receptor_niche_df) %>% 
-    group_by(ligand) %>% filter(receiver == receiver_oi) %>% 
-    top_n(2, prioritization_score) %>% ungroup() 
-  
-  exprs_activity_target_plot = 
-    make_ligand_activity_target_exprs_plot(receiver_oi, 
-                                           prioritized_tbl_oi,  
-                                           prioritization_tables$prioritization_tbl_ligand_receptor,  
-                                           prioritization_tables$prioritization_tbl_ligand_target, 
-                                           output$exprs_tbl_ligand,  
-                                           output$exprs_tbl_target, 
-                                           lfc_cutoff, 
-                                           ligand_target_matrix, 
-                                           plot_legend = FALSE, 
-                                           heights = NULL, widths = NULL)
-  
-  exprs_activity_target_plot$combined_plot
-  
-  ggsave(paste0(outDir, '/Combined_plots_ligand_top20_receiverCells_', receiver_cells, '.pdf'), 
-         width = 30, height = 14)
-  
-  
+
+  ggsave(paste0(outDir, '/Combined_plots_ligand_receiverCells_', receiver_cells, '_top50.pdf'),
+         width = 50, height = 14, limitsize = FALSE)
 }
 
 

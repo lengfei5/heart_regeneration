@@ -98,15 +98,21 @@ run_LIANA = function(refs,
   liana_test <- liana_test %>%
     liana_aggregate(resource = 'Consensus')
   
-  saveRDS(liana_test, file = paste0(outDir, 'res_lianaTest_Consensus.rds'))
+  saveRDS(liana_test, file = paste0(outDir, '/res_lianaTest_Consensus.rds'))
   
   for(n in 1:length(celltypes)){
     # n = 1
+    #liana_test %>%
+    #  liana_dotplot(source_groups = celltypes[n],
+    #                target_groups = celltypes,
+    #                ntop = ntop)
     liana_test %>%
-      liana_dotplot(source_groups = celltypes[n],
-                    target_groups = celltypes,
+      liana_dotplot(source_groups = celltypes,
+                    target_groups = celltypes[n],
                     ntop = ntop)
-    ggsave(filename = paste0(outDir, '/liana_LR_prediction_senderCell_', celltypes[n], '.pdf'), 
+    
+    ggsave(filename = paste0(outDir, '/liana_LR_prediction_recieveCell_', celltypes[n], 
+                             '_ntop', ntop, '.pdf'), 
            width = 16, height = min(c(10*ntop/20, 50)), limitsize = FALSE)
     
   }
@@ -169,6 +175,31 @@ run_LIANA = function(refs,
       
     }
   }
+  
+}
+
+assembly.liana.plot = function()
+{
+  liana_test = readRDS(file = paste0(outDir, '/res_lianaTest_Consensus.rds'))
+  ntop = 80
+  
+  for(n in 1:length(celltypes)){
+    # n = 1
+    #liana_test %>%
+    #  liana_dotplot(source_groups = celltypes[n],
+    #                target_groups = celltypes,
+    #                ntop = ntop)
+    liana_test %>%
+      liana_dotplot(source_groups = celltypes,
+                    target_groups = celltypes[n],
+                    ntop = ntop)
+    
+    ggsave(filename = paste0(outDir, '/liana_LR_prediction_recieveCell_', celltypes[n], 
+                             '_ntop', ntop, '.pdf'), 
+           width = 16, height = 6*ntop/20, limitsize = FALSE)
+    
+  }
+  
   
 }
 
