@@ -367,10 +367,20 @@ DoHeatmap(xx, features = top10$gene) + NoLegend()
 
 ggsave(filename = paste0(resDir, '/first_test_clusterMarkers_v2.pdf'), width = 45, height = 40)
 
+########################################################
+########################################################
+# Section : Elad's analysis,
+# doubletFinding, cell filtering and manual annotation
+########################################################
+########################################################
+SeuratObj = '/groups/tanaka/Collaborations/Jingkui-Elad/scMultiome/Rdata_spliced/'
+bb = readRDS(file = paste0(SeuratObj, 'seuratObject_axloltl_scRNAseq_R13591_20220720_lognormamlized_pca_umap.rds'))
+
+
 
 ########################################################
 ########################################################
-# Section : after Elad's doubletFinder, cleaning and manual annotation
+# Section XX: after Elad's doubletFinder, cleaning and manual annotation
 # 
 ########################################################
 ########################################################
