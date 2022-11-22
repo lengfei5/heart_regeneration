@@ -148,8 +148,8 @@ for(n in 1:length(cc))
   
 }
 
-saveRDS(aa, file = paste0(RdataDir, 'seuratObject_merged_cellFiltered_doubletFinderOut_', 
-                          species, version.analysis, '.rds'))
+saveRDS(aa, file = paste0(RdataDir, 'seuratObject_', species, version.analysis, 
+                          '_lognormamlized_pca_umap_keep.missed_subtypes_DFinderOut.rds'))
 
 ##########################################
 # Visulize the doublet 
