@@ -448,7 +448,6 @@ refs_file = paste0('/groups/tanaka/Collaborations/Jingkui-Elad/scMultiome/aa_sub
 refs = readRDS(file = refs_file)
 table(refs$subtypes)
 
-# refs0 = readRDS(file ='/groups/tanaka/Collaborations/Jingkui-Elad/scMultiome/aa_annotated_no_doublets_20221004.rds')
 
 ## prepare the parameters for RCTD coarse cell types
 Run.RCTD.coarse.celltypes = FALSE
@@ -502,7 +501,10 @@ Run.celltype.deconvolution.RCTD(st, refs,
                                 PLOT.scatterpie = FALSE,
 )
 
-source('analysis_RCTD_result.R')
+source('functions_Visium.R')
+plot.RCTD.results(RCTD_out = RCTD_out,
+                  plot.RCTD.summary = FALSE)
+
 
 ########################################################
 ########################################################
