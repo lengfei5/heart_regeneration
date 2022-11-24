@@ -412,16 +412,6 @@ if(Filter.cells.with.scATAC){
   # quick filtering 
   srat_cr <- subset(
     x = srat_cr,
-    subset = nCount_ATAC > 100 &
-      nCount_ATAC < 20000 &
-      #pct_reads_in_peaks > 15 &
-      #blacklist_ratio < 0.05 &
-      nucleosome_signal < 4 &
-      TSS.enrichment > 1
-  )
-  
-  srat_cr <- subset(
-    x = srat_cr,
     subset = nCount_ATAC < 100000 &
       nCount_RNA < 25000 &
       nCount_ATAC > 200 &
@@ -429,6 +419,7 @@ if(Filter.cells.with.scATAC){
       nucleosome_signal < 6 &
       TSS.enrichment > 1
   )
+  
 }
 
 srat_cr <- RunTFIDF(srat_cr)
@@ -440,27 +431,32 @@ DepthCor(srat_cr, n = 30)
 #cordat = DepthCor(srat_cr, reduction = "lsi", n = 30)$data
 #dims_use = cordat$Component[abs(cordat$counts)<0.3]
 
-#srat_cr = FindNeighbors(object = srat_cr, reduction = 'lsi', dims = dims_use, 
-#                        force.recalc = T, graph.name = "thegraph")
-#srat_cr = FindClusters(object = srat_cr, verbose = FALSE, algorithm = 3, 
-#                       graph.name = "thegraph", resolution = 1)
+srat_cr = FindNeighbors(object = srat_cr, reduction = 'lsi', dims = dims_use, 
+                        force.recalc = T, graph.name = "thegraph")
+srat_cr = FindClusters(object = srat_cr, verbose = FALSE, algorithm = 3, 
+                       graph.name = "thegraph", resolution = 1)
 
 dims_use = c(2:30)
 print(dims_use)
 
-srat_cr <- RunUMAP(object = srat_cr, reduction = 'lsi', dims = 2:50, n.neighbors = 30, min.dist = 0.1, 
+srat_cr <- RunUMAP(object = srat_cr, reduction = 'lsi', dims = 2:30, n.neighbors = 30, min.dist = 0.1, 
                    reduction.name = "umap_lsi")
 
 
-DimPlot(object = srat_cr, label = TRUE, group.by = 'celltypes', reduction = 'umap_lsi') + NoLegend()
+DimPlot(object = srat_cr, label = TRUE, reduction = 'umap_lsi') + NoLegend()
 
+p1 = DimPlot(srat_cr, label = TRUE, repel = TRUE, reduction = 'umap', group.by = 'subtypes') + 
+  NoLegend() + ggtitle('snRNA-seq')
+p2 = DimPlot(object = srat_cr, label = TRUE, repel = TRUE, group.by = 'subtypes') + 
+  NoLegend() + ggtitle('scATAC-seq')
 
-DimPlot(object = srat_cr, label = TRUE, repel = TRUE) + NoLegend()
-ggsave(filename = paste0(resDir, '/cellRangerPeaks_umap_v1.pdf'), height =8, width = 12 )
+p1 + p2
+ggsave(filename = paste0(resDir, '/multiome_snRNA_snATAC_filtered.pdf'), height = 8, width = 20)
 
-DimPlot(object = srat_cr, label = TRUE, repel = TRUE, split.by = 'condition') + NoLegend()
-ggsave(filename = paste0(resDir, '/cellRangerPeaks_umap_perCondition_v1.pdf'), height =8, width = 30 )
+#DimPlot(object = srat_cr, label = TRUE, repel = TRUE, split.by = 'condition') + NoLegend()
+#ggsave(filename = paste0(resDir, '/cellRangerPeaks_umap_perCondition_v1.pdf'), height =8, width = 30 )
 
+FeaturePlot(srat_cr, features = c('nCount_ATAC', 'nucleosome_signal'), reduction = 'umap_lsi')
 
 ##########################################
 # link peaks and coveragePlots
