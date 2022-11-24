@@ -56,7 +56,9 @@ library(data.table)
 library(BSgenome.Amexicanum.axolotlomics.AmexGv6cut500M)
 
 library(ballgown)
-gtf_axolotl = "/groups/tanaka/People/current/jiwang/scripts/axolotl_multiome/r_package/AmexT_v47.FULL_corr_chr_cut.gtf"
+gtf_axolotl = paste0("/groups/tanaka/People/current/jiwang/scripts/axolotl_multiome/r_package/", 
+                     "AmexT_v47.FULL_corr_chr_cut.gtf")
+
 granges_axolotl = ballgown::gffReadGR(gtf_axolotl)
 # adding a gene biotype, as that's necessary for TSS metaprofile
 granges_axolotl$gene_biotype = "protein_coding"
@@ -87,7 +89,7 @@ library(future)
 ########################################################
 ########################################################
 ## import scRNA seq data as reference to select cells
-scRNA_file = '/groups/tanaka/Collaborations/Jingkui-Elad/scMultiome/aa_subtypes_final_20221117.rds'
+scRNA_file = '/groups/tanaka/Collaborations/Jingkui-Elad/scMultiome/aa_annotated_no_doublets_20221004_2.rds'
 refs = readRDS(file = scRNA_file)
 table(refs$subtypes)
 
@@ -211,9 +213,12 @@ srat_reduced = Reduce(merge, srat_cr)
 
 saveRDS(srat_reduced, file = (paste0(RdataDir, 'seuratObj_scATAC_merged.peaks.cellranger.584K_v1.rds')))
 
-##########################################
-# filtering and normalization
-##########################################
+########################################################
+########################################################
+# Section II : combine snRNA-seq and scATAC-seq
+# - continue scATAC-seq analysis
+########################################################
+########################################################
 srat_cr = readRDS(file = paste0(RdataDir, 'seuratObj_scATAC_merged.peaks.cellranger.584K_v1.rds'))
 design$condition = gsub('_scATAC', '', design$condition)
 
@@ -221,14 +226,17 @@ levels = design$condition
 srat_cr$condition = factor(srat_cr$condition, levels = levels)
 Idents(srat_cr) = srat_cr$condition
 
-# import the snRNA-seq data to merge multiome
-cat('snRNA-seq --', basename(scRNA_file), '\n')
-refs = readRDS(file = scRNA_file)
-
-table(refs$subtypes)
-
+##########################################
+# merge snRNA and scATAC data 
+##########################################
 Merge_scATAC_snRNA = FALSE
 if(Merge_scATAC_snRNA){
+  
+  # import the snRNA-seq data to merge multiome
+  cat('snRNA-seq --', basename(scRNA_file), '\n')
+  refs = readRDS(file = scRNA_file)
+  
+  table(refs$subtypes)
   
   xx <- RenameCells(
     refs,
@@ -248,22 +256,67 @@ if(Merge_scATAC_snRNA){
   colnames(metadata)[-c(1:2)] = paste0(colnames(metadata)[-c(1,2)], '_RNA')
   
   srat_cr = AddMetaData(srat_cr, metadata = metadata)
-  saveRDS(srat_cr, file = paste0(RdataDir, 
-                                 'seuratObj_multiome_snRNA.annotated_scATAC.merged.peaks.cellranger.441K_v2.rds'))
+  saveRDS(srat_cr, 
+          file = paste0(RdataDir, 
+                        'seuratObj_multiome_snRNA.annotated_scATAC.merged.peaks.cellranger.584K_38280cells.rds'))
   
-  #DefaultAssay(refs)  = 'ATAC'
-  #refs = NucleosomeSignal(refs)
+  rm(xx, refs)
+  ##########################################
+  # modify the gene names in the ATAC-seq annotation to have the same as RNA assay
+  ##########################################
+  Run.annotation.motification = FALSE
+  if(Run.annotation.motification){
+    annotation = srat_cr@assays$ATAC@annotation
+    
+    DefaultAssay(srat_cr) <- "RNA"
+    ggs = rownames(srat_cr)
+    
+    get_geneID = function(srat_cr)
+    {
+      return(sapply(srat_cr, function(x) {test = unlist(strsplit(as.character(x), '-')); return(test[length(test)])}))
+      
+    }
+    
+    ######
+    geneids = get_geneID(ggs)
+    ggs = data.frame(ggs, geneids)
+    
+    mm = match(annotation$gene_id, ggs$geneids)
+    ii = which(!is.na(mm))
+    jj = mm[ii]
+    annotation$gene_name[ii] = ggs$ggs[jj]
+    
+    # for(n in 1:length(geneids))
+    # {
+    #   cat(n, '\n')
+    #   annotation$gene_name[which(annotation$gene_id == geneids[n])] = ggs[n]
+    #   
+    # }
+    
+    # tx_id required for the annotation plot in CoveragePlot
+    # https://github.com/stuart-lab/signac/issues/1159
+    annotation$tx_id = annotation$transcript_id
+    
+    # save the modified annotation
+    #saveRDS(annotation , "/groups/tanaka/Collaborations/Jingkui-Elad/scMultiome/snATACseq/Annotation_atac.rds")
+    
+  }
+  
+  srat_cr@assays$ATAC@annotation <- annotation
+  
+  saveRDS(srat_cr, 
+          file = paste0(RdataDir, 
+                        'seuratObj_multiome_snRNA.annotated_scATAC.merged.peaks.cr.584K.annot_38280cells.rds'))
+  
+  
 }
 
-srat_cr <- NucleosomeSignal(srat_cr)
-srat_cr <- TSSEnrichment(srat_cr, fast = FALSE)
-
+#srat_cr <- NucleosomeSignal(srat_cr)
+#srat_cr <- TSSEnrichment(srat_cr, fast = FALSE)
 srat_cr$high.tss <- ifelse(srat_cr$TSS.enrichment > 5, 'High', 'Low')
+#saveRDS(srat_cr, file = (paste0(RdataDir, 'seuratObj_scATAC_merged.peaks.cellranger_QCs.rds')))
 
-saveRDS(srat_cr, file = (paste0(RdataDir, 'seuratObj_scATAC_merged.peaks.cellranger_QCs.rds')))
-
-
-TSSPlot(srat_cr, group.by = 'high.tss') + NoLegend()
+#TSSPlot(srat_cr, group.by = 'high.tss') + NoLegend()
 
 VlnPlot(srat_cr, features = "nCount_ATAC", ncol = 1, y.max = 10000, group.by = 'condition', pt.size = 0., log = TRUE) +
   geom_hline(yintercept = c(1000, 1500, 2000))
@@ -290,6 +343,10 @@ ggsave(filename = paste0(resDir, '/QCs_TSS.enrichment_cellRangerPeaks.pdf'), hei
 VlnPlot(object = srat_cr, features = c("nucleosome_signal"), pt.size = 0)
 ggsave(filename = paste0(resDir, '/QCs_nucleosome_signal_cellRangerPeaks.pdf'), height =8, width = 12 )
 
+
+##########################################
+# dimension reduction for scATAC-seq 
+##########################################
 # quick filtering 
 srat_cr <- subset(
   x = srat_cr,
@@ -327,5 +384,146 @@ ggsave(filename = paste0(resDir, '/cellRangerPeaks_umap_v1.pdf'), height =8, wid
 DimPlot(object = srat_cr, label = TRUE, repel = TRUE, split.by = 'condition') + NoLegend()
 
 ggsave(filename = paste0(resDir, '/cellRangerPeaks_umap_perCondition_v1.pdf'), height =8, width = 30 )
+
+
+
+## continue with analysis
+VlnPlot(
+  object = srat_cr,
+  features = c("nCount_RNA", "nCount_ATAC", "TSS.enrichment", "nucleosome_signal"),
+  ncol = 4,
+  pt.size = 0
+)
+
+srat_cr <- subset(
+  x = srat_cr,
+  subset = nCount_ATAC < 100000 &
+    nCount_RNA < 25000 &
+    nCount_ATAC > 200 &
+    nCount_RNA > 1000 &
+    nucleosome_signal < 6 &
+    TSS.enrichment > 1
+)
+
+
+DefaultAssay(srat_cr) <- "RNA"
+srat_cr$subtypes = srat_cr$subtypes_RNA
+srat_cr$celltypes = as.character(srat_cr$subtypes)
+
+srat_cr$celltypes[grep('CM_|CMs_|_CM|_CM_', srat_cr$subtypes)] = 'CM'
+srat_cr$celltypes[grep('EC_|_EC', srat_cr$subtypes)] = 'EC'
+srat_cr$celltypes[grep('FB_', srat_cr$subtypes)] = 'FB'
+srat_cr$celltypes[grep('B_cells', srat_cr$subtypes)] = 'Bcell'
+
+srat_cr$celltypes[grep('Macrophages|_MF', srat_cr$subtypes)] = 'Macrophages'
+srat_cr$celltypes[grep('Megakeryocytes', srat_cr$subtypes)] = 'Megakeryocytes'
+srat_cr$celltypes[grep('RBC', srat_cr$subtypes)] = 'RBC'
+
+
+# saveRDS(srat_cr, paste0("/groups/tanaka/Collaborations/Jingkui-Elad/scMultiome/snATACseq/",
+#                     "seuratObj_multiome_snRNA.annotated_scATAC.merged.peaks.cellranger.441K_v3_testByJK.rds"))
+
+
+DefaultAssay(srat_cr) = 'RNA'
+# renormalize the RNA data
+srat_cr <- NormalizeData(srat_cr, normalization.method = "LogNormalize", scale.factor = 10000)
+
+srat_cr <- FindVariableFeatures(srat_cr, selection.method = "vst", nfeatures = 8000)
+srat_cr <- ScaleData(srat_cr)
+srat_cr <- RunPCA(srat_cr, features = VariableFeatures(object = srat_cr), verbose = FALSE)
+
+ElbowPlot(srat_cr, ndims = 50)
+srat_cr <- RunUMAP(srat_cr, dims = 1:30, n.neighbors = 30, min.dist = 0.1, 
+              reduction.name = "umap")
+
+DimPlot(srat_cr, label = TRUE, repel = TRUE, reduction = 'umap') + NoLegend()
+
+DimPlot(srat_cr, label = TRUE, group.by = 'celltypes', repel = TRUE, reduction = 'umap') + NoLegend()
+
+DimPlot(srat_cr, label = TRUE, group.by = 'celltypes', repel = TRUE, reduction = 'umap_lsi') + NoLegend()
+
+# normalize ATAC and UMAP
+DefaultAssay(srat_cr) <- "ATAC"
+srat_cr <- FindTopFeatures(srat_cr, min.cutoff = 5)
+srat_cr <- RunTFIDF(srat_cr)
+srat_cr <- RunSVD(srat_cr)
+
+DepthCor(srat_cr)
+
+srat_cr <- RunUMAP(object = srat_cr, reduction = 'lsi', dims = 2:50, n.neighbors = 30, min.dist = 0.1, 
+              reduction.name = "umap_lsi")
+
+DimPlot(object = srat_cr, label = TRUE, group.by = 'celltypes', reduction = 'umap_lsi') + NoLegend()
+
+
+DefaultAssay(srat_cr) = 'RNA'
+
+library(tictoc)
+tic()
+srat_cr <- SCTransform(srat_cr, ncells = 3000, assay = "RNA", verbose = TRUE, 
+                  variable.features.n = 5000, 
+                  return.only.var.genes = TRUE, vst.flavor = "v2")
+toc()
+
+srat_cr <- RunPCA(srat_cr, verbose = FALSE, weight.by.var = TRUE)
+ElbowPlot(srat_cr, ndims = 30)
+
+srat_cr <- RunUMAP(srat_cr, dims = 1:40, n.neighbors = 50, min.dist = 0.3,  reduction.name = "umap_sct")
+DimPlot(srat_cr, label = TRUE, repel = TRUE, group.by = 'celltypes', reduction = 'umap_sct') + NoLegend()
+
+DimPlot(srat_cr, label = TRUE, repel = TRUE, group.by = 'subtypes', reduction = 'umap_sct') + NoLegend()
+
+saveRDS(srat_cr, paste0("/groups/tanaka/Collaborations/Jingkui-Elad/scMultiome/snATACseq/",
+                   "seuratObj_multiome_snRNA.annotated_scATAC.merged.peaks.cellranger.441K_v4_testByJK_", 
+                   "logNormal_SCT_umap_lsiUmap_sctUmap.rds"))
+
+##########################################
+# link peaks and coveragePlots
+# 
+##########################################
+DefaultAssay(srat_cr) = 'ATAC'
+srat_cr <- RegionStats(srat_cr, genome = BSgenome.Amexicanum.axolotlomics.AmexGv6cut500M)
+
+# srat_cr <- LinkPeaks(
+#   object = srat_cr,
+#   peak.assay = "ATAC",
+#   expression.assay = "RNA",
+#   
+#   genes.use = c("CD68-AMEX60DD012740")
+#   
+# )
+
+features = rownames(srat_cr@assays$RNA)[grep('ITGAM', rownames(srat_cr@assays$RNA))]
+
+DefaultAssay(srat_cr) <- "RNA"
+FeaturePlot(srat_cr, features = features[1], order = TRUE, cols = c('gray', 'red'))
+
+features = features[1]
+
+## SCT normalization doesn't seem to be as good as lognormal normalizaiton, so use the 'RNA' rather 'SCT'
+DefaultAssay(srat_cr) <- "ATAC"
+srat_cr <- LinkPeaks(
+  object = srat_cr,
+  peak.assay = "ATAC",
+  expression.assay = "RNA",
+  genes.use = features
+)
+
+srat_cr$subtypes = srat_cr$subtypes_RNA
+Idents(srat_cr) = as.factor(srat_cr$subtypes)
+idents.plot <- c("Proliferating_CM",'CM_Atria', 'CM_OFT', "Mono_Macrophages", "B_cells", "EC")
+
+p1 <- CoveragePlot(
+  object = srat_cr,
+  region = features,
+  features = features,
+  expression.assay = "RNA",
+  idents = idents.plot ,
+  extend.upstream = 500,
+  extend.downstream = 10000
+)
+
+
+patchwork::wrap_plots(p1)
 
 
