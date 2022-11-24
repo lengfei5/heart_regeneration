@@ -488,12 +488,17 @@ refs$celltype_toUse = gsub('Mo/Macs', 'Mo.Macs', refs$celltype_toUse)
 DefaultAssay(refs) = 'RNA'
 DefaultAssay(st) = 'Spatial'
 require_int_SpatialRNA = FALSE
-RCTD_out = paste0(resDir, '/RCTD_subtype_out_42subtypes_v4')
+
+condition.specific.ref = TRUE
+refs$condition = gsub('_scRNA', '', refs$condition)
+
+RCTD_out = paste0(resDir, '/RCTD_subtype_out_42subtypes_ref.time.specific_v4.2')
 max_cores = 32
 # st = subset(st, condition == 'Amex_d4')
 
 source('functions_Visium.R')
 Run.celltype.deconvolution.RCTD(st, refs, 
+                                condition.specific.ref = condition.specific.ref,
                                 require_int_SpatialRNA = require_int_SpatialRNA,
                                 max_cores = max_cores,
                                 RCTD_out = RCTD_out,

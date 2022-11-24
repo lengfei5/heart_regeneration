@@ -29,6 +29,7 @@ library(Signac)
 library(Seurat)
 library(GenomeInfoDb)
 library(patchwork)
+require(SeuratObject)
 
 library(pryr) # monitor the memory usage
 require(ggplot2)
@@ -41,6 +42,7 @@ set.seed(1234)
 mem_used()
 
 library(data.table)
+
 
 ##########################################
 # axoltol genome and annotation (fragmented version) 
@@ -85,7 +87,7 @@ library(future)
 ########################################################
 ########################################################
 ## import scRNA seq data as reference to select cells
-scRNA_file = '/groups/tanaka/Collaborations/Jingkui-Elad/scMultiome/aa_annotated_no_doublets_20221004_2.rds'
+scRNA_file = '/groups/tanaka/Collaborations/Jingkui-Elad/scMultiome/aa_subtypes_final_20221117.rds'
 refs = readRDS(file = scRNA_file)
 table(refs$subtypes)
 
@@ -218,6 +220,12 @@ design$condition = gsub('_scATAC', '', design$condition)
 levels = design$condition
 srat_cr$condition = factor(srat_cr$condition, levels = levels)
 Idents(srat_cr) = srat_cr$condition
+
+# import the snRNA-seq data to merge multiome
+cat('snRNA-seq --', basename(scRNA_file), '\n')
+refs = readRDS(file = scRNA_file)
+
+table(refs$subtypes)
 
 Merge_scATAC_snRNA = FALSE
 if(Merge_scATAC_snRNA){
@@ -407,6 +415,7 @@ srat = Reduce(merge, srat)
 
 saveRDS(srat, file = (paste0(RdataDir, 'seuratObj_scATAC_merged.peaks.macs2.800K_v2.rds')))
 
+
 ##########################################
 # QCs and filtering 
 ##########################################
@@ -417,6 +426,7 @@ srat$condition = factor(srat$condition, levels = levels)
 Idents(srat) = srat$condition
 
 srat <- NucleosomeSignal(srat)
+
 srat <- TSSEnrichment(srat, fast = FALSE)
 
 srat$high.tss <- ifelse(srat$TSS.enrichment > 5, 'High', 'Low')

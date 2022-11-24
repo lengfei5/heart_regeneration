@@ -537,6 +537,7 @@ Convert.batch.corrected.expression.matrix.to.UMIcount = function(refs){
 ##########################################
 Run.celltype.deconvolution.RCTD = function(st, # spatial transcriptome seurat object 
                                            refs, # scRNA-seq reference with annotation names celltype_toUse
+                                           condition.specific.ref = FALSE,
                                            RCTD_out = '../results/RCTD_out', 
                                            require_int_SpatialRNA = FALSE,
                                            max_cores = 16,
@@ -555,36 +556,27 @@ Run.celltype.deconvolution.RCTD = function(st, # spatial transcriptome seurat ob
   # first for major cell types 
   # secondly for subtypes
   ##########################################
-  cat('-- prepare reference --\n')
   
-  #E.corrected <- refs@assays$integrated@data
-  #E.corrected = expm1(E.corrected) # linear scale of corrected gene expression
-  E_refs = GetAssayData(object = refs, slot = "data")
-  E_refs = expm1(E_refs) # linear scale of corrected gene expression
-  
-  ### Create the Reference object for major cell types
-  cell_types <- refs@meta.data$celltype_toUse
-  names(cell_types) <- colnames(refs) # create cell_types named list
-  cell_types <- as.factor(cell_types) # convert to factor data type
-  reference <- Reference(E_refs, cell_types, nUMI = NULL, require_int = FALSE)
-  
-  rm(E_refs, cell_types)
-  
-  ## Examine reference object (optional)
-  print(dim(reference@counts)) #observe Digital Gene Expression matrix
-  #> [1] 384 475
-  table(reference@cell_types) #number of occurences for each cell type
-  
-  ### create reference objects for subtypes
-  # if(run.RCTD.subtype){
-  #   subtypes <- refs@meta.data$subtype
-  #   names(subtypes) <- colnames(refs) # create cell_types named list
-  #   subtypes <- as.factor(subtypes) # convert to factor data type
-  #   reference_subtype <- Reference(E.corrected, subtypes, nUMI = NULL, require_int = FALSE)
-  #   table(reference_subtype@cell_types)
-  # }
-  # 
-  # #rm(E.corrected)
+  if(!condition.specific.ref){
+    cat('-- prepare global reference --\n')
+    
+    E_refs = GetAssayData(object = refs, slot = "data")
+    E_refs = expm1(E_refs) # linear scale of corrected gene expression
+    
+    ### Create the Reference object for major cell types
+    cell_types <- refs@meta.data$celltype_toUse
+    names(cell_types) <- colnames(refs) # create cell_types named list
+    cell_types <- as.factor(cell_types) # convert to factor data type
+    reference <- Reference(E_refs, cell_types, nUMI = NULL, require_int = FALSE)
+    
+    rm(E_refs, cell_types)
+    
+    ## Examine reference object (optional)
+    print(dim(reference@counts)) #observe Digital Gene Expression matrix
+    #> [1] 384 475
+    table(reference@cell_types) #number of occurences for each cell type
+    
+  }
   
   ##########################################
   # loop over all conditions of st for now
@@ -597,8 +589,38 @@ Run.celltype.deconvolution.RCTD = function(st, # spatial transcriptome seurat ob
   for(n in 1:length(cc))
   #for(n in c(1, 2, 4))
   {
-    # n = 2
+    # n = 1
     cat('slice -- ', cc[n], '\n')
+    
+    
+    ## prepare condition-specific refs
+    if(condition.specific.ref){
+      cat('-- prepare refs for ', cc[n], '\n')
+      refs_sub = subset(refs, condition == cc[n])
+      celltypes_nbs = table(refs_sub$celltype_toUse)
+      celltypes_nbs = celltypes_nbs[which(celltypes_nbs>30)]
+      refs_sub = subset(refs_sub, cells = colnames(refs_sub)[!is.na(match(refs_sub$celltype_toUse, 
+                                                                          names(celltypes_nbs)))])
+      
+      E_refs = GetAssayData(object = refs_sub, slot = "data")
+      E_refs = expm1(E_refs) # linear scale of corrected gene expression
+      
+      ### Create the Reference object for major cell types
+      cell_types <- refs_sub@meta.data$celltype_toUse
+      names(cell_types) <- colnames(refs_sub) # create cell_types named list
+      cell_types <- as.factor(cell_types) # convert to factor data type
+      reference <- Reference(E_refs, cell_types, nUMI = NULL, require_int = FALSE)
+      
+      rm(E_refs, cell_types, refs_sub)
+      
+      ## Examine reference object (optional)
+      print(dim(reference@counts)) #observe Digital Gene Expression matrix
+      #> [1] 384 475
+      table(reference@cell_types) #number of occurences for each cell type
+      
+      
+    }
+    
     slice = cc[n]
     stx = st[, which(st$condition == slice)]
     

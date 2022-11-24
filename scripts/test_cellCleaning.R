@@ -240,8 +240,8 @@ DimPlot(aa, label = TRUE, repel = TRUE, group.by = 'celltypes')
 
 ## redo the umap and HVGs and clustering
 aa <- FindVariableFeatures(aa, selection.method = "vst", nfeatures = 8000)
-all.genes <- rownames(aa)
-aa <- ScaleData(aa, features = all.genes)
+#all.genes <- rownames(aa)
+aa <- ScaleData(aa)
 aa <- RunPCA(aa, features = VariableFeatures(object = aa), verbose = FALSE)
 
 ElbowPlot(aa, ndims = 30)
@@ -250,6 +250,7 @@ aa <- FindNeighbors(aa, dims = 1:30)
 aa <- FindClusters(aa, verbose = FALSE, algorithm = 3, resolution = 1.0)
 
 aa <- RunUMAP(aa, dims = 1:30, n.neighbors = 30, min.dist = 0.1)
+
 
 p1 = DimPlot(aa, label = TRUE, repel = TRUE) + ggtitle("doublet filtered - compare Elad's subtypes")
 p2 = DimPlot(aa, label = TRUE, repel = TRUE, group.by = 'celltypes')
@@ -260,7 +261,11 @@ ggsave(filename = paste0(resDir, '/snRNAseq_doubletFiltered_clusters_vs_celltype
        width = 20, height = 8)
 
 
-# manaul 
+# manually annotate clusters based on Elad's celltypes 
+features = rownames(aa)[grep('PECAM|VIM-|COL1A1|COL1A2|COL3A1|LUM-|POSTN', rownames(aa))]
+FeaturePlot(aa, features = features, cols = c('gray', 'red'))
+
+
 DimPlot(aa, label = TRUE, repel = TRUE, cells.highlight = colnames(aa)[which(aa$seurat_clusters == '23')])
 
 aa$labels = NA
@@ -374,6 +379,7 @@ sub.combined$condition = factor(sub.combined$condition,
                                 levels = c('Amex_scRNA_d0', 'Amex_scRNA_d1', 
                                 'Amex_scRNA_d4', 'Amex_scRNA_d7',
                                 'Amex_scRNA_d14'))
+
 sub.combined <- ScaleData(sub.combined, verbose = FALSE)
 sub.combined <- RunPCA(sub.combined, npcs = 30, verbose = FALSE)
 
@@ -384,15 +390,10 @@ sub.combined <- FindClusters(sub.combined, algorithm = 3, resolution = 0.5)
 
 sub.combined <- RunUMAP(sub.combined, reduction = "pca", dims = 1:30, n.neighbors = 30, min.dist = 0.3) 
 
-
 p0 = DimPlot(sub.obj, reduction = "umap")
 p1 = DimPlot(sub.combined, reduction = "umap", group.by = 'RNA_snn_res.0.5')
 
 p0 | p1
 
 DimPlot(sub.combined, reduction = 'umap', label = TRUE, label.size = 4,  split.by = 'condition') 
-
-ggsave(paste0(resDir, '/Forte2020_Ren2020_IntegrationRPCA_', Normalization, '.pdf'), 
-       width = 24, height = 10)
-
 
