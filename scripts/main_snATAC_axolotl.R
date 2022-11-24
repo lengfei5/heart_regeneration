@@ -311,6 +311,9 @@ if(Merge_scATAC_snRNA){
   
 }
 
+##########################################
+# QCs of scATAC-seq
+##########################################
 #srat_cr <- NucleosomeSignal(srat_cr)
 #srat_cr <- TSSEnrichment(srat_cr, fast = FALSE)
 srat_cr$high.tss <- ifelse(srat_cr$TSS.enrichment > 5, 'High', 'Low')
@@ -345,67 +348,9 @@ ggsave(filename = paste0(resDir, '/QCs_nucleosome_signal_cellRangerPeaks.pdf'), 
 
 
 ##########################################
-# dimension reduction for scATAC-seq 
+# filter or not 
+# umap visualization both snRNA and scATAC
 ##########################################
-# quick filtering 
-srat_cr <- subset(
-  x = srat_cr,
-  subset = nCount_ATAC > 100 &
-    nCount_ATAC < 20000 &
-    #pct_reads_in_peaks > 15 &
-    #blacklist_ratio < 0.05 &
-    nucleosome_signal < 4 &
-    TSS.enrichment > 1
-)
-
-srat_cr = RunTFIDF(srat_cr)
-srat_cr = FindTopFeatures(srat_cr, min.cutoff = 'q5')
-srat_cr = RunSVD(srat_cr)
-
-DepthCor(srat_cr, n = 30)
-
-#cordat = DepthCor(srat_cr, n = 30)$data
-cordat = DepthCor(srat_cr, reduction = "lsi", n = 30)$data
-dims_use = cordat$Component[abs(cordat$counts)<0.3]
-
-dims_use = c(2:30)
-print(dims_use)
-
-srat_cr = FindNeighbors(object = srat_cr, reduction = 'lsi', dims = dims_use, 
-                     force.recalc = T, graph.name = "thegraph")
-srat_cr = FindClusters(object = srat_cr, verbose = FALSE, algorithm = 3, 
-                    graph.name = "thegraph", resolution = 1)
-
-srat_cr <- RunUMAP(object = srat_cr, reduction = 'lsi', dims = dims_use, n.neighbors = 30, min.dist = 0.1)
-
-DimPlot(object = srat_cr, label = TRUE, repel = TRUE) + NoLegend()
-ggsave(filename = paste0(resDir, '/cellRangerPeaks_umap_v1.pdf'), height =8, width = 12 )
-
-DimPlot(object = srat_cr, label = TRUE, repel = TRUE, split.by = 'condition') + NoLegend()
-
-ggsave(filename = paste0(resDir, '/cellRangerPeaks_umap_perCondition_v1.pdf'), height =8, width = 30 )
-
-
-
-## continue with analysis
-VlnPlot(
-  object = srat_cr,
-  features = c("nCount_RNA", "nCount_ATAC", "TSS.enrichment", "nucleosome_signal"),
-  ncol = 4,
-  pt.size = 0
-)
-
-srat_cr <- subset(
-  x = srat_cr,
-  subset = nCount_ATAC < 100000 &
-    nCount_RNA < 25000 &
-    nCount_ATAC > 200 &
-    nCount_RNA > 1000 &
-    nucleosome_signal < 6 &
-    TSS.enrichment > 1
-)
-
-
 DefaultAssay(srat_cr) <- "RNA"
 srat_cr$subtypes = srat_cr$subtypes_RNA
 srat_cr$celltypes = as.character(srat_cr$subtypes)
@@ -419,14 +364,32 @@ srat_cr$celltypes[grep('Macrophages|_MF', srat_cr$subtypes)] = 'Macrophages'
 srat_cr$celltypes[grep('Megakeryocytes', srat_cr$subtypes)] = 'Megakeryocytes'
 srat_cr$celltypes[grep('RBC', srat_cr$subtypes)] = 'RBC'
 
-
-# saveRDS(srat_cr, paste0("/groups/tanaka/Collaborations/Jingkui-Elad/scMultiome/snATACseq/",
-#                     "seuratObj_multiome_snRNA.annotated_scATAC.merged.peaks.cellranger.441K_v3_testByJK.rds"))
-
-
+## need to rerun normalizaiton, PCA and UMAP
 DefaultAssay(srat_cr) = 'RNA'
 # renormalize the RNA data
 srat_cr <- NormalizeData(srat_cr, normalization.method = "LogNormalize", scale.factor = 10000)
+
+use.SCT.normalization = FALSE
+if(use.SCT.normalization){
+  library(tictoc)
+  tic()
+  srat_cr <- SCTransform(srat_cr, ncells = 3000, assay = "RNA", verbose = TRUE, 
+                         variable.features.n = 5000, 
+                         return.only.var.genes = TRUE, vst.flavor = "v2")
+  toc()
+  
+  srat_cr <- RunPCA(srat_cr, verbose = FALSE, weight.by.var = TRUE)
+  ElbowPlot(srat_cr, ndims = 30)
+  
+  srat_cr <- RunUMAP(srat_cr, dims = 1:40, n.neighbors = 50, min.dist = 0.3,  reduction.name = "umap_sct")
+  DimPlot(srat_cr, label = TRUE, repel = TRUE, group.by = 'celltypes', reduction = 'umap_sct') + NoLegend()
+  
+  DimPlot(srat_cr, label = TRUE, repel = TRUE, group.by = 'subtypes', reduction = 'umap_sct') + NoLegend()
+  
+  saveRDS(srat_cr, paste0("/groups/tanaka/Collaborations/Jingkui-Elad/scMultiome/snATACseq/",
+                          "seuratObj_multiome_snRNA.annotated_scATAC.merged.peaks.cellranger.441K_v4_testByJK_", 
+                          "logNormal_SCT_umap_lsiUmap_sctUmap.rds"))
+}
 
 srat_cr <- FindVariableFeatures(srat_cr, selection.method = "vst", nfeatures = 8000)
 srat_cr <- ScaleData(srat_cr)
@@ -434,48 +397,70 @@ srat_cr <- RunPCA(srat_cr, features = VariableFeatures(object = srat_cr), verbos
 
 ElbowPlot(srat_cr, ndims = 50)
 srat_cr <- RunUMAP(srat_cr, dims = 1:30, n.neighbors = 30, min.dist = 0.1, 
-              reduction.name = "umap")
+                   reduction.name = "umap")
 
 DimPlot(srat_cr, label = TRUE, repel = TRUE, reduction = 'umap') + NoLegend()
 
 DimPlot(srat_cr, label = TRUE, group.by = 'celltypes', repel = TRUE, reduction = 'umap') + NoLegend()
 
-DimPlot(srat_cr, label = TRUE, group.by = 'celltypes', repel = TRUE, reduction = 'umap_lsi') + NoLegend()
 
 # normalize ATAC and UMAP
 DefaultAssay(srat_cr) <- "ATAC"
-srat_cr <- FindTopFeatures(srat_cr, min.cutoff = 5)
+
+Filter.cells.with.scATAC = FALSE
+if(Filter.cells.with.scATAC){
+  # quick filtering 
+  srat_cr <- subset(
+    x = srat_cr,
+    subset = nCount_ATAC > 100 &
+      nCount_ATAC < 20000 &
+      #pct_reads_in_peaks > 15 &
+      #blacklist_ratio < 0.05 &
+      nucleosome_signal < 4 &
+      TSS.enrichment > 1
+  )
+  
+  srat_cr <- subset(
+    x = srat_cr,
+    subset = nCount_ATAC < 100000 &
+      nCount_RNA < 25000 &
+      nCount_ATAC > 200 &
+      nCount_RNA > 1000 &
+      nucleosome_signal < 6 &
+      TSS.enrichment > 1
+  )
+}
+
 srat_cr <- RunTFIDF(srat_cr)
+srat_cr = FindTopFeatures(srat_cr, min.cutoff = 'q5')
 srat_cr <- RunSVD(srat_cr)
 
-DepthCor(srat_cr)
+DepthCor(srat_cr, n = 30)
+
+#cordat = DepthCor(srat_cr, reduction = "lsi", n = 30)$data
+#dims_use = cordat$Component[abs(cordat$counts)<0.3]
+
+#srat_cr = FindNeighbors(object = srat_cr, reduction = 'lsi', dims = dims_use, 
+#                        force.recalc = T, graph.name = "thegraph")
+#srat_cr = FindClusters(object = srat_cr, verbose = FALSE, algorithm = 3, 
+#                       graph.name = "thegraph", resolution = 1)
+
+dims_use = c(2:30)
+print(dims_use)
 
 srat_cr <- RunUMAP(object = srat_cr, reduction = 'lsi', dims = 2:50, n.neighbors = 30, min.dist = 0.1, 
-              reduction.name = "umap_lsi")
+                   reduction.name = "umap_lsi")
+
 
 DimPlot(object = srat_cr, label = TRUE, group.by = 'celltypes', reduction = 'umap_lsi') + NoLegend()
 
 
-DefaultAssay(srat_cr) = 'RNA'
+DimPlot(object = srat_cr, label = TRUE, repel = TRUE) + NoLegend()
+ggsave(filename = paste0(resDir, '/cellRangerPeaks_umap_v1.pdf'), height =8, width = 12 )
 
-library(tictoc)
-tic()
-srat_cr <- SCTransform(srat_cr, ncells = 3000, assay = "RNA", verbose = TRUE, 
-                  variable.features.n = 5000, 
-                  return.only.var.genes = TRUE, vst.flavor = "v2")
-toc()
+DimPlot(object = srat_cr, label = TRUE, repel = TRUE, split.by = 'condition') + NoLegend()
+ggsave(filename = paste0(resDir, '/cellRangerPeaks_umap_perCondition_v1.pdf'), height =8, width = 30 )
 
-srat_cr <- RunPCA(srat_cr, verbose = FALSE, weight.by.var = TRUE)
-ElbowPlot(srat_cr, ndims = 30)
-
-srat_cr <- RunUMAP(srat_cr, dims = 1:40, n.neighbors = 50, min.dist = 0.3,  reduction.name = "umap_sct")
-DimPlot(srat_cr, label = TRUE, repel = TRUE, group.by = 'celltypes', reduction = 'umap_sct') + NoLegend()
-
-DimPlot(srat_cr, label = TRUE, repel = TRUE, group.by = 'subtypes', reduction = 'umap_sct') + NoLegend()
-
-saveRDS(srat_cr, paste0("/groups/tanaka/Collaborations/Jingkui-Elad/scMultiome/snATACseq/",
-                   "seuratObj_multiome_snRNA.annotated_scATAC.merged.peaks.cellranger.441K_v4_testByJK_", 
-                   "logNormal_SCT_umap_lsiUmap_sctUmap.rds"))
 
 ##########################################
 # link peaks and coveragePlots
@@ -526,4 +511,5 @@ p1 <- CoveragePlot(
 
 patchwork::wrap_plots(p1)
 
+ggsave(filename = paste0(resDir, '/LinkPeaks_test.example.ITGAM.pdf'), height =8, width = 12)
 
