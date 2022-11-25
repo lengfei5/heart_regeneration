@@ -448,7 +448,6 @@ refs_file = paste0('/groups/tanaka/Collaborations/Jingkui-Elad/scMultiome/aa_sub
 refs = readRDS(file = refs_file)
 table(refs$subtypes)
 
-
 ## prepare the parameters for RCTD coarse cell types
 Run.RCTD.coarse.celltypes = FALSE
 if(Run.RCTD.coarse.celltypes){
@@ -482,9 +481,12 @@ if(Run.RCTD.coarse.celltypes){
   
 }
 
-## preapre the paramters for RCTD subtypes
+##
 refs$celltype_toUse = as.character(refs$subtypes)
 refs$celltype_toUse = gsub('Mo/Macs', 'Mo.Macs', refs$celltype_toUse)
+
+
+## preapre the paramters for RCTD subtypes
 DefaultAssay(refs) = 'RNA'
 DefaultAssay(st) = 'Spatial'
 require_int_SpatialRNA = FALSE
