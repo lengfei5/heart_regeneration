@@ -538,6 +538,7 @@ Convert.batch.corrected.expression.matrix.to.UMIcount = function(refs){
 Run.celltype.deconvolution.RCTD = function(st, # spatial transcriptome seurat object 
                                            refs, # scRNA-seq reference with annotation names celltype_toUse
                                            condition.specific.ref = FALSE,
+                                           condition.specific_celltypes = NULL,
                                            RCTD_out = '../results/RCTD_out', 
                                            require_int_SpatialRNA = FALSE,
                                            max_cores = 16,
@@ -594,13 +595,29 @@ Run.celltype.deconvolution.RCTD = function(st, # spatial transcriptome seurat ob
     
     
     ## prepare condition-specific refs
-    if(condition.specific.ref){
+    if(condition.specific.ref | !is.null(condition.specific_celltypes)){
       cat('-- prepare refs for ', cc[n], '\n')
-      refs_sub = subset(refs, condition == cc[n])
-      celltypes_nbs = table(refs_sub$celltype_toUse)
-      celltypes_nbs = celltypes_nbs[which(celltypes_nbs>30)]
-      refs_sub = subset(refs_sub, cells = colnames(refs_sub)[!is.na(match(refs_sub$celltype_toUse, 
-                                                                          names(celltypes_nbs)))])
+      
+      if(is.null(condition.specific_celltypes)){
+        cat('subset refs based on the condition -- ', cc[n], '\n')
+        refs_sub = subset(refs, condition == cc[n])
+        
+        celltypes_nbs = table(refs_sub$celltype_toUse)
+        celltypes_nbs = celltypes_nbs[which(celltypes_nbs>30)]
+        refs_sub = subset(refs_sub, cells = colnames(refs_sub)[!is.na(match(refs_sub$celltype_toUse, 
+                                                                            names(celltypes_nbs)))])
+      }else{
+        cat('subset refs based on the  -- condition.specific_celltypes ', cc[n], '\n')
+        ii_col = which(colnames(condition.specific_celltypes) == cc[n])
+        if(length(ii_col) != 1) stop(paste0('Error -- no celltypes found for ', cc[n]))
+        
+        celltypes_sel = rownames(condition.specific_celltypes)[which(!is.na(condition.specific_celltypes[, ii_col]))]
+        
+        refs_sub = subset(refs, cells = colnames(refs)[!is.na(match(refs$celltype_toUse, 
+                                                                            celltypes_sel))])
+        
+      }
+      
       
       E_refs = GetAssayData(object = refs_sub, slot = "data")
       E_refs = expm1(E_refs) # linear scale of corrected gene expression

@@ -376,7 +376,6 @@ saveRDS(sub.combine, file = paste0(RdataDir, 'seuratObject_', species, version.a
 ##########################################
 # subset FB 
 ##########################################
-
 Test.bach.correction.FB = FALSE
 if(Test.bach.correction.FB){
   sub.obj = subset(aa, labels == 'FB')

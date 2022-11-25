@@ -481,10 +481,39 @@ if(Run.RCTD.coarse.celltypes){
   
 }
 
-##
+## prepare the celltype to use and also specify the time-specific subtypes
 refs$celltype_toUse = as.character(refs$subtypes)
+refs$condition = gsub('_scRNA', '', refs$condition)
 refs$celltype_toUse = gsub('Mo/Macs', 'Mo.Macs', refs$celltype_toUse)
+refs$celltype_toUse = gsub("[(]", '', refs$celltype_toUse)
+refs$celltype_toUse = gsub("[)]", '', refs$celltype_toUse)
 
+condition.specific_celltypes = openxlsx::read.xlsx('../data/subtypes_timespecific.xlsx', rowNames = TRUE)
+colnames(condition.specific_celltypes) = gsub('day', 'd', 
+                                              paste0('Amex_', colnames(condition.specific_celltypes)))
+
+
+names = gsub('MO/Macs', 'Mo.Macs', rownames(condition.specific_celltypes))
+names = gsub("[(]", '', names)
+names = gsub("[)]", '', names)
+names = gsub('_PROL', '_Prol', names)
+names = gsub('_prol', '_Prol', names)
+names = gsub("CM_ROBO2", "CM_ven_Cav3_1", names)
+names = gsub("CM_CAV3.1", "CM_ven_Robo2", names)
+names = gsub("CM_IS_Prol", "CM_Prol_IS", names)
+names = gsub("CM_Prol1", "CM_Prol_1", names)
+names = gsub("CM_Prol2", "CM_Prol_2", names)
+names = gsub("CM_Prol3", "CM_Prol_3", names)
+names = gsub("CM_atria$", "CM_Atria", names)
+names = gsub("CM_atria_tagln", "CM_Atria_Tagln", names)
+names = gsub("RBC_Prol", "Proliferating_RBC", names)
+names = gsub("Megakeryocytes_Prol", "Proliferating_Megakeryocytes", names)
+
+rownames(condition.specific_celltypes) = names
+
+celltypes = unique(refs$celltype_toUse)
+mm = match(rownames(condition.specific_celltypes), celltypes)
+cat(length(which(is.na(mm))), ' cell types missing in the condition.specific_celltypes \n')
 
 ## preapre the paramters for RCTD subtypes
 DefaultAssay(refs) = 'RNA'
@@ -492,15 +521,15 @@ DefaultAssay(st) = 'Spatial'
 require_int_SpatialRNA = FALSE
 
 condition.specific.ref = TRUE
-refs$condition = gsub('_scRNA', '', refs$condition)
 
-RCTD_out = paste0(resDir, '/RCTD_subtype_out_42subtypes_ref.time.specific_v4.2')
+RCTD_out = paste0(resDir, '/RCTD_subtype_out_42subtypes_ref.time.specific_v4.3')
 max_cores = 32
 # st = subset(st, condition == 'Amex_d4')
 
 source('functions_Visium.R')
 Run.celltype.deconvolution.RCTD(st, refs, 
                                 condition.specific.ref = condition.specific.ref,
+                                condition.specific_celltypes = condition.specific_celltypes,
                                 require_int_SpatialRNA = require_int_SpatialRNA,
                                 max_cores = max_cores,
                                 RCTD_out = RCTD_out,
