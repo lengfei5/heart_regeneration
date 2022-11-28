@@ -1014,6 +1014,12 @@ plot.RCTD.results = function(RCTD_out = '../results/RCTD_out',
       # set color vector
       getPalette <- colorRampPalette(brewer.pal(9, "Set1"))
       
+      ## Preprocess coordinates 
+      spatial_coord <-  spatialRNA@coords %>%
+        tibble::rownames_to_column("ID")
+      
+      weights = norm_weights[match(spatial_coord$ID, rownames(norm_weights)), ]
+      
       # set the color vectors for all cell types
       # n <- 60
       # qual_col_pals = brewer.pal.info[brewer.pal.info$category == 'qual',]
@@ -1022,13 +1028,6 @@ plot.RCTD.results = function(RCTD_out = '../results/RCTD_out',
       # use a panel of colors from https://gotellilab.github.io/GotelliLabMeetingHacks/NickGotelli/ColorPalettes.html
       #tol10qualitative=c("#332288", "#88CCEE", "#44AA99", "#117733", "#999933", "#DDCC77",
       #                   "#661100", "#CC6677", "#882255", "#AA4499")
-      
-      
-      ## Preprocess coordinates 
-      spatial_coord <-  spatialRNA@coords %>%
-        tibble::rownames_to_column("ID")
-      
-      weights = norm_weights[match(spatial_coord$ID, rownames(norm_weights)), ]
       
       Process_celltype_weight_singlet = FALSE 
       if(Process_celltype_weight_singlet){ ### if use the doublet mode 
@@ -1117,8 +1116,8 @@ plot.RCTD.results = function(RCTD_out = '../results/RCTD_out',
         sub.spatial$celltype = as.numeric(as.character(sub.spatial$celltype))
         sub.spatial = data.frame(sub.spatial)
         
-        p1 = ggplot(data = sub.spatial, aes(x = x, y = y, size = celltype)) +
-          geom_point(color = col_ct[m]) +  
+        p1 = ggplot(data = sub.spatial, aes(x = x, y = y)) +
+          geom_point(aes(size = celltype), color = col_ct[m]) +  
           #scale_size_continuous(range = c(0, 0.7)) +
           #geom_raster() +
           ggplot2::labs(title = cell_types_plt[m]) +
@@ -1131,7 +1130,8 @@ plot.RCTD.results = function(RCTD_out = '../results/RCTD_out',
             # panel.background = element_blank(),
             # plot.margin = margin(20, 20, 20, 20),
             plot.title = ggplot2::element_text(hjust = 0.5, size = 20)) +
-          ggplot2::guides(fill = guide_legend(ncol = 1))
+          ggplot2::guides(fill = guide_legend(ncol = 1)) + 
+          scale_size(limits = c(0,1), breaks = seq(0, 1, by = 0.2))
         
         plot(p1)
         
