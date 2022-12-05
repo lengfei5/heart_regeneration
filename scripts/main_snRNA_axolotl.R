@@ -24,7 +24,7 @@ source('functions_scRNAseq.R')
 source('functions_Visium.R')
 
 require(Seurat)
-#require(sctransform)
+#require(sctransform)3
 library(pryr) # monitor the memory usage
 require(ggplot2)
 require(dplyr)

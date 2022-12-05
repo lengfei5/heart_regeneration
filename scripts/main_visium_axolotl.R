@@ -21,6 +21,7 @@ if(!dir.exists(RdataDir)) dir.create(RdataDir)
 source('functions_Visium.R')
 library(pryr) # monitor the memory usage
 require(ggplot2)
+options(future.globals.maxSize = 120000 * 1024^2)
 
 mem_used()
 
@@ -448,45 +449,14 @@ refs_file = paste0('/groups/tanaka/Collaborations/Jingkui-Elad/scMultiome/aa_sub
 refs = readRDS(file = refs_file)
 table(refs$subtypes)
 
-## prepare the parameters for RCTD coarse cell types
-Run.RCTD.coarse.celltypes = FALSE
-if(Run.RCTD.coarse.celltypes){
-  # define coarse clusters
-  refs$celltypes = as.character(refs$subtypes)
-  
-  refs$celltypes[grep('CM_|CMs_|_CM|_CM_', refs$subtypes)] = 'CM'
-  refs$celltypes[grep('EC_|_EC', refs$subtypes)] = 'EC'
-  refs$celltypes[grep('FB_', refs$subtypes)] = 'FB'
-  refs$celltypes[grep('B_cells', refs$subtypes)] = 'Bcell'
-  
-  refs$celltypes[grep('Macrophages|_MF', refs$subtypes)] = 'Macrophages'
-  refs$celltypes[grep('Megakeryocytes', refs$subtypes)] = 'Megakeryocytes'
-  refs$celltypes[grep('RBC', refs$subtypes)] = 'RBC'
-  
-  refs$celltype_toUse = refs$celltypes
-  DefaultAssay(refs) = 'RNA'
-  DefaultAssay(st) = 'Spatial'
-  require_int_SpatialRNA = FALSE
-  RCTD_out = paste0(resDir, '/RCTD_coarse_out_v1')
-  
-  max_cores = 16
-  
-  source('functions_Visium.R')
-  
-  Run.celltype.deconvolution.RCTD(st, refs, 
-                                  require_int_SpatialRNA = require_int_SpatialRNA,
-                                  max_cores = max_cores,
-                                  RCTD_out = RCTD_out
-  )
-  
-}
-
 ## prepare the celltype to use and also specify the time-specific subtypes
 refs$celltype_toUse = as.character(refs$subtypes)
 refs$condition = gsub('_scRNA', '', refs$condition)
 refs$celltype_toUse = gsub('Mo/Macs', 'Mo.Macs', refs$celltype_toUse)
 refs$celltype_toUse = gsub("[(]", '', refs$celltype_toUse)
 refs$celltype_toUse = gsub("[)]", '', refs$celltype_toUse)
+
+table(refs$celltype_toUse)
 
 condition.specific_celltypes = openxlsx::read.xlsx('../data/subtypes_timespecific.xlsx', rowNames = TRUE)
 colnames(condition.specific_celltypes) = gsub('day', 'd', 
@@ -537,10 +507,47 @@ Run.celltype.deconvolution.RCTD(st, refs,
                                 PLOT.scatterpie = FALSE,
 )
 
+saveRDS(condition.specific_celltypes, 'RCTD_refs_condition_specificity.rds')
+saveRDS(refs, file = paste0(RdataDir, 'RCTD_refs_subtypes_final_20221117.rds'))
+
 source('functions_Visium.R')
 plot.RCTD.results(RCTD_out = RCTD_out,
                   plot.RCTD.summary = FALSE)
 
+
+
+## prepare the parameters for RCTD coarse cell types
+Run.RCTD.coarse.celltypes = FALSE
+if(Run.RCTD.coarse.celltypes){
+  # define coarse clusters
+  refs$celltypes = as.character(refs$subtypes)
+  
+  refs$celltypes[grep('CM_|CMs_|_CM|_CM_', refs$subtypes)] = 'CM'
+  refs$celltypes[grep('EC_|_EC', refs$subtypes)] = 'EC'
+  refs$celltypes[grep('FB_', refs$subtypes)] = 'FB'
+  refs$celltypes[grep('B_cells', refs$subtypes)] = 'Bcell'
+  
+  refs$celltypes[grep('Macrophages|_MF', refs$subtypes)] = 'Macrophages'
+  refs$celltypes[grep('Megakeryocytes', refs$subtypes)] = 'Megakeryocytes'
+  refs$celltypes[grep('RBC', refs$subtypes)] = 'RBC'
+  
+  refs$celltype_toUse = refs$celltypes
+  DefaultAssay(refs) = 'RNA'
+  DefaultAssay(st) = 'Spatial'
+  require_int_SpatialRNA = FALSE
+  RCTD_out = paste0(resDir, '/RCTD_coarse_out_v1')
+  
+  max_cores = 16
+  
+  source('functions_Visium.R')
+  
+  Run.celltype.deconvolution.RCTD(st, refs, 
+                                  require_int_SpatialRNA = require_int_SpatialRNA,
+                                  max_cores = max_cores,
+                                  RCTD_out = RCTD_out
+  )
+  
+}
 
 ########################################################
 ########################################################
