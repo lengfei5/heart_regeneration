@@ -314,6 +314,10 @@ if(Merge_scATAC_snRNA){
 ##########################################
 # QCs of scATAC-seq
 ##########################################
+srat_cr = readRDS(file = paste0(RdataDir, 
+                               'seuratObj_multiome_snRNA.annotated_scATAC.merged.peaks.cr.',
+                               '584K.annot_38280cells.rds'))
+
 #srat_cr <- NucleosomeSignal(srat_cr)
 #srat_cr <- TSSEnrichment(srat_cr, fast = FALSE)
 srat_cr$high.tss <- ifelse(srat_cr$TSS.enrichment > 5, 'High', 'Low')
