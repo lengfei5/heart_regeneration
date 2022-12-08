@@ -561,6 +561,9 @@ source('functions_Visium.R')
 load(file = paste0(RdataDir, 'seuratObject_design_variableGenes_umap.clustered', species, '.Rdata'))
 st$condition = factor(st$condition, levels = design$condition)
 
+condition.specific_celltypes, 'RCTD_refs_condition_specificity.rds')
+saveRDS(refs, file = paste0(RdataDir, 'RCTD_refs_subtypes_final_20221117.rds'))
+
 cat('visium conditions :\n')
 print(table(st$condition))
 cc = design$condition
@@ -621,6 +624,7 @@ run_bayesSpace(st, outDir = paste0(resDir, '/bayesSpace/'))
 ##########################################
 load(file = paste0(RdataDir, 'seuratObject_design_variableGenes_umap.clustered_manualSegmentation', 
                    species, '.Rdata'))
+
 source('functions_Visium.R')
 outDir = paste0(resDir, '/neighborhood_test/')
 RCTD_out = '../results/visium_axolotl_R12830_resequenced_20220308/RCTD_subtype_out_v3.5'
@@ -628,7 +632,6 @@ RCTD_out = '../results/visium_axolotl_R12830_resequenced_20220308/RCTD_subtype_o
 run_neighborhood_analysis(st, 
                           outDir = outDir,
                           RCTD_out = RCTD_out)
-
 
 ##########################################
 # step 3) ligand-receptor-target prediction 

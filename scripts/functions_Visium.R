@@ -1156,7 +1156,6 @@ plot.RCTD.results = function(RCTD_out = '../results/RCTD_out',
 
 
 
-
 ########################################################
 ########################################################
 # Section : define boarder zone, injury zone and remote zone
@@ -1417,7 +1416,6 @@ run_bayesSpace = function(st,
 }
 
 
-
 ########################################################
 ########################################################
 # Section : Analyze the cell type proximity
@@ -1584,6 +1582,210 @@ run_neighborhood_analysis = function(st,
   }
   
 }
+
+
+########################################################
+########################################################
+# test colocalization analysis wiht mistyR 
+# original code from : 
+# https://github.com/lengfei5/visium_heart/blob/master/st_snRNAseq/05_colocalization/colocalize_misty.R
+########################################################
+########################################################
+colocalization_analysis_misty = function()
+{
+  library(tidyverse)
+  library(Seurat)
+  library(mistyR)
+  source("misty_utilities.R")
+  future::plan(future::multisession)
+  
+  outDir = paste0(resDir, '/colocalization_misty')
+  system(paste0('mkdir -p ', outDir))
+  
+  # Pipeline definition:
+  run_colocalization <- function(slide, 
+                                 assay, 
+                                 useful_features, 
+                                 out_label, 
+                                 misty_out_alias = paste0(outDir, "/cm_")) 
+  {
+    # Define assay of each view ---------------
+    view_assays <- list("main" = assay,
+                        "juxta" = assay,
+                        "para" = assay)
+    
+    # Define features of each view ------------
+    view_features <- list("main" = useful_features, 
+                          "juxta" = useful_features,
+                          "para" = useful_features)
+    
+    # Define spatial context of each view -----
+    view_types <- list("main" = "intra", 
+                       "juxta" = "juxta",
+                       "para" = "para")
+    
+    # Define additional parameters (l in case of paraview,
+    # n of neighbors in case of juxta) --------
+    view_params <- list("main" = NULL, 
+                        "juxta" = 5,
+                        "para" = 15)
+    
+    misty_out <- paste0(misty_out_alias, 
+                        out_label, "_", assay)
+    
+    run_misty_seurat(visium.slide = slide,
+                     view.assays = view_assays,
+                     view.features = view_features,
+                     view.types = view_types,
+                     view.params = view_params,
+                     spot.ids = NULL,
+                     out.alias = misty_out)
+    
+    return(misty_out)
+  }
+  
+  # Main ------------------------------------------------------------------------
+  cat('-- check visium conditions -- \n')
+  st$condition = droplevels(as.factor(st$condition))
+  print(table(st$condition))
+  cc = names(table(st$condition))
+  
+  RCTD_out = paste0(resDir, '/RCTD_subtype_out_42subtypes_ref.time.specific_v4.3')
+  
+  Idents(st) = st$condition
+  
+  for(n in 1:length(cc))
+  {
+    # n = 2
+    cat('slice -- ', cc[n], '\n')
+    slice = cc[n]
+    stx = subset(st, condition == slice)
+    DefaultAssay(stx) = 'Spatial'
+    
+    Select.Boader.Zone = FALSE
+    if(Select.Boader.Zone){
+      stx$segmentation = as.factor(stx$segmentation)
+      Idents(stx) = stx$segmentation
+      SpatialDimPlot(stx, images = slice)
+      print(table(stx$segmentation))
+      
+    }
+    
+    # import the cell type deconvolution result
+    myRCTD = readRDS(file = paste0(RCTD_out,  '/RCTD_out_doubletMode_', slice, '.rds'))
+    results <- myRCTD@results
+    
+    norm_weights = normalize_weights(results$weights) 
+    #cell_type_names <- myRCTD@cell_type_info$info[[2]] #list of cell type names
+    
+    SPOTlight::plotCorrelationMatrix(as.matrix(norm_weights))
+    ggsave(paste0(outDir, '/CorrelationMatrix_allRegions', slice, '.pdf'), width = 10, height = 10)
+    
+    #plotInteractions(as.matrix(norm_weights), which = "heatmap", metric = "jaccard")
+    #plotInteractions(as.matrix(norm_weights), which = "network")
+    
+    
+    # use a threshold to binarize weights
+    weights = norm_weights >= 0.1 
+    index_border = match(colnames(stx)[which(stx$segmentation == 'BZ')], rownames(weights))
+    
+  # Getting sample annotations --------------------------------------------------
+  #sample_dict <- read.table("./markers/visium_annotations_ext.txt", 
+  #                          sep = "\t", header = T)
+  slide_files_folder <- paste0(resDir, '/RCTD_subtype_out_42subtypes_ref.time.specific_v4.3')
+  slide_files <- list.files(path = slide_files_folder, pattern = '*.rds')
+  slide_ids <- gsub("[.]rds", "", slide_files)
+  
+  # Cell2location proportions - complete
+  assay_label <- "c2l_props"
+  print(slide_file)
+  
+  # Read spatial transcriptomics data
+  slide_id <- gsub("[.]rds", "", slide_file)
+  slide <- readRDS(paste0(slide_files_folder, slide_file))
+  assay <- assay_label
+  DefaultAssay(slide) <- assay
+  useful_features <- rownames(slide)
+  useful_features <- useful_features[! useful_features %in% "prolif"]
+  
+  mout <- run_colocalization(slide = slide,
+                             useful_features = useful_features,
+                             out_label = slide_id,
+                             assay = assay,
+                             misty_out_alias = "./results/tissue_structure/misty/cell_map_props/cm_")
+  
+  misty_res_slide <- collect_results(mout)
+  
+  plot_folder <- paste0(mout, "/plots")
+  
+  system(paste0("mkdir ", plot_folder))
+  
+  pdf(file = paste0(plot_folder, "/", slide_id, "_", "summary_plots.pdf"))
+  
+  mistyR::plot_improvement_stats(misty_res_slide)
+  mistyR::plot_view_contributions(misty_res_slide)
+  
+  mistyR::plot_interaction_heatmap(misty_res_slide, "intra", cutoff = 0)
+  mistyR::plot_interaction_communities(misty_res_slide, "intra", cutoff = 0.5)
+  
+  mistyR::plot_interaction_heatmap(misty_res_slide, "juxta_5", cutoff = 0)
+  mistyR::plot_interaction_communities(misty_res_slide, "juxta_5", cutoff = 0.5)
+  
+  mistyR::plot_interaction_heatmap(misty_res_slide, "para_15", cutoff = 0)
+  mistyR::plot_interaction_communities(misty_res_slide, "para_15", cutoff = 0.5)
+  
+  dev.off()
+  
+  # return(mout)
+  
+  # Cell2location densities - complete
+  assay_label <- "c2l"
+  
+  misty_outs <- map(slide_files, function(slide_file){
+    print(slide_file)
+    # Read spatial transcriptomics data
+    slide_id <- gsub("[.]rds", "", slide_file)
+    slide <- readRDS(paste0(slide_files_folder, slide_file))
+    assay <- assay_label
+    DefaultAssay(slide) <- assay
+    useful_features <- rownames(slide)
+    useful_features <- useful_features[! useful_features %in% "prolif"]
+    
+    mout <- run_colocalization(slide = slide,
+                               useful_features = useful_features,
+                               out_label = slide_id,
+                               assay = assay,
+                               misty_out_alias = "./results/tissue_structure/misty/cell_map/cm_")
+    
+    misty_res_slide <- collect_results(mout)
+    
+    plot_folder <- paste0(mout, "/plots")
+    
+    system(paste0("mkdir ", plot_folder))
+    
+    pdf(file = paste0(plot_folder, "/", slide_id, "_", "summary_plots.pdf"))
+    
+    mistyR::plot_improvement_stats(misty_res_slide)
+    mistyR::plot_view_contributions(misty_res_slide)
+    
+    mistyR::plot_interaction_heatmap(misty_res_slide, "intra", cutoff = 0)
+    mistyR::plot_interaction_communities(misty_res_slide, "intra", cutoff = 0.5)
+    
+    mistyR::plot_interaction_heatmap(misty_res_slide, "juxta_5", cutoff = 0)
+    mistyR::plot_interaction_communities(misty_res_slide, "juxta_5", cutoff = 0.5)
+    
+    mistyR::plot_interaction_heatmap(misty_res_slide, "para_15", cutoff = 0)
+    mistyR::plot_interaction_communities(misty_res_slide, "para_15", cutoff = 0.5)
+    
+    dev.off()
+    
+    return(mout)
+    
+  })
+  }
+  
+}
+
 ##########################################
 # The original code from somewhere for the cell type proximity network analysis 
 # paper https://www.nature.com/articles/s41467-021-21892-z
@@ -1785,170 +1987,6 @@ analyze.celltype.proximity.network = function()
 
 ########################################################
 ########################################################
-# test colocalization analysis wiht mistyR 
-# original code from : 
-# https://github.com/lengfei5/visium_heart/blob/master/st_snRNAseq/05_colocalization/colocalize_misty.R
-########################################################
-########################################################
-colocalization_analysis_misty = function()
-{
-  # Copyright (c) [2021] [Ricardo O. Ramirez Flores]
-  # roramirezf@uni-heidelberg.de
-  
-  #' Run MISTy for spatial interactions between slides
-  #' 
-  library(tidyverse)
-  library(Seurat)
-  library(mistyR)
-  source("./analysis/utils/misty_utilities.R")
-  
-  future::plan(future::multisession)
-  
-  # Pipeline definition:
-  run_colocalization <- function(slide, 
-                                 assay, 
-                                 useful_features, 
-                                 out_label, 
-                                 misty_out_alias = "./results/tissue_structure/misty/cell_map/cm_") {
-    
-    # Define assay of each view ---------------
-    view_assays <- list("main" = assay,
-                        "juxta" = assay,
-                        "para" = assay)
-    # Define features of each view ------------
-    view_features <- list("main" = useful_features, 
-                          "juxta" = useful_features,
-                          "para" = useful_features)
-    # Define spatial context of each view -----
-    view_types <- list("main" = "intra", 
-                       "juxta" = "juxta",
-                       "para" = "para")
-    # Define additional parameters (l in case of paraview,
-    # n of neighbors in case of juxta) --------
-    view_params <- list("main" = NULL, 
-                        "juxta" = 5,
-                        "para" = 15)
-    
-    misty_out <- paste0(misty_out_alias, 
-                        out_label, "_", assay)
-    
-    run_misty_seurat(visium.slide = slide,
-                     view.assays = view_assays,
-                     view.features = view_features,
-                     view.types = view_types,
-                     view.params = view_params,
-                     spot.ids = NULL,
-                     out.alias = misty_out)
-    
-    return(misty_out)
-  }
-  
-  # Main ------------------------------------------------------------------------
-  
-  # Getting sample annotations --------------------------------------------------
-  
-  #sample_dict <- read.table("./markers/visium_annotations_ext.txt", 
-  #                          sep = "\t", header = T)
-  
-  slide_files_folder <- "./processed_visium/objects/"
-  slide_files <- list.files(slide_files_folder)
-  slide_ids <- gsub("[.]rds", "", slide_files)
-  
-  # Cell2location proportions - complete
-  assay_label <- "c2l_props"
-  
-  misty_outs <- map(slide_files, function(slide_file){
-    print(slide_file)
-    # Read spatial transcriptomics data
-    slide_id <- gsub("[.]rds", "", slide_file)
-    slide <- readRDS(paste0(slide_files_folder, slide_file))
-    assay <- assay_label
-    DefaultAssay(slide) <- assay
-    useful_features <- rownames(slide)
-    useful_features <- useful_features[! useful_features %in% "prolif"]
-    
-    mout <- run_colocalization(slide = slide,
-                               useful_features = useful_features,
-                               out_label = slide_id,
-                               assay = assay,
-                               misty_out_alias = "./results/tissue_structure/misty/cell_map_props/cm_")
-    
-    misty_res_slide <- collect_results(mout)
-    
-    plot_folder <- paste0(mout, "/plots")
-    
-    system(paste0("mkdir ", plot_folder))
-    
-    pdf(file = paste0(plot_folder, "/", slide_id, "_", "summary_plots.pdf"))
-    
-    mistyR::plot_improvement_stats(misty_res_slide)
-    mistyR::plot_view_contributions(misty_res_slide)
-    
-    mistyR::plot_interaction_heatmap(misty_res_slide, "intra", cutoff = 0)
-    mistyR::plot_interaction_communities(misty_res_slide, "intra", cutoff = 0.5)
-    
-    mistyR::plot_interaction_heatmap(misty_res_slide, "juxta_5", cutoff = 0)
-    mistyR::plot_interaction_communities(misty_res_slide, "juxta_5", cutoff = 0.5)
-    
-    mistyR::plot_interaction_heatmap(misty_res_slide, "para_15", cutoff = 0)
-    mistyR::plot_interaction_communities(misty_res_slide, "para_15", cutoff = 0.5)
-    
-    dev.off()
-    
-    return(mout)
-    
-  })
-  
-  # Cell2location densities - complete
-  assay_label <- "c2l"
-  
-  misty_outs <- map(slide_files, function(slide_file){
-    print(slide_file)
-    # Read spatial transcriptomics data
-    slide_id <- gsub("[.]rds", "", slide_file)
-    slide <- readRDS(paste0(slide_files_folder, slide_file))
-    assay <- assay_label
-    DefaultAssay(slide) <- assay
-    useful_features <- rownames(slide)
-    useful_features <- useful_features[! useful_features %in% "prolif"]
-    
-    mout <- run_colocalization(slide = slide,
-                               useful_features = useful_features,
-                               out_label = slide_id,
-                               assay = assay,
-                               misty_out_alias = "./results/tissue_structure/misty/cell_map/cm_")
-    
-    misty_res_slide <- collect_results(mout)
-    
-    plot_folder <- paste0(mout, "/plots")
-    
-    system(paste0("mkdir ", plot_folder))
-    
-    pdf(file = paste0(plot_folder, "/", slide_id, "_", "summary_plots.pdf"))
-    
-    mistyR::plot_improvement_stats(misty_res_slide)
-    mistyR::plot_view_contributions(misty_res_slide)
-    
-    mistyR::plot_interaction_heatmap(misty_res_slide, "intra", cutoff = 0)
-    mistyR::plot_interaction_communities(misty_res_slide, "intra", cutoff = 0.5)
-    
-    mistyR::plot_interaction_heatmap(misty_res_slide, "juxta_5", cutoff = 0)
-    mistyR::plot_interaction_communities(misty_res_slide, "juxta_5", cutoff = 0.5)
-    
-    mistyR::plot_interaction_heatmap(misty_res_slide, "para_15", cutoff = 0)
-    mistyR::plot_interaction_communities(misty_res_slide, "para_15", cutoff = 0.5)
-    
-    dev.off()
-    
-    return(mout)
-    
-  })
-  
-  
-}
-
-########################################################
-########################################################
 # Section : functions for SpatialDE analysis
 # test SPARK first (original code from https://xzhoulab.github.io/SPARK/02_SPARK_Example/)
 ########################################################
@@ -2056,6 +2094,5 @@ Find.SpatialDE = function(aa, use.method = 'sparkX')
   }
   
   return(mtest)
- 
 }
-
+  
