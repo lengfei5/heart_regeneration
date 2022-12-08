@@ -37,26 +37,75 @@ mem_used()
 ##########################################
 # load processed scRNA-seq and visium data
 ##########################################
+# load ST data with additional region annotations
 load(file = paste0(RdataDir, 'seuratObject_design_variableGenes_umap.clustered_manualSegmentation', 
                    species, '.Rdata')) # visium data
 
-## snRNA-seq as reference
-refs_file = '/groups/tanaka/Collaborations/Jingkui-Elad/scMultiome/aa_annotated_no_doublets_20221004_2.rds'
-refs = readRDS(file = refs_file)
+table(st$segmentation, st$condition)
+
+## snRNA-seq reference  
+refs = readRDS(file = paste0(RdataDir, 'RCTD_refs_subtypes_final_20221117.rds'))
+refs$subtypes = refs$celltype_toUse # clean the special symbols
+refs$celltypes = refs$celltype_toUse
+#refs_file = '/groups/tanaka/Collaborations/Jingkui-Elad/scMultiome/aa_annotated_no_doublets_20221004_2.rds'
+#refs = readRDS(file = refs_file)
 table(refs$subtypes)
+
+# subtype time-specificity 
+condition.specific_celltypes = readRDS(paste0(RdataDir, 'RCTD_refs_condition_specificity.rds'))
+
+########################################################
+########################################################
+# Section : cell neighborhood analysis
+# 
+########################################################
+########################################################
+source('functions_Visium.R')
+outDir = paste0(resDir, '/neighborhood_test/')
+RCTD_out = '../results/visium_axolotl_R12830_resequenced_20220308/RCTD_subtype_out_v3.5'
+
+run_neighborhood_analysis(st, 
+                          outDir = outDir,
+                          RCTD_out = RCTD_out)
+
+########################################################
+########################################################
+# Section : ligand-receptor prediction analysis with LIANA 
+# and NicheNet
+########################################################
+########################################################
 
 ##########################################
 # run LIANA 
 ##########################################
 # set parameter for ligand-receptor analysis
-outDir = paste0(resDir, '/Ligand_Receptor_analysis/LIANA_v2_test')
+outDir = paste0(resDir, '/Ligand_Receptor_analysis/LIANA_v3_42subtypes_receiverCells.CM_IS')
 
-refs$celltypes = refs$subtypes
-celltypes = c('Mono_Macrophages', 'Proliferating_CM', 'FB_1', 'Injury_specific_EC')
+
+
+timepoint_specific = TRUE
+# define a list of cell type for each time point, either manual defined or from neighborhood enrichment analysis
+celltypes = c('EC', 'EC_NOS3', 'EC_IS_IARS1', 'FB_IS_TFPI2', 'Mo.Macs_SNX22', 'Neu_IL1R1', 
+              'CM_IS', "RBC")
+celltypes_timeSpecific = list(day1 = c('EC', 'EC_NOS3', 'EC_IS_IARS1', 'FB_IS_TFPI2', 'Mo.Macs_SNX22', 'Neu_IL1R1', 
+                                   'CM_IS', "RBC"),
+                          day4 = c('EC_IS_LOX', 'EC_IS_Prol', 'Mo.Macs_SNX22', 'Neu_DYSF', 'CM_IS', 
+                                   'CM_Prol_IS', 'RBC'),
+                          day7 = c('EC_IS_LOX', 'EC_IS_Prol', 'Mo.Macs_FAXDC2', 'Neu_DYSF', 'Neu_IL1R1', 'CM_IS', 
+                                   'CM_Prol_IS', 'RBC'),
+                          day14 = c('EC_IS_LOX', 'EC_IS_Prol', 'FB_PKD1', 'Neu_DYSF', 'CM_IS', 'Megakeryocytes', 
+                                    'RBC')
+                          )
 ntop = 100
 
 source('functions_cccInference.R')
-run_LIANA(refs, celltypes = celltypes, outDir = outDir, ntop = ntop)
+
+run_LIANA(refs, 
+          celltypes_timeSpecific = celltypes_timeSpecific,
+          timepoint_specific = timepoint_specific,
+          receiver_cells = 'CM_IS',
+          outDir = outDir, 
+          ntop = ntop)
 
 
 ########################################################

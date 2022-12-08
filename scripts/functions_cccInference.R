@@ -13,12 +13,15 @@
 # 
 ########################################################
 ########################################################
+# original code from https://saezlab.github.io/liana/articles/liana_tutorial.html
 run_LIANA = function(refs,
-                     celltypes = c('Mono_Macrophages', 'Proliferating_CM', 'Neutrophil', 'Injury_specific_EC'),
+                     celltypes = NULL
+                     celltypes_timeSpecific = NULL,
+                     timepoint_specific = FALSE,
+                     receiver_cells = 'CM_IS',
                      outDir = '../results/Ligand_Receptor_analysis',
                      ntop = 50,
-                     RUN.CPDB.alone = FALSE
-) # original code from https://saezlab.github.io/liana/articles/liana_tutorial.html
+                     RUN.CPDB.alone = FALSE)
 {
   require(tidyverse)
   require(magrittr)
@@ -31,13 +34,31 @@ run_LIANA = function(refs,
   require(MatrixGenerics)
   require(sparseMatrixStats)
   
+  ## double check timepoint_specific and celltype 
+  if(!timepoint_specific){
+    cat(' -- no timepoint to consider -- \n')
+    if(is.null(celltypes)) {
+      stop('no cell types selected found \n')
+    }else{
+      if(is.vector(celltypes) != TRUE | length(celltypes) ==0){
+        stop('a vector of cell types expected \n')
+      }else{
+        mm = match(celltypes, refs$celltypes)
+        if(length(which(is.na(mm)))>0){
+          stop('some selected cell types not found in refs -- ', celltypes[which(is.na(mm))])
+        }else{
+          cat(celltypes, '\n')
+          cat('all selected cell types were found in the refs \n')
+        }
+      }
+    }
+  }
+  
+  
   system(paste0('mkdir -p ', outDir))
-  # liana_path <- system.file(package = "liana")
-  # testdata <- readRDS(file.path(liana_path , "testdata", "input", "testdata.rds"))
-  # 
-  # testdata %>% glimpse()
   
   Idents(refs) = as.factor(refs$celltypes)
+  
   subref = subset(refs, cells = colnames(refs)[!is.na(match(refs$celltypes, celltypes))])
   subref$celltypes = droplevels(as.factor(subref$celltypes))
   table(subref$celltypes)
@@ -200,9 +221,7 @@ assembly.liana.plot = function()
     
   }
   
-  
 }
-
 
 ##########################################
 # Combine Liana and NicheNet  

@@ -561,8 +561,6 @@ source('functions_Visium.R')
 load(file = paste0(RdataDir, 'seuratObject_design_variableGenes_umap.clustered', species, '.Rdata'))
 st$condition = factor(st$condition, levels = design$condition)
 
-condition.specific_celltypes, 'RCTD_refs_condition_specificity.rds')
-saveRDS(refs, file = paste0(RdataDir, 'RCTD_refs_subtypes_final_20221117.rds'))
 
 cat('visium conditions :\n')
 print(table(st$condition))
@@ -575,6 +573,7 @@ ggsave(paste0(resDir, '/QCs_nFeatures_mergedReseq.pdf'), width = 12, height = 8)
 
 VlnPlot(st, features = 'nFeature_SCT', group.by = 'condition') +
   geom_hline(yintercept = c(200, 500, 1000, 2000))
+
 ggsave(paste0(resDir, '/QCs_nFeatures_SCT_mergedReseq.pdf'), width = 12, height = 8)
 
 
@@ -606,6 +605,7 @@ if(Import.manual.spatial.domains){
   }
   
 }
+
 st$segmentation = as.factor(st$segmentation)
 Idents(st) = as.factor(st$segmentation)
 SpatialDimPlot(st)
@@ -619,21 +619,3 @@ save(st, design, file = paste0(RdataDir, 'seuratObject_design_variableGenes_umap
 source('functions_Visium.R')
 run_bayesSpace(st, outDir = paste0(resDir, '/bayesSpace/'))
 
-##########################################
-# step 2) cell proximity analysis 
-##########################################
-load(file = paste0(RdataDir, 'seuratObject_design_variableGenes_umap.clustered_manualSegmentation', 
-                   species, '.Rdata'))
-
-source('functions_Visium.R')
-outDir = paste0(resDir, '/neighborhood_test/')
-RCTD_out = '../results/visium_axolotl_R12830_resequenced_20220308/RCTD_subtype_out_v3.5'
-
-run_neighborhood_analysis(st, 
-                          outDir = outDir,
-                          RCTD_out = RCTD_out)
-
-##########################################
-# step 3) ligand-receptor-target prediction 
-##########################################
-source('analysis_ligandReceptor.R')
