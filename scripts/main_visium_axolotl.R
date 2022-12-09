@@ -448,15 +448,22 @@ refs_file = paste0('/groups/tanaka/Collaborations/Jingkui-Elad/scMultiome/aa_sub
 
 refs = readRDS(file = refs_file)
 table(refs$subtypes)
+length(table(refs$subtypes))
+
+refs$subtypes = droplevels(refs$subtypes) 
+length(table(refs$subtypes)) # only 41 subtype annotations from Elad, with additional annotation "doublet" with 0 cell
 
 ## prepare the celltype to use and also specify the time-specific subtypes
 refs$celltype_toUse = as.character(refs$subtypes)
+length(table(refs$celltype_toUse))
+
 refs$condition = gsub('_scRNA', '', refs$condition)
 refs$celltype_toUse = gsub('Mo/Macs', 'Mo.Macs', refs$celltype_toUse)
 refs$celltype_toUse = gsub("[(]", '', refs$celltype_toUse)
 refs$celltype_toUse = gsub("[)]", '', refs$celltype_toUse)
 
 table(refs$celltype_toUse)
+length(table(refs$celltype_toUse))
 
 condition.specific_celltypes = openxlsx::read.xlsx('../data/subtypes_timespecific.xlsx', rowNames = TRUE)
 colnames(condition.specific_celltypes) = gsub('day', 'd', 

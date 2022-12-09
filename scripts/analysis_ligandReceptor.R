@@ -50,6 +50,7 @@ refs$celltypes = refs$celltype_toUse
 #refs_file = '/groups/tanaka/Collaborations/Jingkui-Elad/scMultiome/aa_annotated_no_doublets_20221004_2.rds'
 #refs = readRDS(file = refs_file)
 table(refs$subtypes)
+length(table(refs$subtypes))
 
 # subtype time-specificity 
 condition.specific_celltypes = readRDS(paste0(RdataDir, 'RCTD_refs_condition_specificity.rds'))
@@ -60,13 +61,17 @@ condition.specific_celltypes = readRDS(paste0(RdataDir, 'RCTD_refs_condition_spe
 # 
 ########################################################
 ########################################################
-source('functions_Visium.R')
-outDir = paste0(resDir, '/neighborhood_test/')
-RCTD_out = '../results/visium_axolotl_R12830_resequenced_20220308/RCTD_subtype_out_v3.5'
-
-run_neighborhood_analysis(st, 
-                          outDir = outDir,
-                          RCTD_out = RCTD_out)
+Run_Neighborhood_Enrichment_Analysis = FALSE
+if(Run_Neighborhood_Enrichment_Analysis){
+  source('functions_Visium.R')
+  outDir = paste0(resDir, '/neighborhood_test/')
+  RCTD_out = '../results/visium_axolotl_R12830_resequenced_20220308/RCTD_subtype_out_v3.5'
+  
+  run_neighborhood_analysis(st, 
+                            outDir = outDir,
+                            RCTD_out = RCTD_out)
+  
+}
 
 ########################################################
 ########################################################
@@ -79,14 +84,12 @@ run_neighborhood_analysis(st,
 # run LIANA 
 ##########################################
 # set parameter for ligand-receptor analysis
-outDir = paste0(resDir, '/Ligand_Receptor_analysis/LIANA_v3_42subtypes_receiverCells.CM_IS')
-
-
+outDir = paste0(resDir, '/Ligand_Receptor_analysis/LIANA_v3.2_41subtypes_receiverCells.CM_IS')
 
 timepoint_specific = TRUE
 # define a list of cell type for each time point, either manual defined or from neighborhood enrichment analysis
-celltypes = c('EC', 'EC_NOS3', 'EC_IS_IARS1', 'FB_IS_TFPI2', 'Mo.Macs_SNX22', 'Neu_IL1R1', 
-              'CM_IS', "RBC")
+#celltypes = c('EC', 'EC_NOS3', 'EC_IS_IARS1', 'FB_IS_TFPI2', 'Mo.Macs_SNX22', 'Neu_IL1R1', 
+#              'CM_IS', "RBC")
 celltypes_timeSpecific = list(day1 = c('EC', 'EC_NOS3', 'EC_IS_IARS1', 'FB_IS_TFPI2', 'Mo.Macs_SNX22', 'Neu_IL1R1', 
                                    'CM_IS', "RBC"),
                           day4 = c('EC_IS_LOX', 'EC_IS_Prol', 'Mo.Macs_SNX22', 'Neu_DYSF', 'CM_IS', 
@@ -97,13 +100,13 @@ celltypes_timeSpecific = list(day1 = c('EC', 'EC_NOS3', 'EC_IS_IARS1', 'FB_IS_TF
                                     'RBC')
                           )
 ntop = 100
-
+receiver_cells = 'CM_IS'
 source('functions_cccInference.R')
 
 run_LIANA(refs, 
           celltypes_timeSpecific = celltypes_timeSpecific,
           timepoint_specific = timepoint_specific,
-          receiver_cells = 'CM_IS',
+          receiver_cells = receiver_cells,
           outDir = outDir, 
           ntop = ntop)
 

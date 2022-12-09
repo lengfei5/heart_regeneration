@@ -13,9 +13,99 @@
 # 
 ########################################################
 ########################################################
+run_LIANA_defined_celltype = function(subref,
+                                      receiver_cells = NULL,
+                                      additionalLabel = '_fixedCelltypes'){
+  source('functions_scRNAseq.R')
+  
+  sce <- as.SingleCellExperiment(subref)
+  colLabels(sce) = as.factor(sce$celltypes)
+  rownames(sce) = toupper(get_geneName(rownames(sce)))
+  
+  ave.counts <- calculateAverage(sce, assay.type = "counts")
+  
+  #hist(log10(ave.counts), breaks=100, main="", col="grey80",
+  #     xlab=expression(Log[10]~"average count"))
+  
+  num.cells <- nexprs(sce, byrow=TRUE)
+  #smoothScatter(log10(ave.counts), num.cells, ylab="Number of cells",
+  #              xlab=expression(Log[10]~"average count"))
+  
+  # detected in >= 5 cells, ave.counts >=5 but not too high
+  genes.to.keep <- num.cells > 20 & ave.counts >= 10^-4  & ave.counts <10^2  
+  summary(genes.to.keep)
+  
+  sce <- sce[genes.to.keep, ]
+  
+  ## run the liana wrap function by specifying resource and methods
+  # Resource currently included in OmniPathR (and hence `liana`) include:
+  show_resources()
+  # Resource currently included in OmniPathR (and hence `liana`) include:
+  show_methods()
+  
+  liana_test <- liana_wrap(sce,  
+                           method = c("natmi", "connectome", "logfc", "sca", "cytotalk",  
+                                      'cellphonedb'),
+                           resource = c("Consensus", 'CellPhoneDB', "OmniPath", "LRdb",
+                                        "CellChatDB",  "CellTalkDB"), 
+                           assay.type = "logcounts", 
+                           idents_col = 'celltypes')
+  
+  # Liana returns a list of results, each element of which corresponds to a method
+  liana_test %>% glimpse
+  
+  # We can aggregate these results into a tibble with consensus ranks
+  liana_test <- liana_test %>%
+    liana_aggregate(resource = 'Consensus')
+  
+  saveRDS(liana_test, file = paste0(outDir, '/res_lianaTest_Consensus', additionalLabel, '.rds'))
+  # liana_test = readRDS(file = paste0(outDir, '/res_lianaTest_Consensus_day1.rds'))
+  if(is.na(receiver_cells)){ # loop over all cell type candidates
+    receiver_cells = celltypes
+  }
+  
+  for(m in 1:length(receiver_cells)){
+    # m = 1
+    #liana_test %>%
+    #  liana_dotplot(source_groups = celltypes[n],
+    #                target_groups = celltypes,
+    #                ntop = ntop)
+    liana_test %>%
+      liana_dotplot(source_groups = celltypes,
+                    target_groups = receiver_cells[m],
+                    ntop = ntop)
+    liana_test_save =  liana_test %>% filter()
+      liana_dotplot(source_groups = celltypes,
+                    target_groups = receiver_cells[m],
+                    ntop = ntop)
+    
+    ggsave(filename = paste0(outDir, '/liana_LR_prediction_recieveCell', additionalLabel, '_',  
+                             receiver_cells[m], 
+                             '_ntop', ntop, '.pdf'), 
+           width = 30, height = min(c(10*ntop/20, 50)), limitsize = FALSE)
+    
+    
+  }
+  
+  pdfname = paste0(outDir, '/liana_celltype_communication_freqHeatmap', additionalLabel, '.pdf')
+  pdf(pdfname, width=20, height = 8)
+  
+  liana_trunc <- liana_test %>%
+    # only keep interactions concordant between methods
+    filter(aggregate_rank <= 0.01) # this can be FDR-corr if n is too high
+  
+  heat_freq(liana_trunc)
+  
+  dev.off()
+  
+}
+
+##########################################
+# main function of LIANA
+##########################################
 # original code from https://saezlab.github.io/liana/articles/liana_tutorial.html
 run_LIANA = function(refs,
-                     celltypes = NULL
+                     celltypes = NULL,
                      celltypes_timeSpecific = NULL,
                      timepoint_specific = FALSE,
                      receiver_cells = 'CM_IS',
@@ -52,102 +142,78 @@ run_LIANA = function(refs,
         }
       }
     }
+  }else{
+    cat('-- time specific to consider -- \n')
+    if(is.null(celltypes_timeSpecific)){
+      stop('no list of time-specific cell types found \n')
+    }else{
+      if(!is.list(celltypes_timeSpecific) | length(celltypes_timeSpecific) == 0){
+        stop('a list of time-specific cell types expected \n')
+      }else{
+        cat(length(celltypes_timeSpecific), 'time points specified \n')
+        cat(names(celltypes_timeSpecific), '\n')
+        
+        for(n in 1:length(celltypes_timeSpecific))
+        {
+          celltypes = celltypes_timeSpecific[[n]]
+          mm = match(celltypes, refs$celltypes)
+          if(length(which(is.na(mm)))>0){
+            stop(names(celltypes_timeSpecific)[n], 
+                 ': some selected cell types not found in refs -- ', celltypes[which(is.na(mm))])
+          }else{
+            cat(names(celltypes_timeSpecific)[n], celltypes,'\n')
+            cat('--all selected cell types were found in the refs \n')
+          }
+        }
+      }
+    }
+    
   }
   
-  
+  # prepre for the LIANA loop
   system(paste0('mkdir -p ', outDir))
-  
   Idents(refs) = as.factor(refs$celltypes)
   
-  subref = subset(refs, cells = colnames(refs)[!is.na(match(refs$celltypes, celltypes))])
-  subref$celltypes = droplevels(as.factor(subref$celltypes))
-  table(subref$celltypes)
-  #subref = subset(x = subref, downsample = 1000)
-  cat('celltype to consider -- ', names(table(subref$celltypes)), '\n')
-  
-  # sels =c(which(refs$celltypes == 'CM')[1:1000], 
-  #         which(refs$celltypes == 'FB')[1:1000], 
-  #         which(refs$celltypes == 'Macrophages')[1:1000], 
-  #         which(refs$celltypes == 'Neutrophil'))
-  
-  #subref = subset(refs, cells = colnames(refs)[sels])
-  
-  #rownames(subref) = toupper(rownames(subref))
-  
-  Idents(subref) = subref$celltypes
-  
-  # Run liana
-  # liana_test <- liana_wrap(testdata, method = 'cellphonedb', resource = 'CellPhoneDB')
-  source('functions_scRNAseq.R')
-  sce <- as.SingleCellExperiment(subref)
-  colLabels(sce) = as.factor(sce$celltypes)
-  rownames(sce) = toupper(get_geneName(rownames(sce)))
-  
-  ave.counts <- calculateAverage(sce, assay.type = "counts")
-  
-  hist(log10(ave.counts), breaks=100, main="", col="grey80",
-       xlab=expression(Log[10]~"average count"))
-  
-  num.cells <- nexprs(sce, byrow=TRUE)
-  smoothScatter(log10(ave.counts), num.cells, ylab="Number of cells",
-                xlab=expression(Log[10]~"average count"))
-  
-  # detected in >= 5 cells, ave.counts >=5 but not too high
-  genes.to.keep <- num.cells > 20 & ave.counts >= 10^-4  & ave.counts <10^2  
-  summary(genes.to.keep)
-  
-  sce <- sce[genes.to.keep, ]
-  
-  ## run the liana wrap function by specifying resource and methods
-  # Resource currently included in OmniPathR (and hence `liana`) include:
-  show_resources()
-  # Resource currently included in OmniPathR (and hence `liana`) include:
-  show_methods()
-  
-  liana_test <- liana_wrap(sce,  
-                           method = c("natmi", "connectome", "logfc", "sca", "cytotalk",  
-                                      'cellphonedb'),
-                           resource = c("Consensus", 'CellPhoneDB', "OmniPath", "LRdb",
-                                        "CellChatDB",  "CellTalkDB"), 
-                           assay.type = "logcounts", 
-                           idents_col = 'celltypes')
-  
-  # Liana returns a list of results, each element of which corresponds to a method
-  liana_test %>% glimpse
-  
-  # We can aggregate these results into a tibble with consensus ranks
-  liana_test <- liana_test %>%
-    liana_aggregate(resource = 'Consensus')
-  
-  saveRDS(liana_test, file = paste0(outDir, '/res_lianaTest_Consensus.rds'))
-  
-  for(n in 1:length(celltypes)){
-    # n = 1
-    #liana_test %>%
-    #  liana_dotplot(source_groups = celltypes[n],
-    #                target_groups = celltypes,
-    #                ntop = ntop)
-    liana_test %>%
-      liana_dotplot(source_groups = celltypes,
-                    target_groups = celltypes[n],
-                    ntop = ntop)
+  if(!timepoint_specific){
+    subref = subset(refs, cells = colnames(refs)[!is.na(match(refs$celltypes, celltypes))])
+    subref$celltypes = droplevels(as.factor(subref$celltypes))
+    table(subref$celltypes)
+    #subref = subset(x = subref, downsample = 1000)
+    cat('celltype to consider -- ', names(table(subref$celltypes)), '\n')
     
-    ggsave(filename = paste0(outDir, '/liana_LR_prediction_recieveCell_', celltypes[n], 
-                             '_ntop', ntop, '.pdf'), 
-           width = 16, height = min(c(10*ntop/20, 50)), limitsize = FALSE)
+    Idents(subref) = subref$celltypes
     
+    # Run liana
+    # liana_test <- liana_wrap(testdata, method = 'cellphonedb', resource = 'CellPhoneDB')
+    run_LIANA_defined_celltype(sburef,
+                               receiver_cells = receiver_cells,
+                               additionalLabel = '_fixedCelltypes')
+    
+  }else{
+    for(n in 1:length(celltypes_timeSpecific))
+    {
+      # n = 1
+      celltypes = celltypes_timeSpecific[[n]]
+      timepoint = names(celltypes_timeSpecific)[n]
+      cat(n, '-- ', timepoint, '\n')
+      cat(celltypes, '\n')
+      subref = subset(refs, cells = colnames(refs)[!is.na(match(refs$celltypes, celltypes))])
+      subref$celltypes = droplevels(as.factor(subref$celltypes))
+      table(subref$celltypes)
+      #subref = subset(x = subref, downsample = 1000)
+      cat('celltype to consider -- ', names(table(subref$celltypes)), '\n')
+      
+      Idents(subref) = subref$celltypes
+      
+      # Run liana
+      # liana_test <- liana_wrap(testdata, method = 'cellphonedb', resource = 'CellPhoneDB')
+      run_LIANA_defined_celltype(subref,
+                                 receiver_cells = receiver_cells,
+                                 additionalLabel = paste0('_', timepoint))
+    }
+    
+      
   }
-  
-  pdfname = paste0(outDir, '/liana_celltype_communication_freqHeatmap.pdf')
-  pdf(pdfname, width=12, height = 8)
-  
-  liana_trunc <- liana_test %>%
-    # only keep interactions concordant between methods
-    filter(aggregate_rank <= 0.01) # this can be FDR-corr if n is too high
-  
-  heat_freq(liana_trunc)
-  
-  dev.off()
   
   # RUN CPDB alone
   if(RUN.CPDB.alone){
