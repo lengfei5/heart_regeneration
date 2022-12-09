@@ -32,6 +32,7 @@ library(clusterProfiler)
 library(plotly)
 library(ggalluvial)
 library(stringr)
+require()
 options(stringsAsFactors = F)
 
 source('functions_scRNAseq.R')
@@ -70,9 +71,11 @@ celltypes_timeSpecific = list(day1 = c('EC', 'EC_NOS3', 'EC_IS_IARS1', 'FB_IS_TF
                                         'RBC')
 )
 
-receiver_cells = 'CM_IS'
 timepoint_specific = TRUE
 
+# test first one receiver with its control 
+receiver_cells = 'CM_IS'
+control_cells = "CM_ven_Robo2"
 #refs = readRDS(file = refs_file)
 table(refs$celltypes)
 
@@ -152,6 +155,9 @@ lr_network = lr_network %>% dplyr::rename(ligand = from, receptor = to) %>%
 # lr_network = lr_network %>% filter(database != "ppi_prediction_go" & database != "ppi_prediction")
 head(lr_network)
 
+ligands = lr_network %>% pull(ligand) %>% unique()
+receptors = lr_network %>% pull(receptor) %>% unique()
+
 # ## weighted integrated networks 
 weighted_networks = readRDS(paste0(dataPath_nichenet,  "weighted_networks.rds"))
 head(weighted_networks$lr_sig) # interactions and their weights in the ligand-receptor + signaling network
@@ -163,6 +169,7 @@ weighted_networks_lr = weighted_networks$lr_sig %>%
                distinct(ligand,receptor), by = c("ligand","receptor"))
 
 ##########################################
+# we directly consider time-specific 
 # loop over the cell types for each time points
 # here we are using the basic function predict_ligand_activities in NicheNet
 # Shoval is also using the same one, more flexible to adapt for data 
@@ -176,7 +183,8 @@ for(n in 1:length(celltypes_timeSpecific)) # loop over each time point
   cat(n, '-- ', timepoint, '\n')
   cat(celltypes, '\n')
   
-  celltypes_sel = unique(c(celltypes, receiver_cells)) 
+  
+  celltypes_sel = unique(c(celltypes, receiver_cells, control_cells)) 
   
   subref = subset(refs, cells = colnames(refs)[!is.na(match(refs$celltypes, celltypes_sel))])
   subref$celltypes = droplevels(as.factor(subref$celltypes))
@@ -186,32 +194,181 @@ for(n in 1:length(celltypes_timeSpecific)) # loop over each time point
   cat('celltype to consider -- ', names(table(subref$celltypes)), '\n')
   Idents(subref) = subref$celltypes
   
-  # step 1
-  #  Define a “sender/niche” cell population and a “receiver/target” cell population present in your expression data and determine which genes are expressed in both populations
+  # process and clean the gene names
+  Gene.filtering.preprocessing = TRUE
+  if(Gene.filtering.preprocessing){
+    sce <- as.SingleCellExperiment(subref)
+    ggs = rownames(sce)
+    
+    colLabels(sce) = as.factor(sce$celltypes)
+    rownames(sce) = get_geneName(rownames(sce))
+    
+    ave.counts <- calculateAverage(sce, assay.type = "counts")
+    
+    hist(log10(ave.counts), breaks=100, main="", col="grey80",
+         xlab=expression(Log[10]~"average count"))
+    
+    num.cells <- nexprs(sce, byrow=TRUE)
+    #smoothScatter(log10(ave.counts), num.cells, ylab="Number of cells",
+    #              xlab=expression(Log[10]~"average count"))
+    
+    # detected in >= 10 cells, ave.counts cutoff are both very lose
+    genes.to.keep <- num.cells > 10 & ave.counts >= 10^-5  & ave.counts <10^3  
+    summary(genes.to.keep)
+    sce <- sce[genes.to.keep, ]
+    ggs = ggs[genes.to.keep]
+    
+    rownames(sce) = make.names(rownames(sce), unique = TRUE)
+    
+    geneDup = data.frame(gene = ggs, gg.uniq = rownames(sce), stringsAsFactors = FALSE)
+    geneDup$geneSymbol = get_geneName(geneDup$gene)
+    
+    kk = which(geneDup$geneSymbol != geneDup$gg.uniq)
+    
+    subref = as.Seurat(sce, counts = "counts", data = "logcounts")
+    rm(sce)
+    Idents(subref) = as.factor(subref$celltypes)
+    
+    #saveRDS(geneDup, paste0(outDir, '/geneSymbol_duplication_inLRanalysis.rds'))
+    
+  }
+  
+  # to save the result for each time point
+  expressed_genes = c()
+  res = tibble(sample=character(), sender=character(), receiver=character(),  
+               test_ligand=character(), auroc=double(), aupr=double(), 
+               pearson = double(),  rank=integer())
+  
+  # step 1:  Define a “sender/niche” cell population and a “receiver/target” cell population 
+  # present in your expression data and determine which genes are expressed in both populations
+  if(is.na(receiver_cells)){ # loop over all cell type candidates
+    receiver_cells = celltypes
+  }
+  
+  for(receiver in receiver_cells) # loop over receiver cells 
+  {
+    # specify receiver
+    # receiver = receiver_cells[1]
+    cat('-- receiver : ', receiver, '-- \n')
+    expressed_genes_receiver = get_expressed_genes(receiver, subref, pct = 0.10)
+    background_expressed_genes = expressed_genes_receiver %>% .[. %in% rownames(ligand_target_matrix)]
+    
+    # step 2: Define a gene set of interest: these are the genes in the “receiver/target” cell population 
+    # that are potentially affected by ligands expressed by interacting cells 
+    # (e.g. genes differentially expressed upon cell-cell interaction)
+    DE_table_receiver = FindMarkers(object = subref, 
+                                    ident.1 = receiver, 
+                                    ident.2 = control_cells, 
+                                    min.pct = 0.10) %>% rownames_to_column("gene")
+    
+    geneset_oi = DE_table_receiver %>% filter(p_val_adj <= 0.05 & abs(avg_log2FC) >= 0.25) %>% pull(gene)
+    geneset_oi = geneset_oi %>% .[. %in% rownames(ligand_target_matrix)]
+    
+    ## sender
+    sender_celltypes = celltypes
+    #loop over the same receiver for sender cells, i.e. incl. self-activation (shoval's example)
+    for (sender in sender_celltypes){
+      # sender = sender_celltypes[1]
+      cat('-- sender : ', sender, '-- \n')
+      expressed_genes_sender = get_expressed_genes(sender, subref, pct=0.1)
+      
+      # Step 3: Define a set of potential ligands
+      # these are ligands that are expressed by the “sender/niche” cell population and 
+      # bind a (putative) receptor expressed by the “receiver/target” population
+      # Get potential ligands in our datasets
+      expressed_ligands = intersect(ligands, expressed_genes_sender)
+      expressed_receptors = intersect(receptors,expressed_genes_receiver)
+            
+      potential_ligands = lr_network %>% filter(ligand %in% expressed_ligands & receptor %in% expressed_receptors) %>%
+        pull(ligand) %>% unique()
+      
+      # Step 4: Perform NicheNet’s ligand activity analysis on the gene set of interest
+      # rank the potential ligands based on the presence of their target genes in the gene set of interest 
+      # (compared to the background set of genes)     
+      # the main function used : predict_ligand_activities
+      ligand_activities = predict_ligand_activities(geneset = geneset_oi,
+                                                    background_expressed_genes = background_expressed_genes,
+                                                    ligand_target_matrix = ligand_target_matrix, 
+                                                    potential_ligands = potential_ligands) 
+      ligand_activities = ligand_activities %>% 
+        arrange(-pearson) %>% dplyr::mutate(sender=sender, receiver=receiver, 
+                                            rank = rank(dplyr::desc(pearson)))
+      
+      # pearson correlation between the target expresson and prediciton as ligand activity scores 
+      res = rbind(res, ligand_activities) 
+    }
+    
+    # list_expressed_genes_sender = sender_celltypes %>% unique() %>% lapply(get_expressed_genes, seuratObj, 0.10) # lapply to get the expressed genes of every sender cell type separately here
+    # expressed_genes_sender = list_expressed_genes_sender %>% unlist() %>% unique()
+  }
+  
+  # processing after the ligand activity prediction
+  res = res %>% dplyr::mutate(interaction=paste0(sender,"-",receiver))
+  #res = res %>% filter(test_ligand %in% growth.factors) %>% dplyr::mutate(interaction=paste0(sender,"-",receiver))
+  
+  res %>% DT::datatable()
+  expressed_genes = unique(expressed_genes)
+  
+  ##########################################
+  # ligand visualization
+  ##########################################
+  res = res %>% dplyr::mutate(interaction=paste0(sender,"-",receiver))
+  
+  # Plot ligand activities scores in general
+  res %>% ggplot(aes(x=pearson)) + 
+    geom_histogram(color="black", fill="darkorange") + 
+    geom_vline(aes(xintercept=0.10), color="red", linetype="dashed", size=1) +  
+    labs(x="ligand activity (Pearson Correlation)", y = "# ligands") +  
+    theme_classic() + ggtitle("Ligands activity scores")
+  
+  # Plot ligand activities scores per interaction
+  res %>% ggplot(aes(x=pearson)) + 
+    geom_histogram(color="black", fill="darkorange") + 
+    geom_vline(aes(xintercept=0.1), color="red", linetype="dashed", size=1) +  
+    labs(x="ligand activity (Pearson Correlation)", y = "# ligands") +  
+    theme_classic() + 
+    ggtitle("Ligands activity scores") + 
+    facet_wrap(.~interaction, )
+  
+  # Visualize ligand expression along different days
+  ligand.expression.df = AverageExpression(subref, features =unique(res$test_ligand))[['RNA']]
+  pseudo_signal = ceiling(log2(range(ligand.expression.df[ligand.expression.df>0]))[1])-1
+  ligand.expression.df = log2(2^pseudo_signal +ligand.expression.df)[sort(rownames(ligand.expression.df)), 
+                                                                     sort(colnames(ligand.expression.df))]
+  write.csv2(inner_join(res, ligand.expression.df %>% as.data.frame %>% rownames_to_column('test_ligand')), 
+             file = paste0(outDir, '/predicted_ligand_activity_avExpr_for_receivers_senders_', timepoint, '.csv'),
+             row.names = FALSE)
+  
+  #p2 = Heatmap(ligand.expression.df, cluster_columns = F, column_title = "Ligand Expression", name="Expression (log2)", row_order = row_order(p1))
+  
+  # Visualization per interaction
+  p1 = res %>% transmute(test_ligand=test_ligand, x=interaction, pearson=pearson) %>% 
+    #spread(x, pearson)  %>% 
+    replace(is.na(.), 0) %>% 
+    ungroup() %>% 
+    column_to_rownames('test_ligand')
+  
+  ha.col = list(Interaction=setNames(c(brewer.pal(9, 'YlOrRd')), colnames(p1)))
+  ha = HeatmapAnnotation(Interaction=colnames(p1), annotation_name_side = 'left', col=ha.col)
+  
+  p1 = p1 %>% Heatmap(
+    column_title = "Average Ligand pearson correlation\n(NAs replaced with zeros)", 
+    cluster_columns = F, show_row_names = F, show_column_names = F, 
+    top_annotation = ha, col=brewer.pal(4, 'Oranges'), 
+    name="Ligand Score(pearson)")
+  ha = colnames(ligand.expression.df)
+  ha = HeatmapAnnotation(Cluster=ha, col=ha.col)
+  p2 = Heatmap(ligand.expression.df, 
+               cluster_columns = F, show_column_names = F,
+               column_title = "Ligand Expression", name="log10(Expression)", 
+               row_order = row_order(p1), 
+               top_annotation = ha)
+  
+  p1+p2
   
   
-  # step 2
   
   
-  # Step 3: Define a set of potential ligands
-  ligands = lr_network %>% pull(from) %>% unique()
-  receptors = lr_network %>% pull(to) %>% unique()
-  
-  expressed_ligands = intersect(ligands,expressed_genes_sender)
-  expressed_receptors = intersect(receptors,expressed_genes_receiver)
-  
-  potential_ligands = lr_network %>% 
-    filter(from %in% expressed_ligands & to %in% expressed_receptors) %>% pull(from) %>% unique()
-  
-  
-  # Step 4: Perform NicheNet’s ligand activity analysis on the gene set of interest
-  ligand_activities = predict_ligand_activities(geneset = geneset_oi, 
-                                                background_expressed_genes = background_expressed_genes, 
-                                                ligand_target_matrix = ligand_target_matrix, 
-                                                potential_ligands = potential_ligands)
-  
-  ligand_activities = ligand_activities %>% arrange(-pearson) %>% mutate(rank = rank(desc(pearson)))
-  ligand_activities
   
   best_upstream_ligands = ligand_activities %>% 
     top_n(30, pearson) %>% arrange(-pearson) %>% pull(test_ligand) %>% unique()

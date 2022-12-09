@@ -74,10 +74,10 @@ run_LIANA_defined_celltype = function(subref,
       liana_dotplot(source_groups = celltypes,
                     target_groups = receiver_cells[m],
                     ntop = ntop)
-    liana_test_save =  liana_test %>% filter()
-      liana_dotplot(source_groups = celltypes,
-                    target_groups = receiver_cells[m],
-                    ntop = ntop)
+    #liana_test_save =  liana_test %>% filter()
+    #  liana_dotplot(source_groups = celltypes,
+    #                target_groups = receiver_cells[m],
+    #                ntop = ntop)
     
     ggsave(filename = paste0(outDir, '/liana_LR_prediction_recieveCell', additionalLabel, '_',  
                              receiver_cells[m], 
