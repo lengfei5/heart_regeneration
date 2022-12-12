@@ -32,7 +32,7 @@ library(clusterProfiler)
 library(plotly)
 library(ggalluvial)
 library(stringr)
-require()
+
 options(stringsAsFactors = F)
 
 source('functions_scRNAseq.R')
@@ -205,8 +205,8 @@ for(n in 1:length(celltypes_timeSpecific)) # loop over each time point
     
     ave.counts <- calculateAverage(sce, assay.type = "counts")
     
-    hist(log10(ave.counts), breaks=100, main="", col="grey80",
-         xlab=expression(Log[10]~"average count"))
+    #hist(log10(ave.counts), breaks=100, main="", col="grey80",
+    #     xlab=expression(Log[10]~"average count"))
     
     num.cells <- nexprs(sce, byrow=TRUE)
     #smoothScatter(log10(ave.counts), num.cells, ylab="Number of cells",
@@ -233,17 +233,17 @@ for(n in 1:length(celltypes_timeSpecific)) # loop over each time point
     
   }
   
-  # to save the result for each time point
-  expressed_genes = c()
-  res = tibble(sample=character(), sender=character(), receiver=character(),  
-               test_ligand=character(), auroc=double(), aupr=double(), 
-               pearson = double(),  rank=integer())
-  
   # step 1:  Define a “sender/niche” cell population and a “receiver/target” cell population 
   # present in your expression data and determine which genes are expressed in both populations
   if(is.na(receiver_cells)){ # loop over all cell type candidates
     receiver_cells = celltypes
   }
+  
+  # to save the result for each time point
+  expressed_genes = c()
+  res = tibble(sample=character(), sender=character(), receiver=character(),  
+               test_ligand=character(), auroc=double(), aupr=double(), 
+               pearson = double(),  rank=integer())
   
   for(receiver in receiver_cells) # loop over receiver cells 
   {
@@ -315,20 +315,27 @@ for(n in 1:length(celltypes_timeSpecific)) # loop over each time point
   res = res %>% dplyr::mutate(interaction=paste0(sender,"-",receiver))
   
   # Plot ligand activities scores in general
-  res %>% ggplot(aes(x=pearson)) + 
+  p1 = res %>% ggplot(aes(x=pearson)) + 
     geom_histogram(color="black", fill="darkorange") + 
     geom_vline(aes(xintercept=0.10), color="red", linetype="dashed", size=1) +  
     labs(x="ligand activity (Pearson Correlation)", y = "# ligands") +  
     theme_classic() + ggtitle("Ligands activity scores")
+  plot(p1)
+  
+  ggsave(filename = paste0(outDir, '/ligand_pearson_correlation_', timepoint, '.pdf'), 
+         width = 10, height = 8)
   
   # Plot ligand activities scores per interaction
-  res %>% ggplot(aes(x=pearson)) + 
+  p2 = res %>% ggplot(aes(x=pearson)) + 
     geom_histogram(color="black", fill="darkorange") + 
     geom_vline(aes(xintercept=0.1), color="red", linetype="dashed", size=1) +  
     labs(x="ligand activity (Pearson Correlation)", y = "# ligands") +  
     theme_classic() + 
     ggtitle("Ligands activity scores") + 
     facet_wrap(.~interaction, )
+  plot(p2)
+  ggsave(filename = paste0(outDir, '/ligand_pearson_correlation_individualInteraction_', timepoint, '.pdf'), 
+         width = 12, height = 10)
   
   # Visualize ligand expression along different days
   ligand.expression.df = AverageExpression(subref, features =unique(res$test_ligand))[['RNA']]
@@ -341,35 +348,52 @@ for(n in 1:length(celltypes_timeSpecific)) # loop over each time point
   
   #p2 = Heatmap(ligand.expression.df, cluster_columns = F, column_title = "Ligand Expression", name="Expression (log2)", row_order = row_order(p1))
   
-  # Visualization per interaction
-  p1 = res %>% transmute(test_ligand=test_ligand, x=interaction, pearson=pearson) %>% 
-    #spread(x, pearson)  %>% 
+  # Visualization top ligand  per interaction
+  p1 = res %>% top_n(500, pearson) %>% transmute(test_ligand=test_ligand, x=interaction, pearson=pearson) %>% 
+    spread(x, pearson)  %>% 
     replace(is.na(.), 0) %>% 
     ungroup() %>% 
     column_to_rownames('test_ligand')
+  p2 = ligand.expression.df[match(rownames(p1), rownames(ligand.expression.df)), ]
   
-  ha.col = list(Interaction=setNames(c(brewer.pal(9, 'YlOrRd')), colnames(p1)))
+  #ha.col = list(Interaction=setNames(c(brewer.pal(9, 'YlOrRd')), colnames(p1)))
+  ha.col = c(brewer.pal(9, 'YlOrRd'))[1:length(colnames(p1))]
+  names(ha.col) = colnames(p1)
+  ha.col = as.list(ha.col)
   ha = HeatmapAnnotation(Interaction=colnames(p1), annotation_name_side = 'left', col=ha.col)
   
-  p1 = p1 %>% Heatmap(
+  p3 = p1 %>% Heatmap(
     column_title = "Average Ligand pearson correlation\n(NAs replaced with zeros)", 
     cluster_columns = F, show_row_names = F, show_column_names = F, 
     top_annotation = ha, col=brewer.pal(4, 'Oranges'), 
     name="Ligand Score(pearson)")
-  ha = colnames(ligand.expression.df)
+  
+  ha = colnames(p2)
   ha = HeatmapAnnotation(Cluster=ha, col=ha.col)
-  p2 = Heatmap(ligand.expression.df, 
+  p4 = Heatmap(p2, 
                cluster_columns = F, show_column_names = F,
                column_title = "Ligand Expression", name="log10(Expression)", 
-               row_order = row_order(p1), 
+               row_order = row_order(p3), 
                top_annotation = ha)
   
-  p1+p2
+  pdfname = paste0(outDir, '/heatmap_top_ligand_pearson_correlation_individualInteraction_', timepoint, '.pdf')
+  pdf(pdfname, width=16, height = 25)
+  
+  pp = p3 + p4
+  plot(pp)
+  dev.off()
+  
+}
   
   
-  
-  
-  
+########################################################
+########################################################
+# Section : test code not used currently
+# 
+########################################################
+########################################################
+
+
   best_upstream_ligands = ligand_activities %>% 
     top_n(30, pearson) %>% arrange(-pearson) %>% pull(test_ligand) %>% unique()
   DotPlot(subref, features = best_upstream_ligands %>% rev(), cols = "RdYlBu") + RotatedAxis()
