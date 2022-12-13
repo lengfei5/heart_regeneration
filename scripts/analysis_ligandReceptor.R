@@ -119,12 +119,12 @@ receiver_cells_RZ = 'CM_Robo2'
 ##########################################
 # set parameter for ligand-receptor analysis
 outDir = paste0(resDir, '/Ligand_Receptor_analysis/LIANA_v3.2_41subtypes_receiverCells.CM_IS')
+ntop = 100
 
 source('functions_cccInference.R')
-
 run_LIANA(refs, 
           timepoint_specific = timepoint_specific,
-          celltypes_timeSpecific = celltypes_timeSpecific,
+          celltypes_timeSpecific = celltypes_BZ_timeSepcific,
           receiver_cells = receiver_cells_BZ,
           outDir = outDir, 
           ntop = ntop)

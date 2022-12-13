@@ -14,8 +14,11 @@
 ########################################################
 ########################################################
 run_LIANA_defined_celltype = function(subref,
+                                      celltypes,
                                       receiver_cells = NULL,
-                                      additionalLabel = '_fixedCelltypes'){
+                                      ntop = 50, 
+                                      additionalLabel = '_fixedCelltypes')
+{
   source('functions_scRNAseq.R')
   
   sce <- as.SingleCellExperiment(subref)
@@ -44,8 +47,9 @@ run_LIANA_defined_celltype = function(subref,
   show_methods()
   
   liana_test <- liana_wrap(sce,  
-                           method = c("natmi", "connectome", "logfc", "sca", "cytotalk",  
-                                      'cellphonedb'),
+                           method = c("natmi", "connectome", "logfc", "sca", "cytotalk"  
+                                      #'cellphonedb'
+                                      ),
                            resource = c("Consensus", 'CellPhoneDB', "OmniPath", "LRdb",
                                         "CellChatDB",  "CellTalkDB"), 
                            assay.type = "logcounts", 
@@ -79,13 +83,13 @@ run_LIANA_defined_celltype = function(subref,
     #                target_groups = receiver_cells[m],
     #                ntop = ntop)
     
-    ggsave(filename = paste0(outDir, '/liana_LR_prediction_recieveCell', additionalLabel, '_',  
-                             receiver_cells[m], 
-                             '_ntop', ntop, '.pdf'), 
+    ggsave(filename = paste0(outDir, '/liana_LR_prediction_recieveCell', 
+                             additionalLabel, 
+                             '_receiverCells.', receiver_cells[m], 
+                             '_ntop.', ntop, '.pdf'), 
            width = 30, height = min(c(10*ntop/20, 50)), limitsize = FALSE)
-    
-    
   }
+  
   
   pdfname = paste0(outDir, '/liana_celltype_communication_freqHeatmap', additionalLabel, '.pdf')
   pdf(pdfname, width=20, height = 8)
@@ -186,6 +190,7 @@ run_LIANA = function(refs,
     # Run liana
     # liana_test <- liana_wrap(testdata, method = 'cellphonedb', resource = 'CellPhoneDB')
     run_LIANA_defined_celltype(sburef,
+                               celltypes = celltypes,
                                receiver_cells = receiver_cells,
                                additionalLabel = '_fixedCelltypes')
     
@@ -196,20 +201,26 @@ run_LIANA = function(refs,
       celltypes = celltypes_timeSpecific[[n]]
       timepoint = names(celltypes_timeSpecific)[n]
       cat(n, '-- ', timepoint, '\n')
-      cat(celltypes, '\n')
-      subref = subset(refs, cells = colnames(refs)[!is.na(match(refs$celltypes, celltypes))])
+      cat('---- ', celltypes, '\n')
+      
+      celltypes_sel = unique(c(celltypes, receiver_cells))
+      
+      subref = subset(refs, cells = colnames(refs)[!is.na(match(refs$celltypes, celltypes_sel))])
       subref$celltypes = droplevels(as.factor(subref$celltypes))
       table(subref$celltypes)
       #subref = subset(x = subref, downsample = 1000)
+      
       cat('celltype to consider -- ', names(table(subref$celltypes)), '\n')
       
       Idents(subref) = subref$celltypes
       
       # Run liana
-      # liana_test <- liana_wrap(testdata, method = 'cellphonedb', resource = 'CellPhoneDB')
       run_LIANA_defined_celltype(subref,
+                                 celltypes = celltypes,
                                  receiver_cells = receiver_cells,
+                                 ntop = ntop,
                                  additionalLabel = paste0('_', timepoint))
+
     }
     
       
