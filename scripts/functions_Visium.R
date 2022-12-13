@@ -1154,8 +1154,6 @@ plot.RCTD.results = function(RCTD_out = '../results/RCTD_out',
   
 }
 
-
-
 ########################################################
 ########################################################
 # Section : define boarder zone, injury zone and remote zone
