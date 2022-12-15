@@ -1625,6 +1625,7 @@ run_misty_colocalization_analysis = function(st,
                                  assay, 
                                  useful_features, 
                                  slide_id, 
+                                 cv.folds = 10,
                                  misty_out_alias = paste0(outDir, "/cm_")) 
   {
     # Define assay of each view ---------------
@@ -1657,6 +1658,7 @@ run_misty_colocalization_analysis = function(st,
                      view.types = view_types,
                      view.params = view_params,
                      slide_id = slide_id,
+                     cv.folds = cv.folds,
                      spot.ids = NULL,
                      out.alias = misty_out)
     
@@ -1692,6 +1694,7 @@ run_misty_colocalization_analysis = function(st,
     myRCTD = readRDS(file = paste0(RCTD_out,  '/RCTD_out_doubletMode_', slice, '.rds'))
     results <- myRCTD@results
     
+    weights = results$weights
     norm_weights = normalize_weights(results$weights) 
     
     #SPOTlight::plotCorrelationMatrix(as.matrix(norm_weights))
@@ -1718,11 +1721,12 @@ run_misty_colocalization_analysis = function(st,
     useful_features <- rownames(stx)
     #useful_features <- useful_features[! useful_features %in% "prolif"]
     
+    
     mout <- run_colocalization(slide = stx,
                                useful_features = useful_features,
                                slide_id = slide_id,
                                assay = assay,
-                               misty_out_alias = paste0(outDir, 'misty_', slide_id, '_'))
+                               misty_out_alias = paste0(outDir, 'misty_'))
     
     misty_res_slide <- collect_results(mout)
     

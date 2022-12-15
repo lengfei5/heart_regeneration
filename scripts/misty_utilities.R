@@ -22,9 +22,9 @@ run_misty_seurat <- function(visium.slide,
                              # for each view.
                              slide_id, 
                              spot.ids = NULL,
+                             cv.folds = 10,
                              # spot IDs to use. Use all by default.
-                             out.alias = "results",
-                             cv.folds = 10
+                             out.alias = "results"
                              # folder name for output
                              ) 
 {
