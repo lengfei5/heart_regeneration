@@ -1727,11 +1727,11 @@ run_misty_colocalization_analysis = function(st,
                                    slide_id = slide_id,
                                    assay = assay,
                                    cv.folds = cv.folds,
-                                   misty_out_alias = paste0(outDir, 'misty_'))
+                                   misty_out_alias = paste0(outDir, 'out_misty/'))
         
         misty_res_slide <- collect_results(mout)
         
-        plot_folder <- paste0(outDir, assay_label)
+        plot_folder <- paste0(outDir, "Plots_", assay_label)
         system(paste0("mkdir -p ", plot_folder))
         
         pdf(file = paste0(plot_folder, "/", slide_id, "_", segment,  "_summary_plots.pdf"), 
