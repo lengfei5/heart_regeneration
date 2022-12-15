@@ -1681,122 +1681,79 @@ run_misty_colocalization_analysis = function(st,
     stx = subset(st, condition == slice)
     DefaultAssay(stx) = 'Spatial'
     
-    Select.Boader.Zone = FALSE
-    if(Select.Boader.Zone){
-      stx$segmentation = as.factor(stx$segmentation)
-      Idents(stx) = stx$segmentation
-      SpatialDimPlot(stx, images = slice)
-      print(table(stx$segmentation))
-      
-    }
-    
     # import the cell type deconvolution result
     myRCTD = readRDS(file = paste0(RCTD_out,  '/RCTD_out_doubletMode_', slice, '.rds'))
     results <- myRCTD@results
     
     weights = results$weights
     norm_weights = normalize_weights(results$weights) 
-    
-    #SPOTlight::plotCorrelationMatrix(as.matrix(norm_weights))
-    #ggsave(paste0(outDir, '/CorrelationMatrix_allRegions', slice, '.pdf'), width = 10, height = 10)
-    
-    # use a threshold to binarize weights
-    #weights = norm_weights >= 0.1 
-    #index_border = match(colnames(stx)[which(stx$segmentation == 'BZ')], rownames(weights))
-    
-    # make 
+    weights = as.matrix(t(weights))
     norm_weights = as.matrix(t(norm_weights))
+    
+    # filter the subtypes without matching
     mm = match(colnames(stx), colnames(norm_weights))
     stx = subset(stx, cells = colnames(stx)[which(!is.na(mm))])
-    norm_weights = norm_weights[,mm[which(!is.na(mm))]]
+    norm_weights = norm_weights[, mm[which(!is.na(mm))]]
+    weights = weights[ ,mm[which(!is.na(mm))]]
     
-    adt_assay = CreateAssayObject(data = norm_weights)
-    stx[["RCTD_propos"]] = adt_assay
+    stx[["RCTD_propos"]] = CreateAssayObject(data = norm_weights)
+    stx[["RCTD_density"]] = CreateAssayObject(data = weights)
     
-    assay_label <- "RCTD_propos"
-    slide_id = slice
-    
-    assay <- assay_label
-    DefaultAssay(stx) <- assay
-    useful_features <- rownames(stx)
-    #useful_features <- useful_features[! useful_features %in% "prolif"]
-    
-    
-    mout <- run_colocalization(slide = stx,
-                               useful_features = useful_features,
-                               slide_id = slide_id,
-                               assay = assay,
-                               misty_out_alias = paste0(outDir, 'misty_'))
-    
-    misty_res_slide <- collect_results(mout)
-    
-    plot_folder <- paste0(mout, "/plots")
-    
-    system(paste0("mkdir -p ", plot_folder))
-    
-    pdf(file = paste0(plot_folder, "/", slide_id, "_", "summary_plots.pdf"), height = 6, width = 10)
-    
-    mistyR::plot_improvement_stats(misty_res_slide)
-    mistyR::plot_view_contributions(misty_res_slide)
-    
-    mistyR::plot_interaction_heatmap(misty_res_slide, "intra", cutoff = 0)
-    mistyR::plot_interaction_communities(misty_res_slide, "intra", cutoff = 0.5)
-    
-    mistyR::plot_interaction_heatmap(misty_res_slide, "juxta_5", cutoff = 0)
-    mistyR::plot_interaction_communities(misty_res_slide, "juxta_5", cutoff = 0.5)
-    
-    mistyR::plot_interaction_heatmap(misty_res_slide, "para_15", cutoff = 0)
-    mistyR::plot_interaction_communities(misty_res_slide, "para_15", cutoff = 0.5)
-    
-    dev.off()
-    
-    # return(mout)
-    
-    # Cell2location densities - complete
-    # assay_label <- "c2l"
-    # 
-    # misty_outs <- map(slide_files, function(slide_file){
-    #   print(slide_file)
-    #   # Read spatial transcriptomics data
-    #   slide_id <- gsub("[.]rds", "", slide_file)
-    #   slide <- readRDS(paste0(slide_files_folder, slide_file))
-    #   assay <- assay_label
-    #   DefaultAssay(slide) <- assay
-    #   useful_features <- rownames(slide)
-    #   useful_features <- useful_features[! useful_features %in% "prolif"]
-    #   
-    #   mout <- run_colocalization(slide = slide,
-    #                              useful_features = useful_features,
-    #                              slide_id = slide_id,
-    #                              assay = assay,
-    #                              misty_out_alias = "./results/tissue_structure/misty/cell_map/cm_")
-    #   
-    #   misty_res_slide <- collect_results(mout)
-    #   
-    #   plot_folder <- paste0(mout, "/plots")
-    #   
-    #   system(paste0("mkdir ", plot_folder))
-    #   
-    #   pdf(file = paste0(plot_folder, "/", slide_id, "_", "summary_plots.pdf"))
-    #   
-    #   mistyR::plot_improvement_stats(misty_res_slide)
-    #   mistyR::plot_view_contributions(misty_res_slide)
-    #   
-    #   mistyR::plot_interaction_heatmap(misty_res_slide, "intra", cutoff = 0)
-    #   mistyR::plot_interaction_communities(misty_res_slide, "intra", cutoff = 0.5)
-    #   
-    #   mistyR::plot_interaction_heatmap(misty_res_slide, "juxta_5", cutoff = 0)
-    #   mistyR::plot_interaction_communities(misty_res_slide, "juxta_5", cutoff = 0.5)
-    #   
-    #   mistyR::plot_interaction_heatmap(misty_res_slide, "para_15", cutoff = 0)
-    #   mistyR::plot_interaction_communities(misty_res_slide, "para_15", cutoff = 0.5)
-    #   
-    #   dev.off()
-    #   
-    #   return(mout)
-    #   }
-    #   )  
-    # 
+    for(assay_label in c("RCTD_propos", "RCTD_density"))
+    {
+      for(segment in c('all', 'BZ', 'Remote'))
+      {
+        # assay_label = 'RCTD_density'
+        cat(' --- selected assay ', assay_label, '; selected region ', segment, '---\n')
+        
+        slide_id = slice
+        assay <- assay_label
+        DefaultAssay(stx) <- assay
+        
+        if(segment == 'all'){
+          stx_sel = stx
+          cv.folds = 10
+        }else{
+          stx_sel = subset(stx, cells = colnames(stx)[grep(segment, stx$segmentation)])
+          cv.folds = 5
+        }
+        
+        xx = GetAssayData(stx_sel, slot = 'data', assay = assay)
+        sds = apply(xx, 1, sd)
+        useful_features <- rownames(stx_sel)[which(sds>0.001)]
+        
+        mout <- run_colocalization(slide = stx_sel,
+                                   useful_features = useful_features,
+                                   slide_id = slide_id,
+                                   assay = assay,
+                                   cv.folds = cv.folds,
+                                   misty_out_alias = paste0(outDir, 'misty_'))
+        
+        misty_res_slide <- collect_results(mout)
+        
+        plot_folder <- paste0(outDir, assay_label)
+        system(paste0("mkdir -p ", plot_folder))
+        
+        pdf(file = paste0(plot_folder, "/", slide_id, "_", segment,  "_summary_plots.pdf"), 
+            height = 10, width = 16)
+        
+        mistyR::plot_improvement_stats(misty_res_slide)
+        mistyR::plot_view_contributions(misty_res_slide)
+        
+        mistyR::plot_interaction_heatmap(misty_res_slide, "intra", cutoff = 0)
+        mistyR::plot_interaction_communities(misty_res_slide, "intra", cutoff = 0.5)
+        
+        mistyR::plot_interaction_heatmap(misty_res_slide, "juxta_5", cutoff = 0)
+        mistyR::plot_interaction_communities(misty_res_slide, "juxta_5", cutoff = 0.5)
+        
+        mistyR::plot_interaction_heatmap(misty_res_slide, "para_15", cutoff = 0)
+        mistyR::plot_interaction_communities(misty_res_slide, "para_15", cutoff = 0.5)
+        
+        dev.off()
+        
+      }
+     
+    }
   
   }
   
