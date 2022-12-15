@@ -65,12 +65,16 @@ condition.specific_celltypes = readRDS(paste0(RdataDir, 'RCTD_refs_condition_spe
 Run_Neighborhood_Enrichment_Analysis = FALSE
 if(Run_Neighborhood_Enrichment_Analysis){
   source('functions_Visium.R')
-  outDir = paste0(resDir, '/neighborhood_test/')
-  RCTD_out = '../results/visium_axolotl_R12830_resequenced_20220308/RCTD_subtype_out_v3.5'
+  outDir = paste0(resDir, '/neighborhood_test/Run_misty_v1.5/')
+  RCTD_out = '../results/visium_axolotl_R12830_resequenced_20220308/RCTD_subtype_out_42subtypes_ref.time.specific_v4.3'
   
-  run_neighborhood_analysis(st, 
-                            outDir = outDir,
-                            RCTD_out = RCTD_out)
+  # run_neighborhood_analysis(st, 
+  #                           outDir = outDir,
+  #                           RCTD_out = RCTD_out)
+  run_misty_colocalization_analysis(st, 
+                                    outDir = outDir,
+                                    RCTD_out = RCTD_out
+                                    )
   
   
 }
@@ -89,6 +93,7 @@ if(Run_Neighborhood_Enrichment_Analysis){
 # BZ-specific and Remote-specific populations (Nichenet specific)
 ##########################################
 timepoint_specific = TRUE
+
 # define a list of cell type for each time point, either manual defined or from neighborhood enrichment analysis
 #celltypes = c('EC', 'EC_NOS3', 'EC_IS_IARS1', 'FB_IS_TFPI2', 'Mo.Macs_SNX22', 'Neu_IL1R1', 
 #              'CM_IS', "RBC")
@@ -105,12 +110,17 @@ celltypes_BZ_timeSepcific = list(day1 = c('EC', 'EC_NOS3', 'EC_IS_IARS1', 'FB_IS
                                         'RBC')
 )
 
-celltypes_RZ_timeSepcific = list(day1 = c('EC', 'EC_NOS3', 'FB_PKD1', 'FB_IS_TFPI2', 'Mo.Macs_SNX22', 
-                                          'CM_Robo2', 'CM_IS'),
-                                 day4 = c('EC', 'EC_NOS3', 'EC_WNT4', 'FB_PKD1', 'CM_Robo2'),
-                                 dya7 = c('EC', 'EC_NOS3', 'EC_IS_Prol', 'FB_PKD1', 'Neu_IL1R1', 'CM_Robo2'),
-                                 day14 = c('EC', 'EC_NOS3', 'EC_IS_Prol', 'FB_PKD1', 'CM_Robo2')
-                                 )
+# celltypes_RZ_timeSepcific = list(day1 = c('EC', 'EC_NOS3', 'FB_PKD1', 'FB_IS_TFPI2', 'Mo.Macs_SNX22', 
+#                                           'CM_Robo2', 'CM_IS'),
+#                                  day4 = c('EC', 'EC_NOS3', 'EC_WNT4', 'FB_PKD1', 'CM_Robo2'),
+#                                  dya7 = c('EC', 'EC_NOS3', 'EC_IS_Prol', 'FB_PKD1', 'Neu_IL1R1', 'CM_Robo2'),
+#                                  day14 = c('EC', 'EC_NOS3', 'EC_IS_Prol', 'FB_PKD1', 'CM_Robo2')
+#                                  )
+celltypes_RZ_timeSepcific = list(day1 = c('EC', 'EC_NOS3', 'FB_PKD1', 'CM_Robo2'),
+                                 day4 = c('EC', 'EC_NOS3', 'FB_PKD1', 'CM_Robo2'),
+                                 dya7 = c('EC', 'EC_NOS3', 'FB_PKD1', 'CM_Robo2'),
+                                 day14 = c('EC', 'EC_NOS3', 'FB_PKD1', 'CM_Robo2')
+)
 
 receiver_cells_BZ = 'CM_IS'
 receiver_cells_RZ = 'CM_Robo2'
@@ -134,7 +144,7 @@ run_LIANA(refs,
 # diff Nichenet for ligand-receptor analysis
 # original code from https://github.com/saeyslab/nichenetr/blob/master/vignettes/seurat_steps.md
 ########################################################
-outDir = paste0(resDir, '/Ligand_Receptor_analysis/DiffNicheNet_v3')
+outDir = paste0(resDir, '/Ligand_Receptor_analysis/DiffNicheNet_v3.5_fixedRemoteNiche')
 system(paste0('mkdir -p ', outDir))
 
 source('functions_cccInference.R')

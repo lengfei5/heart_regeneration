@@ -1,6 +1,10 @@
 # Copyright (c) [2021] [Ricardo O. Ramirez Flores]
 # roramirezf@uni-heidelberg.de
 
+##########################################
+# misty help functions
+# https://saezlab.github.io/mistyR/articles/mistySeurat.html
+##########################################
 #' Catalog of MISTy utilities
 #' 
 run_misty_seurat <- function(visium.slide,
@@ -16,16 +20,20 @@ run_misty_seurat <- function(visium.slide,
                              view.params,
                              # Named list with parameters (NULL or value)
                              # for each view.
+                             slide_id, 
                              spot.ids = NULL,
                              # spot IDs to use. Use all by default.
-                             out.alias = "results"
+                             out.alias = "results",
+                             cv.folds = 10
                              # folder name for output
-) {
-  
+                             ) 
+{
   mistyR::clear_cache()
   
+  # visium.slide = slide; view.assays = view_assays;view.features = view_features; 
+  # view.types = view_types; view.params = view_params
   # Extracting geometry
-  geometry <- GetTissueCoordinates(visium.slide,
+  geometry <- GetTissueCoordinates(visium.slide, image = slide_id,
                                    cols = c("row", "col"), scale = NULL
   )
   
@@ -44,8 +52,10 @@ run_misty_seurat <- function(visium.slide,
     view.params = view.params,
     geometry = geometry,
     spot.ids = spot.ids,
-    out.alias = out.alias
+    out.alias = out.alias,
+    cv.folds = cv.folds
   )
+  
 }
 
 
@@ -53,14 +63,15 @@ run_misty_seurat <- function(visium.slide,
 # and aligns the IDs to the geometry
 extract_seurat_data <- function(visium.slide,
                                 assay,
-                                geometry) {
+                                geometry) 
+{
   print(assay)
   data <- GetAssayData(visium.slide, assay = assay) %>%
     as.matrix() %>%
     t() %>%
     as_tibble(rownames = NA)
   
-  return(data %>% slice(match(rownames(.), rownames(geometry))))
+  return(data %>% dplyr::slice(match(rownames(.), rownames(geometry))))
 }
 
 # Filters data to contain only features of interest
@@ -73,13 +84,17 @@ filter_data_features <- function(data,
            column_to_rownames())
 }
 
+# View creation
+# This helper function wraps the three options available by default for view creation in mistyR 
+# with additional features that allow for creating views for specific spots.
 # Builds views depending on the paramaters defined
 create_default_views <- function(data,
                                  view.type,
                                  view.param,
                                  view.name,
                                  spot.ids,
-                                 geometry) {
+                                 geometry) 
+{
   
   mistyR::clear_cache()
   
@@ -130,16 +145,25 @@ create_default_views <- function(data,
   }
   
   return(misty.view)
+  
 }
 
+##########################################
+# Building a mistyR pipeline and running the model
+# Finally, we show a wrapper function build_misty_pipeline() that allows you to 
+# build automatically a mistyR workflow from a list of data frames, 
+# with specified spatial context, parameters, features and locations. 
 # Builds automatic MISTy workflow and runs it
+##########################################
 build_misty_pipeline <- function(view.data,
                                  view.features,
                                  view.types,
                                  view.params,
                                  geometry,
                                  spot.ids = NULL,
-                                 out.alias = "default") {
+                                 out.alias = "default",
+                                 cv.folds = 10) 
+{
   
   # Adding all spots ids in case they are not defined
   if (is.null(spot.ids)) {
@@ -176,13 +200,13 @@ build_misty_pipeline <- function(view.data,
   
   
   # Run MISTy
-  run_misty(pline.views, out.alias, cached = FALSE)
+  run_misty(pline.views, out.alias, cv.folds = cv.folds, cached = FALSE)
+  
 }
 
-#
-# Bug in collecting results
-#
-
+##########################################
+# # Bug in collecting results
+##########################################
 collect_results_v2 <- function(folders){
   samples <- R.utils::getAbsolutePath(folders)
   message("\nCollecting improvements")

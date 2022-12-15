@@ -593,10 +593,12 @@ run_Diff_NicheNet = function(refs = refs,
         "receiver" = receiver_cells_RZ)
     )
     lfc_cutoff = 0.15
+    expression_pct = 0.10
+    top_n_target = 200
     res = prioritize_ligands_between_niches(seurat_obj, niches,
-                                            expression_pct = 0.10,
+                                            expression_pct = expression_pct,
                                             lfc_cutoff = lfc_cutoff,
-                                            top_n_target = 250)
+                                            top_n_target = top_n_target)
     
     saveRDS(res, 
             file = paste0(outDir, '/nichenet_prioritization_tables_output',
@@ -736,6 +738,31 @@ prioritize_ligands_between_niches = function(seurat_obj,
   # step 0): Nichenet data loaded already 
   ##########################################
   # NicheNet’s ligand-target prior model
+  ligand_target_matrix = readRDS(paste0(dataPath_nichenet,  "ligand_target_matrix.rds"))
+  ligand_target_matrix[1:5,1:5] # target genes in rows, ligands in columns
+  
+  # ligand-receptor network, Putative ligand-receptor links from NicheNet
+  lr_network = readRDS(paste0(dataPath_nichenet, "lr_network.rds"))
+  lr_network = lr_network %>% mutate(bonafide = ! database %in% c("ppi_prediction","ppi_prediction_go"))
+  lr_network = lr_network %>% dplyr::rename(ligand = from, receptor = to) %>% 
+    distinct(ligand, receptor, bonafide)
+  
+  # If wanted, users can remove ligand-receptor interactions that were predicted based on 
+  # protein-protein interactions and 
+  # only keep ligand-receptor interactions that are described in curated databases.
+  # lr_network = lr_network %>% filter(database != "ppi_prediction_go" & database != "ppi_prediction")
+  head(lr_network)
+  
+  # ## weighted integrated networks 
+  weighted_networks = readRDS(paste0(dataPath_nichenet,  "weighted_networks.rds"))
+  head(weighted_networks$lr_sig) # interactions and their weights in the ligand-receptor + signaling network
+  head(weighted_networks$gr) # interactions and their weights in the gene regulatory network
+  
+  weighted_networks_lr = weighted_networks$lr_sig %>% 
+    dplyr::rename(ligand = from, receptor = to) %>%
+    inner_join(lr_network %>% 
+                 distinct(ligand,receptor), by = c("ligand","receptor"))
+  
   
   
   ##########################################
