@@ -311,9 +311,11 @@ if(Merge_scATAC_snRNA){
   
 }
 
-##########################################
-# QCs of scATAC-seq
-##########################################
+########################################################
+########################################################
+# Section III : analyze the scATAC and scRNA
+########################################################
+########################################################
 srat_cr = readRDS(file = paste0(RdataDir, 
                                'seuratObj_multiome_snRNA.annotated_scATAC.merged.peaks.cr.',
                                '584K.annot_38280cells.rds'))
@@ -323,37 +325,39 @@ srat_cr = readRDS(file = paste0(RdataDir,
 srat_cr$high.tss <- ifelse(srat_cr$TSS.enrichment > 5, 'High', 'Low')
 #saveRDS(srat_cr, file = (paste0(RdataDir, 'seuratObj_scATAC_merged.peaks.cellranger_QCs.rds')))
 
-#TSSPlot(srat_cr, group.by = 'high.tss') + NoLegend()
-
-VlnPlot(srat_cr, features = "nCount_ATAC", ncol = 1, y.max = 10000, group.by = 'condition', pt.size = 0., log = TRUE) +
-  geom_hline(yintercept = c(1000, 1500, 2000))
-
-ggsave(filename = paste0(resDir, '/QCs_nCount_ATAC_cellRangerPeaks.pdf'), height =8, width = 12)
-
-VlnPlot(srat_cr, features = c("atac_fragments"), y.max = 10^6, group.by = 'condition', pt.size = 0, log = TRUE) +
-  geom_hline(yintercept = c(10000, 20000))
-ggsave(filename = paste0(resDir, '/QCs_atac_fragments_cellRangerPeaks_20k.pdf'), height =8, width = 12)
-
-VlnPlot(srat_cr, features = c("atac_raw_reads"), y.max = 10^6, group.by = 'condition', pt.size = 0, log = TRUE) +
-  geom_hline(yintercept = c(10000, 50000))
-ggsave(filename = paste0(resDir, '/QCs_atac_rawReads_cellRangerPeaks_50k.pdf'), height =8, width = 12)
-
-
-VlnPlot(srat_cr, features = c("pct_reads_in_peaks"))
-ggsave(filename = paste0(resDir, '/QCs_pct_readsWithinPeaks_cellRangerPeaks.pdf'), height =8, width = 12 )
-
-
-VlnPlot(object = srat_cr, features = c("TSS.enrichment"), pt.size = 0, y.max = 10) +
-  geom_hline(yintercept = c(1, 2))
-ggsave(filename = paste0(resDir, '/QCs_TSS.enrichment_cellRangerPeaks.pdf'), height =8, width = 12 )
-
-VlnPlot(object = srat_cr, features = c("nucleosome_signal"), pt.size = 0)
-ggsave(filename = paste0(resDir, '/QCs_nucleosome_signal_cellRangerPeaks.pdf'), height =8, width = 12 )
-
+make.QC.plots = FALSE
+if(make.QC.plots){
+  #TSSPlot(srat_cr, group.by = 'high.tss') + NoLegend()
+  
+  VlnPlot(srat_cr, features = "nCount_ATAC", ncol = 1, y.max = 10000, group.by = 'condition', pt.size = 0., log = TRUE) +
+    geom_hline(yintercept = c(1000, 1500, 2000))
+  
+  ggsave(filename = paste0(resDir, '/QCs_nCount_ATAC_cellRangerPeaks.pdf'), height =8, width = 12)
+  
+  VlnPlot(srat_cr, features = c("atac_fragments"), y.max = 10^6, group.by = 'condition', pt.size = 0, log = TRUE) +
+    geom_hline(yintercept = c(10000, 20000))
+  ggsave(filename = paste0(resDir, '/QCs_atac_fragments_cellRangerPeaks_20k.pdf'), height =8, width = 12)
+  
+  VlnPlot(srat_cr, features = c("atac_raw_reads"), y.max = 10^6, group.by = 'condition', pt.size = 0, log = TRUE) +
+    geom_hline(yintercept = c(10000, 50000))
+  ggsave(filename = paste0(resDir, '/QCs_atac_rawReads_cellRangerPeaks_50k.pdf'), height =8, width = 12)
+  
+  
+  VlnPlot(srat_cr, features = c("pct_reads_in_peaks"))
+  ggsave(filename = paste0(resDir, '/QCs_pct_readsWithinPeaks_cellRangerPeaks.pdf'), height =8, width = 12 )
+  
+  
+  VlnPlot(object = srat_cr, features = c("TSS.enrichment"), pt.size = 0, y.max = 10) +
+    geom_hline(yintercept = c(1, 2))
+  ggsave(filename = paste0(resDir, '/QCs_TSS.enrichment_cellRangerPeaks.pdf'), height =8, width = 12 )
+  
+  VlnPlot(object = srat_cr, features = c("nucleosome_signal"), pt.size = 0)
+  ggsave(filename = paste0(resDir, '/QCs_nucleosome_signal_cellRangerPeaks.pdf'), height =8, width = 12 )
+  
+}
 
 ##########################################
-# filter or not 
-# umap visualization both snRNA and scATAC
+# reprocess snRNÅ-seq data
 ##########################################
 DefaultAssay(srat_cr) <- "RNA"
 srat_cr$subtypes = srat_cr$subtypes_RNA
@@ -407,6 +411,16 @@ DimPlot(srat_cr, label = TRUE, repel = TRUE, reduction = 'umap') + NoLegend()
 
 DimPlot(srat_cr, label = TRUE, group.by = 'celltypes', repel = TRUE, reduction = 'umap') + NoLegend()
 
+save(srat_cr, file = paste0(RdataDir, 
+              'seuratObj_multiome_snRNA.annotated_normalized.umap_scATAC.merged.peaks.cr.',
+              '584K.annot_38280cells.rds'))
+
+##########################################
+# 
+##########################################
+srat_cr = readRDS(file = paste0(RdataDir, 
+              'seuratObj_multiome_snRNA.annotated_normalized.umap_scATAC.merged.peaks.cr.',
+              '584K.annot_38280cells.rds'))
 
 # normalize ATAC and UMAP
 DefaultAssay(srat_cr) <- "ATAC"
