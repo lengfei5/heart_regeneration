@@ -430,6 +430,7 @@ cistopic_workflow = function(bmat, topic=seq(20, 120, by=10)) {
   
   return(cisTopicObject)
   
+  
 }
 
 # Wrapper for SnapATAC workflow up until PCA step.

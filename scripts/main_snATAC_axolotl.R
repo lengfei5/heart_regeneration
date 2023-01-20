@@ -24,7 +24,6 @@ source('functions_scATAC.R')
 source('functions_scRNAseq.R')
 source('functions_Visium.R')
 
-
 library(Signac)
 library(Seurat)
 library(GenomeInfoDb)
@@ -37,7 +36,7 @@ require(dplyr)
 require(stringr)
 require(tidyr)
 require(tictoc)
-options(future.globals.maxSize = 64000 * 1024^2)
+options(future.globals.maxSize = 80000 * 1024^2)
 set.seed(1234)
 mem_used()
 
