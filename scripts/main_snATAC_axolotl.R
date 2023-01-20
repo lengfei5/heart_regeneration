@@ -324,6 +324,7 @@ srat_cr = readRDS(file = paste0(RdataDir,
 srat_cr$high.tss <- ifelse(srat_cr$TSS.enrichment > 5, 'High', 'Low')
 #saveRDS(srat_cr, file = (paste0(RdataDir, 'seuratObj_scATAC_merged.peaks.cellranger_QCs.rds')))
 
+
 make.QC.plots = FALSE
 if(make.QC.plots){
   #TSSPlot(srat_cr, group.by = 'high.tss') + NoLegend()
@@ -411,15 +412,17 @@ DimPlot(srat_cr, label = TRUE, repel = TRUE, reduction = 'umap') + NoLegend()
 DimPlot(srat_cr, label = TRUE, group.by = 'celltypes', repel = TRUE, reduction = 'umap') + NoLegend()
 
 save(srat_cr, file = paste0(RdataDir, 
-              'seuratObj_multiome_snRNA.annotated_normalized.umap_scATAC.merged.peaks.cr.',
+              'seuratObj_multiome_snRNA.annotated.normalized.umap_',
+              'scATAC.merged.peaks.cr.',
               '584K.annot_38280cells.rds'))
 
 ##########################################
-# 
+# process and normalize the ATAC-seq data 
 ##########################################
 srat_cr = readRDS(file = paste0(RdataDir, 
-              'seuratObj_multiome_snRNA.annotated_normalized.umap_scATAC.merged.peaks.cr.',
-              '584K.annot_38280cells.rds'))
+                                'seuratObj_multiome_snRNA.annotated.normalized.umap_',
+                                'scATAC.merged.peaks.cr.',
+                                '584K.annot_38280cells.rds'))
 
 # normalize ATAC and UMAP
 DefaultAssay(srat_cr) <- "ATAC"
@@ -438,6 +441,12 @@ if(Filter.cells.with.scATAC){
   )
   
 }
+
+Test_cisTopic = FALSE
+if(Test_cisTopic){
+  
+}
+
 
 srat_cr <- RunTFIDF(srat_cr)
 srat_cr = FindTopFeatures(srat_cr, min.cutoff = 'q5')
