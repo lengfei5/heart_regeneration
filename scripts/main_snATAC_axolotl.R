@@ -411,7 +411,7 @@ DimPlot(srat_cr, label = TRUE, repel = TRUE, reduction = 'umap') + NoLegend()
 
 DimPlot(srat_cr, label = TRUE, group.by = 'celltypes', repel = TRUE, reduction = 'umap') + NoLegend()
 
-save(srat_cr, file = paste0(RdataDir, 
+saveRDS(srat_cr, file = paste0(RdataDir, 
               'seuratObj_multiome_snRNA.annotated.normalized.umap_',
               'scATAC.merged.peaks.cr.',
               '584K.annot_38280cells.rds'))
