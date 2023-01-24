@@ -1591,7 +1591,8 @@ run_neighborhood_analysis = function(st,
 ########################################################
 run_misty_colocalization_analysis = function(st, 
                                              outDir,
-                                             RCTD_out
+                                             RCTD_out,
+                                             condSpec_celltypes = NULL
                                              )
 {
   library(tidyverse)
@@ -1690,6 +1691,18 @@ run_misty_colocalization_analysis = function(st,
     norm_weights = normalize_weights(results$weights) 
     weights = as.matrix(t(weights))
     norm_weights = as.matrix(t(norm_weights))
+    
+    if(!is.null(condSpec_celltypes)){
+      celltypes_sels = condSpec_celltypes[[which(names(condSpec_celltypes) == gsub('Amex_', '', cc[n]))]]
+      mm = match(celltypes_sels, rownames(weights))
+      if(length(which(is.na(mm))) == 0){
+        weights = weights[mm, ]
+        norm_weights = norm_weights[mm, ]
+        cat('--', nrow(weights), ' celltypes to use -- \n')
+      }
+    }else{
+      stop('some selected not found')
+    }
     
     # filter the subtypes without matching
     mm = match(colnames(stx), colnames(norm_weights))
