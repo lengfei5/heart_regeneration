@@ -53,8 +53,6 @@ refs$celltypes = refs$celltype_toUse
 table(refs$subtypes)
 length(table(refs$subtypes))
 
-# subtype time-specificity 
-condition.specific_celltypes = readRDS(paste0(RdataDir, 'RCTD_refs_condition_specificity.rds'))
 
 ########################################################
 ########################################################
@@ -68,6 +66,10 @@ if(Run_Neighborhood_Enrichment_Analysis){
   outDir = paste0(resDir, '/neighborhood_test/Run_misty_v1.6/')
   RCTD_out = paste0('../results/visium_axolotl_R12830_resequenced_20220308/',
                     'RCTD_subtype_out_42subtypes_ref.time.specific_v4.3')
+  
+  # condition-specific subtypes selected
+  condSpec_celltypes = readxl::read_xlsx("../data/neighbourhood_analysis_list_short.xlsx")
+  
   
   # run_neighborhood_analysis(st, 
   #                           outDir = outDir,
@@ -87,6 +89,9 @@ if(Run_Neighborhood_Enrichment_Analysis){
 # time-specifc and space-specific niches for nichenet
 ########################################################
 ########################################################
+
+# subtype time-specificity 
+condition.specific_celltypes = readRDS(paste0(RdataDir, 'RCTD_refs_condition_specificity.rds'))
 
 ##########################################
 # specific sub-populations to compare
