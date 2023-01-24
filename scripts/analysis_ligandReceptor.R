@@ -66,7 +66,8 @@ Run_Neighborhood_Enrichment_Analysis = FALSE
 if(Run_Neighborhood_Enrichment_Analysis){
   source('functions_Visium.R')
   outDir = paste0(resDir, '/neighborhood_test/Run_misty_v1.6/')
-  RCTD_out = '../results/visium_axolotl_R12830_resequenced_20220308/RCTD_subtype_out_42subtypes_ref.time.specific_v4.3'
+  RCTD_out = paste0('../results/visium_axolotl_R12830_resequenced_20220308/',
+                    'RCTD_subtype_out_42subtypes_ref.time.specific_v4.3')
   
   # run_neighborhood_analysis(st, 
   #                           outDir = outDir,

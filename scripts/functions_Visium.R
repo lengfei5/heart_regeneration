@@ -916,7 +916,7 @@ plot.RCTD.results = function(RCTD_out = '../results/RCTD_out',
   for(n in 1:length(cc))
   #for(n in c(1, 2, 4))
   {
-    # n = 1
+    # n = 2
     cat('slice -- ', cc[n], '\n')
     slice = cc[n]
     #stx = st[, which(st$condition == slice)]
@@ -1663,6 +1663,7 @@ run_misty_colocalization_analysis = function(st,
                      out.alias = misty_out)
     
     return(misty_out)
+    
   }
   
   # Main ------------------------------------------------------------------------
