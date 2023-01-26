@@ -8,6 +8,13 @@
 ##########################################################################
 ##########################################################################
 
+annots = readRDS('/groups/tanaka/People/current/jiwang/Genomes/axolotl/annotations/geneAnnotation_geneSymbols_cleaning_synteny_sameSymbols.hs.nr_curated.geneSymbol.toUse.rds')
+annots = annots[, c(1:7, 16)]
+
+write.table(annots, file = paste0("/groups/tanaka/People/current/jiwang/Genomes/axolotl/annotations/", 
+                                  "geneAnnotation_curated.geneSymbol.toUse.txt"), 
+            row.names = FALSE, col.names = TRUE, quote = FALSE, sep = "\t")
+
 ##########################################
 # CM umap  
 ##########################################
