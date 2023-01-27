@@ -85,6 +85,7 @@ run_dim_reduction = function(atac_matrix, cell_embeddings, dims, metadata=NULL, 
     Seurat::RunTSNE(reduction = reduction, dims = dims) %>%
     Seurat::FindNeighbors(reduction=reduction, nn.eps=0.25, dims=dims)
   return(seurat_obj)
+  
 }
 
 
