@@ -3,7 +3,7 @@
 #SBATCH --time=24:00:00
 #SBATCH --nodes=1
 #SBATCH --cpus-per-task=32
-#SBATCH --mem=300G
+#SBATCH --mem=1000G
 #SBATCH --job-name="sc_Rscript"
 #SBATCH --output="logs/slurm-%x_%j.out"
 #SBATCH --error="logs/slurm-%x_%j.err"
@@ -21,4 +21,5 @@ ml load r-bundle-bioconductor/3.14-foss-2021b-r-4.1.2
 #Rscript script_run_bayesSpace.R
 #Rscript script_snRNAseq_batchCorrection_animals.R
 #Rscript script_scATAC_cisTopic_downsample.R
-Rscript script_scATAC_cisTopic.R
+#Rscript script_scATAC_cisTopic.R
+Rscript run_LDA.R
