@@ -31,7 +31,7 @@ require(dplyr)
 require(stringr)
 require(tidyr)
 require(tictoc)
-options(future.globals.maxSize = 64000 * 1024^2)
+options(future.globals.maxSize = 80000 * 1024^2)
 
 mem_used()
 
