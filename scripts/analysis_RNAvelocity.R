@@ -12,6 +12,148 @@
 outDir = paste0(resDir, '/RNA_velocity/')
 system(paste0('mkdir -p ', outDir))
 
+##########################################
+# test kallisto annotation using BUSpaRse
+##########################################
+# test kallisto annotation file making 
+if(make_annotationFile_kallisto){
+  library(BUSpaRse)
+  library(Seurat)
+  #library(SeuratWrappers)
+  library(BSgenome.Mmusculus.UCSC.mm10)
+  library(AnnotationHub)
+  library(zeallot) # For %<-% that unpacks lists in the Python manner
+  library(DropletUtils)
+  library(tidyverse)
+  library(GGally) # For ggpairs
+  library(velocyto.R)
+  library(SingleR)
+  library(scales)
+  library(plotly)
+  theme_set(theme_bw())
+  
+  ah <- AnnotationHub()
+  query(ah, pattern = c("Ensembl", "97", "Mus musculus", "EnsDb"))
+  
+  # Get mouse Ensembl 97 annotation
+  edb <- ah[["AH73905"]]
+  
+  require("ensembldb")
+  
+  get_velocity_files(edb, L = 91, Genome = BSgenome.Mmusculus.UCSC.mm10, 
+                     out_path = paste0("/groups/tanaka/People/current/jiwang/Genomes/",
+                                       "axolotl/Transcriptomics/kallisto_RNAvelocity_index/test"), 
+                     isoform_action = "separate")
+  
+}
+
+##########################################
+# test eisaR and alevin 
+##########################################
+use_eisaR_alevein = FALSE
+if(use_eisaR_alevein){
+  suppressPackageStartupMessages({
+    library(Biostrings)
+    library(BSgenome)
+    library(eisaR)
+    library(GenomicFeatures)
+    library(SummarizedExperiment)
+    library(tximeta)
+    library(rjson)
+    library(reticulate)
+    library(SingleCellExperiment)
+    library(scater)
+  })
+  
+  # gtf and fa files of mouse using eisaR
+  # we load the eisaR package and extract a GRanges object 
+  # containing the genomic coordinates of each annotated transcript and intron. 
+  # In this example, we use the ‘separate’ approach to define introns separately for each transcript, 
+  # and add a flank length of 90nt to each intron.
+  
+  genomeDir = '/groups/tanaka/People/current/jiwang/Genomes/axolotl/Transcriptomics/alevin_velocity/'
+  
+  annotDir = '/groups/tanaka/People/current/jiwang/Genomes/axolotl/annotations/'
+  gtf = paste0(annotDir, 'AmexT_v47.chr.FINAL.FULL.gtf')
+  #annot = import(paste0(annotDir, 'AmexT_v47.release.gtf'))
+  #txdb <- GenomicFeatures::makeTxDbFromGFF(gtf, format = "gtf")
+  
+  #gtf <- "/groups/tanaka/People/current/jiwang/Genomes/mouse/mm10_ens/Mus_musculus.GRCm38.87.gtf"
+  genome.file = "/groups/tanaka/People/current/jiwang/Genomes/axolotl/AmexG_v6.DD.corrected.round2.chr.fa"
+  
+  ##########################################
+  # clean a bit the gtf for transcript name 
+  ##########################################
+  Clean_transcript_id = FALSE
+  if(Clean_transcript_id){
+    library('rtracklayer')
+    library(GenomicRanges)
+    library('GenomicFeatures')
+    
+    gtf = paste0(annotDir, 'AmexT_v47.release.gtf')
+    annot = rtracklayer::import(paste0(annotDir, 'AmexT_v47.release.gtf'))
+    
+    xx = annot[grep('chr', seqnames(annot))]
+    seqlevels(xx) <- seqlevelsInUse(xx)
+    
+    write.table(seqlevels(xx), file = paste0(genomeDir, 'AmexT_v47_genome.chrnames.txt'), 
+                sep = '\t', row.names = FALSE, col.names = FALSE, quote = FALSE)
+    
+    #sels = which(!is.na(xx$transcript_id))
+    
+    transcripts = xx$transcript_id
+    transcripts = sapply(transcripts, function(x) {test = unlist(strsplit(as.character(x), '[|]')); 
+    test[length(test)]})
+    xx$transcript_id = transcripts
+    
+    rtracklayer::export(xx, paste0(genomeDir, 'AmexT_v47.release_chr_transcript.id.cleaned.gtf'))
+  }
+  
+  
+  gtf = paste0(genomeDir, 'AmexT_v47.release_chr_transcript.id.cleaned.gtf')
+  
+  grl <- eisaR::getFeatureRanges(
+    gtf = gtf,
+    featureType = c("spliced", "intron"), 
+    intronType = "separate", 
+    flankLength = 90L, 
+    joinOverlappingIntrons = FALSE, 
+    verbose = TRUE
+  )
+  
+  grl[4:6]
+  
+  eisaR::exportToGtf(
+    grl, 
+    filepath = paste0(genomeDir, "AmexT_v47.annotation.expanded.gtf")
+  )
+  
+  head(metadata(grl)$corrgene)
+  
+  write.table(
+    metadata(grl)$corrgene, 
+    file = paste0(genomeDir, "AmexT_v47.annotation.expanded.features.tsv"),
+    row.names = FALSE, col.names = TRUE, quote = FALSE, sep = "\t"
+  )
+  
+  df <- eisaR::getTx2Gene(
+    grl, filepath = paste0(genomeDir, "AmexT_v47.annotation.expanded.tx2gene.tsv")
+  )
+  
+  genome <- Biostrings::readDNAStringSet(genome.file)
+  
+  names(genome) <- sapply(strsplit(names(genome), " "), .subset, 1)
+  seqs <- GenomicFeatures::extractTranscriptSeqs(
+    x = genome, 
+    transcripts = grl
+  )
+  
+  Biostrings::writeXStringSet(
+    seqs, filepath = paste0(genomeDir,  "AmexT_v47.annotation.expanded.fa")
+  )
+  
+  
+}
 
 ########################################################
 ########################################################
@@ -42,7 +184,7 @@ cols = c("#4CC9F0", "#49A2F0",
 
 DimPlot(aa, dims = c(1, 2), label = TRUE, repel = TRUE, group.by = 'subtypes', raster=FALSE,
         cols = cols
-) 
+)
 
 ggsave(filename = paste0(outDir, 'UMAP_CMsubsets_forRNAvelocity.pdf'), width = 10, height = 8)
 
@@ -75,7 +217,7 @@ library(Seurat)
 library(Seurat)
 library(DropletUtils)
 library(edgeR)
-library(BiocParallel)
+#library(BiocParallel)
 
 source('functions_scRNAseq.R')
 
@@ -83,6 +225,7 @@ dataDir = "../R13591_axolotl_multiome/kallisto_velocity"
 design = data.frame(sampleID = seq(197249, 197253), 
                     condition = c(paste0('Amex_scRNA_d', c(0, 1, 4, 7, 14))), 
                     stringsAsFactors = FALSE)
+
 design$time = gsub('Amex_scRNA_', '', design$condition)
 
 for(n in 1:nrow(design))
@@ -172,15 +315,53 @@ rm(g)
 #                            'cellCycleScoring_annot.v2_newUMAP_clusters_time_',
 #                            species, version.analysis, '.rds'))
 
-p1 = DimPlot(aa, label = TRUE, repel = TRUE, group.by = 'condition', raster=FALSE)
-p2 = DimPlot(aa, label = TRUE, repel = TRUE, group.by = 'subtypes', raster=FALSE, cols = cols)
-p1 + p2
+subsetting_further = FALSE
+if(subsetting_further){
+  
+  aa = subset(aa, cells = colnames(aa)[which(aa$subtypes == 'CM_IS'|aa$subtypes == "CM_Prol_IS")])
+  
+  aa <- FindVariableFeatures(aa, selection.method = "vst", nfeatures = 3000)
+  # 
+  aa <- ScaleData(aa)
+  # 
+  aa <- RunPCA(aa, features = VariableFeatures(object = aa), weight.by.var = TRUE, verbose = FALSE)
+  # 
+  ElbowPlot(aa, ndims = 50)
+  
+  aa <- RunUMAP(aa, dims = 1:20, n.neighbors = 20, min.dist = 0.3)
+  DimPlot(aa, label = TRUE, repel = TRUE, group.by = 'condition', raster=FALSE)
+  
+  source("functions_scRNAseq.R")
+  explore.umap.params.combination(sub.obj = aa, resDir = outDir, 
+                                  pdfname = 'axolotl_snRNA_RNAvelocity_umap_test.pdf',
+                                  use.parallelization = FALSE,
+                                  group.by = 'condition',
+                                  nfeatures.sampling = c(1000, 2000, 3000, 5000),
+                                  nb.pcs.sampling = c(20, 30, 50, 100), 
+                                  n.neighbors.sampling = c(20, 30, 50, 100, 200),
+                                  min.dist.sampling = c(0.1, 0.3)
+                                  
+  )
+  
+  aa <- FindVariableFeatures(aa, selection.method = "vst", nfeatures = 5000)
+  aa <- ScaleData(aa)
+  
+  aa <- RunPCA(aa, features = VariableFeatures(object = aa), weight.by.var = TRUE, verbose = FALSE)
+  aa <- RunUMAP(aa, dims = 1:20, n.neighbors = 30, min.dist = 0.3)
+  DimPlot(aa, label = TRUE, repel = TRUE, group.by = 'condition', raster=FALSE)
+  
+  
+}
 
-DimPlot(aa, label = TRUE, repel = TRUE, group.by = 'celltypes', raster=FALSE)
 
 ## load saved spliced and unspliced 
 load(file = paste0(RdataDir, 'seuratObject_spliced_unspliced_', species, version.analysis, '.Rdata'))
 aa$cell.id = aa$cell.ids
+
+# swapping the unspliced and spliced matrix
+#xx = spliced
+#spliced = unspliced
+#unspliced = xx 
 
 ## select features shares by spliced and unspliced
 features = intersect(rownames(spliced), rownames(unspliced))
@@ -234,12 +415,18 @@ DefaultAssay(mnt) = 'RNA'
 VariableFeatures(mnt)
 
 Idents(mnt) = mnt$condition
+mnt$condition = as.character(mnt$condition)
+mnt$celltypes = as.character(mnt$subtypes)
+
+mnt$celltypes[which(mnt$celltypes == "CM_ven_(Robo2)")] = "CM_ven_Robo2"
+mnt$celltypes[which(mnt$celltypes == "CM_ven_(Cav3_1)")] = "CM_ven_Cav3_1"
+
 #mnt = subset(mnt, downsample = 2000)
 
 #saveDir = paste0("/Volumes/groups/tanaka/People/current/jiwang/projects/RA_competence/",
 #                "results/scRNAseq_R13547_10x_mNT_20220813/RA_symetryBreaking/")
-
-saveFile = 'RNAmatrix_umap_kalisto.velocity_spliced_unspliced_CMsutypes_v1.h5Seurat'
+#saveFile = "RNAmatrix_umap_kalisto.velocity_spliced_unspliced_CMsutypes_v1.2.h5Seurat"
+saveFile = 'RNAmatrix_umap_kalisto.velocity_spliced_unspliced_CMsutypes_injurySpec_v2.2.h5Seurat'
 
 SaveH5Seurat(mnt, filename = paste0(outDir, saveFile), 
              overwrite = TRUE)
@@ -278,5 +465,7 @@ if(Test_umap_use.only.splicedMatrix){
   
 }
 
+### double check the intron and exon ratios
+xx = readRDS(file = "../results/Rdata/seuratObject_axloltl_scRNAseq_R13591_20220720_lognormamlized_pca_umap_v2.rds")
 
 

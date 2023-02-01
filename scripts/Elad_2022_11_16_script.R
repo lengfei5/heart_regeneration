@@ -69,7 +69,7 @@ DimPlot(aa, label = TRUE, repel = TRUE, split.by = "condition") + ggtitle("scNuc
 DimPlot(aa_sub, label = TRUE) + NoLegend()
 DimPlot(aa_sub, group.by = "subtypes")
 
-features = rownames(aa_sub)[grep('ARG1', rownames(aa))]
+features = rownames(aa)[grep('ROBO2', rownames(aa))]
 FeaturePlot(aa, features = features, cols = c('gray', 'red'))
 
 features = rownames(aa)[grep('DLGAP5', rownames(aa))]
@@ -82,8 +82,9 @@ aa
 features = rownames(aa)[grep('ITGA2B|MPL-AMEX60DD020059|ITGB3-AMEX60DD009754|PECAM|SELP', rownames(aa))]
 FeaturePlot(aa, features = features, cols = c('gray', 'red'))
 
-features = rownames(aa)[grep('CD68', rownames(aa))]
-FeaturePlot(aa, features = features, cols = c('gray', 'red'))
+features = rownames(CM_subset)[grep('AMEX60DD008752', rownames(CM_subset))]
+FeaturePlot(CM_subset, features = features, cols = c('gray', 'red'))
+VlnPlot(CM_subset, features = features)
 
 features = rownames(aa)[grep('MYH6|ACTN2|NPPA|TNNT2|GATA4', rownames(aa))]
 FeaturePlot(aa, features = features, cols = c('gray', 'red'))
@@ -92,7 +93,7 @@ DotPlot(Cluster_5_subest, features = features)$data[,c("features.plot", "id","pc
 features = rownames(aa)[grep('CD68|CD8A|CD74|CSF1R|ITGAM', rownames(aa))]
 FeaturePlot(aa, features = features, cols = c('gray', 'red'))
 
-features = rownames(aa)[grep('MKI67|CCNB2|PCNA-|CDK1-', rownames(aa))]
+features = rownames(aa)[grep('SMAD3', rownames(aa))]
 FeaturePlot(aa, features = features, cols = c('gray', 'red'))
 
 VlnPlot(pbmc, features = c("nFeature_RNA", "nCount_RNA", "percent.mt"), ncol = 3)
@@ -133,7 +134,7 @@ FeaturePlot(aa, features = features, cols = c('gray', 'red'))
 
 Cluster_5_subest <- subset(aa, idents = 5)
 #Subseting cluster
-pbmc <- RunPCA(pbmc, features = VariableFeatures(object = pbmc))
+
 
 
 
@@ -702,6 +703,7 @@ EC_subset$newId = Idents(EC_subset)
 
 #aa$subtypes = NA
 cell.sels = colnames(EC_subset)
+mm = match(cell.sels, colnames(aa))
 cat(length(which(is.na(cell.sels))), '--', length(mm), '\n')
 aa$subtypes[mm] = as.character(EC_subset$newId)
 
@@ -2286,7 +2288,7 @@ FeaturePlot(aa, features = features, split.by = "condition",  order = TRUE, cols
 
 #AMEX60DD008752 = HMGA1?
 
-EC_subset <- subset(aa1,  subtypes %in% c("EC", "EC_IS_(LOX)", "EC_(CEMIP)", "EC_(NOS3)", "EC_(WNT4)", "EC_Prol","EC_IS_(IARS1)","EC_IS_Prol","EC_(LHX6)"))
+EC_subset <- subset(aa,  subtypes %in% c("EC", "EC_IS_(LOX)", "EC_(CEMIP)", "EC_(NOS3)", "EC_(WNT4)", "EC_Prol","EC_IS_(IARS1)","EC_IS_Prol","EC_(LHX6)"))
 
 EC_subset <- FindVariableFeatures(EC_subset, selection.method = "vst", nfeatures = 2000)
 
@@ -2298,7 +2300,7 @@ EC_subset <- RunPCA(EC_subset, features = VariableFeatures(object = EC_subset))
 EC_subset <- FindNeighbors(EC_subset, dims = 1:10)
 
 
-EC_subset <- FindClusters(EC_subset, resolution = 0.25)
+#EC_subset <- FindClusters(EC_subset, resolution = 0.25)
 
 
 EC_subset <- RunUMAP(EC_subset, dims = 1:10)
@@ -2313,8 +2315,10 @@ DimPlot(EC_subset, group.by = "seurat_clusters")
 EC_subset_marker <- FindAllMarkers(EC_subset, min.pct = 0.4, min.diff.pct = 0.2) 
 
 
-features = rownames(aa)[grep('CSPG4', rownames(aa))]
-FeaturePlot(aa,  features = features, order = TRUE, cols = c("#dee2e6", "#661CB0"))
+features = rownames(EC_subset)[grep('EPHB4', rownames(EC_subset))]
+FeaturePlot(EC_subset,  features = features, order = TRUE, cols = c("#dee2e6", "#661CB0"))
+
+VlnPlot(EC_subset, features = features)
 
 load("/groups/tanaka/People/current/Paco/Collaborations/Elad_Paco/CellCycleGenes.RData")
 
@@ -2737,6 +2741,32 @@ DimPlot(CM_subset_hs,  cols = c(
   "#C61010"   
 ) )
 
+features_Robo2 = rownames(CM_subset_hs)[grep('ROBO2-AMEX60DD047486|JPH3-AMEX60DD017176|STAC-AMEX60DD03796', rownames(CM_subset_hs))]
+features_Cav = rownames(CM_subset_hs)[grep('RBPMS-AMEX60DD043590|CNTFR-AMEX60DD041547|SEPTIN9-AMEX60DD030744', rownames(CM_subset_hs))]
+features_OFT = rownames(CM_subset_hs)[grep('THSD4-AMEX60DD014724|CRISPLD2-AMEX60DD017214|GRIK2-AMEX60DD034010', rownames(CM_subset_hs))]
+features_A1 = rownames(CM_subset_hs)[grep('GFRA1-AMEX60DD053205|ADAMTS17-AMEX60DD003517|AGBL1-AMEX60DD004208', rownames(CM_subset_hs))]
+features_Ltbp2 = rownames(CM_subset_hs)[grep('LTBP2-AMEX60DD011463|TENM2-AMEX60DD030344|HCN4-AMEX60DD003883', rownames(CM_subset_hs))]
+
+
+CMmyLevels <- c("CM_Atria",
+                "CM_PM_(HCN4)",
+                "CM_OFT",
+                "CM_ven_(Cav3_1)",
+                "CM_ven_(Robo2)"
+                
+)
+
+
+
+
+factor(Idents(CM_subset_hs), levels= CMmyLevels)
+Idents(CM_subset_hs) <- factor(Idents(CM_subset_hs), levels= CMmyLevels)
+
+
+DotPlot(CM_subset_hs, col.min = 0, features = c( features_Robo2,features_Cav,features_OFT,features_Ltbp2,features_A1)) + RotatedAxis()
+############
+
+
 ######################################### FB_HS
 
 FB_subset_hs <- subset(aa,  subtypes %in%  c(  "FB_(PKD1)","FB_(TNXB)", "FB_(VWA2)"))
@@ -2838,28 +2868,452 @@ DimPlot(EC_subset_hs,  cols = c(
   
 ) )
 
-features_EC = rownames(EC_subest_2)[grep('LAMA2-AMEX60DD034687|KCNMB2-AMEX60DD030396|RADIL-AMEX60DD025680', rownames(CM_subset))]
-features_NOS3 = rownames(EC_subest_2)[grep('NOS3-AMEX60DD026163|ADAM15-AMEX60DD014884|HSPA12B-AMEX60DD046249', rownames(CM_subset))]
-features_WNT4 = rownames(EC_subest_2)[grep('KCNQ5-AMEX60DD033595|HEG1-AMEX60DD009667|WNT4-AMEX60DD052091', rownames(CM_subset))]
-features_VCAM1 = rownames(EC_subest_2)[grep('NTRK3-AMEX60DD004199|VCAM1-AMEX60DD018837|CA8-AMEX60DD039785', rownames(CM_subset))]
-features_LHX6 = rownames(EC_subest_2)[grep('PDE2A-AMEX60DD049847|ADGRF5-AMEX60DD032958|LHX6-AMEX60DD050778', rownames(CM_subset))]
+features_1 = rownames(EC_subset_hs)[grep('LAMA2-AMEX60DD034687|KCNMB2-AMEX60DD030396|RADIL-AMEX60DD025680', rownames(EC_subset_hs))]
+features_2 = rownames(EC_subset_hs)[grep('NOS3-AMEX60DD026163|ADAM15-AMEX60DD014884|HSPA12B-AMEX60DD046249', rownames(EC_subset_hs))]
+features_3 = rownames(EC_subset_hs)[grep('KCNQ5-AMEX60DD033595|HEG1-AMEX60DD009667|WNT4-AMEX60DD052091', rownames(EC_subset_hs))]
+features_4 = rownames(EC_subset_hs)[grep('PTH1R-AMEX60DD020537|SVEP1-AMEX60DD044566|NTRK3-AMEX60DD004199', rownames(EC_subset_hs))]
+features_5 = rownames(EC_subset_hs)[grep('PDE2A-AMEX60DD049847|ADGRF5-AMEX60DD032958|LHX6-AMEX60DD050778', rownames(EC_subset_hs))]
 
-FBmyLevels <- c( "FB_(PKD1)",
-                 "FB_(TNXB)",
-                 "FB_(VWA2)"
+ECmyLevels <- c( "EC",
+                 "EC_(NOS3)",
+                 "EC_(WNT4)",
+                 "EC_(CEMIP)",
                  
+                 "EC_(LHX6)"
+                 
+                
                  
 )
 
 
 
 
-factor(Idents(EC_subset_hs), levels= FBmyLevels)
-Idents(EC_subset_hs) <- factor(Idents(EC_subset_hs), levels= FBmyLevels)
+factor(Idents(EC_subset_hs), levels= ECmyLevels)
+Idents(EC_subset_hs) <- factor(Idents(EC_subset_hs), levels= ECmyLevels)
 
 
 #DotPlot(EC_subest_2, col.min = 0, features = c(features_EC,features_NOS3,features_WNT4,features_VCAM1,features_LHX6)) + RotatedAxis()
-DotPlot(EC_subset_hs, col.min = 0, features = c(features_3,features_2,features_1)) + RotatedAxis() & coord_flip()
+DotPlot(EC_subset_hs, col.min = 0, features = c(features_5,features_4,features_3,features_2,features_1)) + RotatedAxis() & coord_flip()
+############
+
+CM_subset_2 <- subset(aa,  subtypes %in%  c(  "CM_ven_(Robo2)", "CM_ven_(Cav3_1)", "CM_IS", "CM_Prol_1", "CM_Prol_3", "CM_Prol_IS"))
+DimPlot(CM_subset_2)
+CM_subset_2$subtypes -> Idents(CM_subset_2)
+
+CM_subset_2 <- FindVariableFeatures(CM_subset_2, selection.method = "vst", nfeatures = 2000)
+
+all.genes <- rownames(CM_subset_2)
+CM_subset_2 <- ScaleData(CM_subset_2, features = all.genes)
+
+CM_subset_2 <- RunPCA(CM_subset_2, features = VariableFeatures(object = CM_subset_2))
+
+CM_subset_2 <- FindNeighbors(CM_subset_2, dims = 1:10)
+
+
+CM_subset_2 <- FindClusters(CM_subset_2, resolution = 0.3)
+CM_subset_2$subtypes -> Idents(CM_subset_2)
+
+CM_subset_2 <- RunUMAP(CM_subset_2, dims = 1:10)
+
+CM_subset_2_marker <- FindAllMarkers(CM_subset_2, min.pct = 0.4, min.diff.pct = 0.2)
+
+CM_subset_2$subtypes -> Idents(CM_subset_2)
+
+load("/groups/tanaka/People/current/Paco/Collaborations/Elad_Paco/CellCycleGenes.RData")
+
+s.genes.new <- c()
+for (i in s.genes) {
+  s.genes.new <-c(s.genes.new, rownames(CM_subset_2)[grep(i, rownames(CM_subset_2))])
+}
+
+g2m.genes.new <- c()
+for (i in g2m.genes) {
+  g2m.genes.new <-c(g2m.genes.new, rownames(CM_subset_2)[grep(i, rownames(CM_subset_2))])
+}
+
+CM_subset_2 <- CellCycleScoring(CM_subset_2, s.features = s.genes.new, g2m.features = g2m.genes.new, set.ident = TRUE)
+
+
+CMmyLevels <- c(  "CM_ven_(Robo2)", "CM_ven_(Cav3_1)", "CM_IS","CM_Prol_IS", "CM_Prol_1", "CM_Prol_3")
+
+
+
+
+factor(Idents(CM_subset_2), levels= CMmyLevels)
+Idents(CM_subset_2) <- factor(Idents(CM_subset_2), levels= CMmyLevels)
+
+DimPlot(CM_subset_2, group.by = "Phase",  cols = c(
+  
+  "#4CC9F0",
+  
+  "#C61010"  ,
+  "#414CDC"
+  
+  
+) )
+
+features_Robo2 = rownames(CM_subset_2)[grep('ROBO2-AMEX60DD047486|SCN5A-AMEX60DD021356|HRH2-AMEX60DD027783', rownames(CM_subset_2))]
+features_Cav = rownames(CM_subset_2)[grep('CACNA1G-AMEX60DD030985|AGBL1-AMEX60DD004208|CPA6-AMEX60DD039860', rownames(CM_subset_2))]
+features_IS = rownames(CM_subset_2)[grep('ACAN-AMEX60DD007108|ADAMTS6-AMEX60DD042234|ARHGAP31-AMEX60DD047024', rownames(CM_subset_2))]
+features_PIS = rownames(CM_subset_2)[grep('CACNA1D-AMEX60DD023703|NPPA-AMEX60DD051099|CTF1-AMEX60DD028289', rownames(CM_subset_2))]
+features_Pro1 = rownames(CM_subset_2)[grep('CENPF-AMEX60DD036088|ASPM-AMEX60DD018743|ANLN-AMEX60DD03806', rownames(CM_subset_2))]
+features_Pro3 = rownames(CM_subset_2)[grep('E2F1-AMEX60DD028458|DIAPH3-AMEX60DD048907|CENPE-AMEX60DD044675', rownames(CM_subset_2))]
+
+
+CMmyLevels <- c(  "CM_Prol_3", "CM_Prol_1", "CM_Prol_IS","CM_IS", "CM_ven_(Cav3_1)", "CM_ven_(Robo2)")
+
+
+
+factor(Idents(CM_subset_2), levels= CMmyLevels)
+Idents(CM_subset_2) <- factor(Idents(CM_subset_2), levels= CMmyLevels)
+
+
+DotPlot(CM_subset_2, col.min = 0, features = c( features_Robo2,features_Cav,features_IS,features_PIS,features_Pro1,features_Pro3)) + RotatedAxis()
+############
+############
+
+CM_subset <- subset(aa,  subtypes %in%  c(  "CM_ven_(Robo2)", "CM_ven_(Cav3_1)", "CM_IS", "CM_Prol_1", "CM_Prol_3", "CM_Prol_IS"))
+CM_subset$subtypes -> Idents(CM_subset)
+DimPlot(CM_subset)
+
+
+CM_subset <- FindVariableFeatures(CM_subset, selection.method = "vst", nfeatures = 2000)
+
+all.genes <- rownames(CM_subset)
+CM_subset <- ScaleData(CM_subset, features = all.genes)
+
+CM_subset <- RunPCA(CM_subset, features = VariableFeatures(object = CM_subset))
+
+CM_subset <- FindNeighbors(CM_subset, dims = 1:10)
+
+
+CM_subset <- FindClusters(CM_subset, resolution = 0.3)
+CM_subset$subtypes -> Idents(CM_subset)
+
+CM_subset <- RunUMAP(CM_subset, dims = 1:10)
+
+CM_subset_marker <- FindAllMarkers(CM_subset, min.pct = 0.4, min.diff.pct = 0.2)
+
+CM_subset$subtypes -> Idents(CM_subset)
+
+CM_IS_VS_ROBO2 <- FindMarkers(aa, ident.1 = "CM_IS", ident.2 = c("CM_ven_(Robo2)"), min.pct = 0.4, min.diff.pct = 0.2)
+
+CMmyLevels <- c(  "CM_ven_(Robo2)", "CM_ven_(Cav3_1)", "CM_IS","CM_Prol_IS", "CM_Prol_1", "CM_Prol_3")
+
+
+
+
+factor(Idents(CM_subset), levels= CMmyLevels)
+Idents(CM_subset) <- factor(Idents(CM_subset), levels= CMmyLevels)
+
+DimPlot(CM_subset,  cols = c(
+  
+  
+  "#4CC9F0",
+  
+  "#49A2F0",
+  "#941F56",
+  
+  "#C61010",  
+  
+  "#4361EE",
+  
+  "#3F37C9"
+  
+  
+  
+  
+) )
+
+
+FB_subset <- subset(aa,  subtypes %in%  c(  "FB_(PKD1)","FB_(TNXB)", "FB_(VWA2)", "FB_IS_(TFPI2)", "FB_IS_(TNC)", "FB_Prol"))
+DimPlot(FB_subset)
+FB_subset$subtypes -> Idents(FB_subset)
+
+FB_subset <- FindVariableFeatures(FB_subset, selection.method = "vst", nfeatures = 2000)
+
+all.genes <- rownames(FB_subset)
+FB_subset <- ScaleData(FB_subset, features = all.genes)
+
+FB_subset <- RunPCA(FB_subset, features = VariableFeatures(object = FB_subset))
+
+FB_subset <- FindNeighbors(FB_subset, dims = 1:10)
+
+
+FB_subset <- FindClusters(FB_subset, resolution = 0.3)
+
+FB_subset <- RunUMAP(FB_subset, dims = 1:10)
+FB_subset$subtypes -> Idents(FB_subset)
+
+FB_subset_marker <- FindAllMarkers(FB_subset, min.pct = 0.4, min.diff.pct = 0.2)
+
+DimPlot(FB_subset, label = TRUE,  cols = c(
+  
+  "#4CC9F0",
+
+  "#49A2F0",
+ 
+  "#4361EE",
+
+  "#4042D3",
+ 
+  "#941F56",
+ 
+  "#C61010"  
+  
+) )
+
+features_1 = rownames(FB_subset)[grep('C3-AMEX60DD032076|SLC29A1-AMEX60DD036508|KRT19-AMEX60DD010100', rownames(FB_subset))]
+features_2 = rownames(FB_subset)[grep('TNXB-AMEX60DD010491|ADAMTS15-AMEX60DD053555|POSTN-AMEX60DD049175', rownames(FB_subset))]
+features_3 = rownames(FB_subset)[grep('ACAN-AMEX60DD004178|VWA2-AMEX60DD053181|CSPG5-AMEX60DD026060', rownames(FB_subset))]
+features_4 = rownames(FB_subset)[grep('TFPI2-AMEX60DD022268|CXCL14-AMEX60DD028973|HAS1-AMEX60DD017885', rownames(FB_subset))]
+features_5 = rownames(FB_subset)[grep('TNC-AMEX60DD050822|ERG-AMEX60DD047184|COL11A1-AMEX60DD018809', rownames(FB_subset))]
+features_6 = rownames(FB_subset)[grep('ASPM-AMEX60DD018743|CENPF-AMEX60DD036088|IQGAP3-AMEX60DD016824', rownames(FB_subset))]
+
+
+FBmyLevels <- c(  "FB_Prol","FB_IS_(TNC)", "FB_IS_(TFPI2)", "FB_(VWA2)", "FB_(TNXB)", "FB_(PKD1)")
+
+
+factor(Idents(FB_subset), levels= FBmyLevels)
+Idents(FB_subset) <- factor(Idents(FB_subset), levels= FBmyLevels)
+
+
+#DotPlot(EC_subest_2, col.min = 0, features = c(features_EC,features_NOS3,features_WNT4,features_VCAM1,features_LHX6)) + RotatedAxis()
+DotPlot(FB_subset, col.min = 0, features = c(features_1,features_2,features_3,features_4,features_5,features_6)) + RotatedAxis() 
+############
+
+#############
+MY_subset <- subset(aa,  subtypes %in% c(
+
+"B_cells_(FOXO1)",
+"B_cells_(SIGLEC11)", 
+"B_cells_Prol",
+"Mo/Macs_(FAXDC2)",
+"Mo/Macs_(SNX22)",
+"Mo/Macs_Prol",
+"Mo/Macs_resident",
+"Neu_(DYSF)",
+"Neu_(IL1R1)",
+"T_cells"
+))
+
+#MY_subset_2 <- subset(aa1,  subtypes %in% c("Mono_Macrophages", "Neutrophil","Proliferating_Mono_Macrophages", "Resident_MF" ))
+
+#MY_subset <- subset(MY_subset,  subtypes %in% c("Mono/MF_(CD163L1+)", "B_cells_(MUSK+)", "B_Cells", "T_cells", "B_cells_(Prol)", "Mono/MF_(Prol)"))
+
+MY_subset <- FindVariableFeatures(MY_subset, selection.method = "vst", nfeatures = 2000)
+
+all.genes <- rownames(MY_subset)
+MY_subset <- ScaleData(MY_subset, features = all.genes)
+
+MY_subset <- RunPCA(MY_subset, features = VariableFeatures(object = MY_subset))
+
+MY_subset <- FindNeighbors(MY_subset, dims = 1:10)
+MY_subset$subtypes -> Idents(MY_subset)
+
+#MY_subset <- FindClusters(MY_subset, resolution = 0.3)
+
+MY_subset <- RunUMAP(MY_subset, dims = 1:10)
+
+MY_subset_marker <- FindAllMarkers(MY_subset, min.pct = 0.4, min.diff.pct = 0.2)
+
+
+features = rownames(MY_subset)[grep('ITGB3-AMEX60DD00975', rownames(MY_subset))]
+FeaturePlot(MY_subset, features = features, order = TRUE, cols = c("#dee2e6", "#661CB0"))
+
+DimPlot(MY_subset)
+DimPlot(MY_subset, group.by = "subtypes")
+DimPlot(MY_subset, split.by = "condition")
+DimPlot(MY_subset, split.by = "condition", group.by = "subtypes")
+
+DimPlot(MY_subset, split.by = "condition",  cols = c(
+  "#ADE8F4",
+  "#90E0EF",
+  "#48CAE4",
+  "#0096C7",
+  
+  "#0077B6",
+  "#023E8A",
+  "#03045E",
+  "#941F56",
+  "#AD1833",
+  "#FB3640"  
+  
+  
+  
+ 
+  
+) )
+##MY.cluster.ids <- c("Mono/MF_(CD163L1+)", "B_cells_(MUSK+)", "Mono/MF_(PLBD1+)", "B_Cells", "T_cells", "B_cells_(Prol)", "T_cells", "Mono/MF_(Prol)")
+#names(MY.cluster.ids) <- levels(MY_subset)
+#MY_subset <- RenameIdents(MY_subset, MY.cluster.ids)
+
+#MY_subset$subtypes -> MY_subset_2$newId_1
+
+#############
+MY_subset <- subset(aa,  subtypes %in% c(
+  
+
+  "Mo/Macs_(FAXDC2)",
+  "Mo/Macs_(SNX22)",
+  "Mo/Macs_Prol",
+  "Mo/Macs_resident",
+  "Neu_(DYSF)",
+  "Neu_(IL1R1)"
+  
+))
+
+#MY_subset_2 <- subset(aa1,  subtypes %in% c("Mono_Macrophages", "Neutrophil","Proliferating_Mono_Macrophages", "Resident_MF" ))
+
+#MY_subset <- subset(MY_subset,  subtypes %in% c("Mono/MF_(CD163L1+)", "B_cells_(MUSK+)", "B_Cells", "T_cells", "B_cells_(Prol)", "Mono/MF_(Prol)"))
+
+MY_subset <- FindVariableFeatures(MY_subset, selection.method = "vst", nfeatures = 2000)
+
+all.genes <- rownames(MY_subset)
+MY_subset <- ScaleData(MY_subset, features = all.genes)
+
+MY_subset <- RunPCA(MY_subset, features = VariableFeatures(object = MY_subset))
+
+MY_subset <- FindNeighbors(MY_subset, dims = 1:10)
+MY_subset$subtypes -> Idents(MY_subset)
+
+#MY_subset <- FindClusters(MY_subset, resolution = 0.3)
+
+MY_subset <- RunUMAP(MY_subset, dims = 1:10)
+
+MY_subset_marker <- FindAllMarkers(MY_subset, min.pct = 0.4, min.diff.pct = 0.2)
+
+
+features = rownames(MY_subset)[grep('ITGB3-AMEX60DD00975', rownames(MY_subset))]
+FeaturePlot(MY_subset, features = features, order = TRUE, cols = c("#dee2e6", "#661CB0"))
+
+DimPlot(MY_subset)
+DimPlot(MY_subset, group.by = "subtypes")
+DimPlot(MY_subset, split.by = "condition")
+DimPlot(MY_subset, split.by = "condition", group.by = "subtypes")
+
+DimPlot(MY_subset,split.by = "condition",  cols = c(
+  "#ADE8F4",
+  
+  "#48CAE4",
+  "#0096C7",
+  
+  "#0077B6",
+  
+ 
+  "#941F56",
+  "#AD1833",
+  "#FB3640"  
+  
+) )
+
+load("/groups/tanaka/People/current/Paco/Collaborations/Elad_Paco/CellCycleGenes.RData")
+
+s.genes.new <- c()
+for (i in s.genes) {
+  s.genes.new <-c(s.genes.new, rownames(MY_subset)[grep(i, rownames(MY_subset))])
+}
+
+g2m.genes.new <- c()
+for (i in g2m.genes) {
+  g2m.genes.new <-c(g2m.genes.new, rownames(MY_subset)[grep(i, rownames(MY_subset))])
+}
+
+MY_subset <- CellCycleScoring(MY_subset, s.features = s.genes.new, g2m.features = g2m.genes.new, set.ident = TRUE)
+
+MY_subset_2 <- ScaleData(MY_subset, vars.to.regress = c("S.Score", "G2M.Score"), features = rownames(MY_subset))
+
+MY_subset_2 <- RunPCA(MY_subset_2, features = VariableFeatures(object = MY_subset_2))
+
+MY_subset_2 <- RunUMAP(MY_subset_2, dims = 1:10)
+
+MY_subset_2$subtypes -> Idents(MY_subset_2)
+
+DimPlot(MY_subset,   cols = c(
+  "#ADE8F4",
+  
+  "#48CAE4",
+  "#0096C7",
+  
+  "#0077B6",
+  
+  
+  "#941F56",
+  "#AD1833",
+  "#FB3640"  
+  
+) )
+
+features_1 = rownames(MY_subset)[grep('AXL-AMEX60DD024484|CD163L1-AMEX60DD01641|ADGRL3-AMEX60DD043519', rownames(MY_subset))]
+features_2 = rownames(MY_subset)[grep('FAXDC2-AMEX60DD030063|PLBD1-AMEX60DD029125|PARVG-AMEX60DD006445', rownames(MY_subset))]
+features_3 = rownames(MY_subset)[grep('LGALS9-AMEX60DD054072|SNX22-AMEX60DD003839|ITGAD-AMEX60DD028068', rownames(MY_subset))]
+features_4 = rownames(MY_subset)[grep('NSD2-AMEX60DD046033|ASPM-AMEX60DD018743|SMC4-AMEX60DD00181', rownames(MY_subset))]
+features_5 = rownames(MY_subset)[grep('DYSF-AMEX60DD046270|HVCN1-AMEX60DD000672|CFP-AMEX60DD020986', rownames(MY_subset))]
+features_6 = rownames(MY_subset)[grep('ARG1-AMEX60DD034655|IL1R1-AMEX60DD048111|CSF3R-AMEX60DD00590', rownames(MY_subset))]
+
+
+MYmyLevels <- c(
+  
+  "Neu_(IL1R1)",
+  "Neu_(DYSF)",
+  "Mo/Macs_Prol",
+  "Mo/Macs_(SNX22)",
+    "Mo/Macs_(FAXDC2)",
+  "Mo/Macs_resident"
+  
+
+)
+
+
+factor(Idents(MY_subset), levels= MYmyLevels)
+Idents(MY_subset) <- factor(Idents(MY_subset), levels= MYmyLevels)
+
+
+#DotPlot(EC_subest_2, col.min = 0, features = c(features_EC,features_NOS3,features_WNT4,features_VCAM1,features_LHX6)) + RotatedAxis()
+DotPlot(MY_subset, col.min = 0, features = c(features_1,features_2,features_3,features_4,features_5,features_6)) + RotatedAxis() 
+############
+
+DimPlot (aa,  cols = c("B_cells_(FOXO1)" =  "#E3F2FD"   ,       "B_cells_(SIGLEC11)" = "#BBDEFB"  ,             "B_cells_Prol"  =  "#90CAF9"  ,           
+                    
+                "CM_Atria"  = "#E01E37", "CM_Atria_Tagln" = "#C71F37" ,   "CM_IS" =    "#DA1E37"      , "CM_OFT" =    "#B41E35"     , 
+                "CM_PM_(HCN4)"=  "#A11D33",
+
+"CM_Prol_1" = "#931B2F",             "CM_Prol_2" = "#85182A" ,              "CM_Prol_3" = "#801729",        "CM_Prol_IS" = "#7A1627" ,
+
+"CM_ven_(Cav3_1)" = "#771626",       "CM_ven_(Robo2)" ="#641220" ,  
+"EC" = "#007F5F", "EC_(CEMIP)" = "#2B9348"     , "EC_(LHX6)" = "#55A630"  ,  "EC_(NOS3)" = "#80B918",  "EC_(WNT4)" = "#AACC00",
+
+"EC_IS_(IARS1)"  = "#BFD200" ,              "EC_IS_(LOX)"= "#D4D700"  ,                "EC_IS_Prol" = "#E6E710",                    "EC_Prol"= "#E2E211",
+
+"FB_(PKD1)"=  "#CC5803",                  "FB_(TNXB)" ="#E2711D" ,                  "FB_(VWA2)"= "#FF9505",               "FB_IS_(TFPI2)" ="#FFB627",
+
+"FB_IS_(TNC)" = "#FFC04C",                    "FB_Prol"="#FFC971",               "Megakeryocytes" ="#EDC4B3" ,           "Mo/Macs_(FAXDC2)" ="#42A5F5",
+
+"Mo/Macs_(SNX22)"= "#64B5F6",                "Mo/Macs_Prol" ="#2196F3",            "Mo/Macs_resident"=  "#1E88E5",                 "Neu_(DYSF)"= "#1565C0",
+
+"Neu_(IL1R1)"="#0D47A1" ,                    "Neuronal"="#979dac",    "Proliferating_Megakeryocytes"="#DEAB90"  ,            "Proliferating_RBC"="#9D6B53",
+
+"RBC"= "#F3D5B5" ,                    "T_cells"= "#5c677d"))
+
+####
+
+DimPlot (MY_subset, label = TRUE,  cols = c("B_cells_(FOXO1)" =  "#CAF0F8"   ,       "B_cells_(SIGLEC11)" = "#ADE8F4"  ,             "B_cells_Prol"  =  "#90E0EF"  ,           
+                       
+                               "FB_IS_(TFPI2)" ="#48CAE4",
+                       
+                            "Mo/Macs_(FAXDC2)" ="#00B4D8",
+                       
+                       "Mo/Macs_(SNX22)"= "#0096C7",                "Mo/Macs_Prol" ="#0096C7",            "Mo/Macs_resident"=  "#0077B6",                 "Neu_(DYSF)"= "#023E8A",
+                       
+                       "Neu_(IL1R1)"="#03045E" ,                          "T_cells"= "#5c677d"))
+#####
+
+head(AverageExpression(CM_subset, pb.method = "aggregate" ,slot = "counts", assays = "RNA"))
+head(PseudobulkExpression(CM_subset, slot = "counts", assays = "RNA"))
+
+  
+
+
 ############
 
 ##### color scheme
@@ -2911,13 +3365,39 @@ DotPlot(EC_subset_hs, col.min = 0, features = c(features_3,features_2,features_1
 "641220"
 
 
+#light-blue - dark blue- purple - red - 10 colors
+"#ADE8F4",
+"#90E0EF",
+"#48CAE4",
+"#0096C7",
 
+"#0077B6",
+"#023E8A",
+"#03045E",
+"#941F56",
+"#AD1833",
+"#FB3640"  
 
 
 ######
+features = rownames(aa)[grep('FYB1', rownames(aa))]
+FeaturePlot(aa, features = features, order = TRUE, cols = c("#dee2e6", "#661CB0"))
+VlnPlot(CM_subset, features = features)
+
+## view specific cells dimplot
+DimPlot(aa, cells = names(aa$condition)[aa$condition == "Amex_scRNA_d0"])
+
+number_cluster <- c()
+
+for (i in levels(aa$condition)) {
+  number_cluster <- rbind(number_cluster, summary(aa$subtypes[names(aa$condition)[aa$condition == i]]) )
+}
+
+rownames(number_cluster) <- levels(aa$condition)
 
 
-
+## saverds
 saveRDS(aa1, "/groups/tanaka/Collaborations/Jingkui-Elad/scMultiome/aa_subtypes_final_20221117.rds")
 
+write.csv(number_cluster, "/groups/tanaka/People/current/Elad/number_of_clusters_for_deconv.csv", quote = F)
 
