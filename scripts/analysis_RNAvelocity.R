@@ -173,7 +173,7 @@ levels = c("Amex_scRNA_d0", "Amex_scRNA_d1",
            "Amex_scRNA_d14")
 Idents(aa) = factor(aa$condition, levels = levels)
 
-DimPlot(aa, label = TRUE, repel = TRUE, group.by = 'condition', raster=FALSE)
+#DimPlot(aa, label = TRUE, repel = TRUE, group.by = 'condition', raster=FALSE)
 
 CMmyLevels <- c(  "CM_ven_(Robo2)", "CM_ven_(Cav3_1)", "CM_IS","CM_Prol_IS", "CM_Prol_1", "CM_Prol_3")
 aa$subtypes = factor(aa$subtypes, levels = CMmyLevels)
@@ -187,6 +187,14 @@ DimPlot(aa, dims = c(1, 2), label = TRUE, repel = TRUE, group.by = 'subtypes', r
 )
 
 ggsave(filename = paste0(outDir, 'UMAP_CMsubsets_forRNAvelocity.pdf'), width = 10, height = 8)
+
+xx = aa
+xx@reductions$umap@cell.embeddings = -xx@reductions$umap@cell.embeddings
+DimPlot(xx, dims = c(1, 2), label = TRUE, repel = TRUE, group.by = 'subtypes', raster=FALSE,
+        cols = cols
+)
+
+aa = xx
 
 ## this is how the umap was calculated
 # CM_subset_2 = aa
@@ -425,8 +433,8 @@ mnt$celltypes[which(mnt$celltypes == "CM_ven_(Cav3_1)")] = "CM_ven_Cav3_1"
 
 #saveDir = paste0("/Volumes/groups/tanaka/People/current/jiwang/projects/RA_competence/",
 #                "results/scRNAseq_R13547_10x_mNT_20220813/RA_symetryBreaking/")
-#saveFile = "RNAmatrix_umap_kalisto.velocity_spliced_unspliced_CMsutypes_v1.2.h5Seurat"
-saveFile = 'RNAmatrix_umap_kalisto.velocity_spliced_unspliced_CMsutypes_injurySpec_v2.2.h5Seurat'
+saveFile = "RNAmatrix_umap_kalisto.velocity_spliced_unspliced_CMsutypes_v1.5.h5Seurat"
+#saveFile = 'RNAmatrix_umap_kalisto.velocity_spliced_unspliced_CMsutypes_injurySpec_v2.2.h5Seurat'
 
 SaveH5Seurat(mnt, filename = paste0(outDir, saveFile), 
              overwrite = TRUE)
