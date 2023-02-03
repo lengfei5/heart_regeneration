@@ -100,7 +100,7 @@ if(Run_Neighborhood_Enrichment_Analysis){
   # 
   condSpec_celltypes = list(d1 = c('EC', "EC_CEMIP", "EC_LHX6", 'EC_NOS3', "EC_WNT4", 'EC_IS_IARS1', "EC_Prol",
                                    "FB_PKD1", "FB_TNXB",'FB_IS_TFPI2',
-                                   'Mo.Macs_SNX22', "Neu_DYSF", "Neu_IL1R1",
+                                   'Mo.Macs_SNX22', "Neu_DYSF", "Neu_IL1R1", 
                                    "CM_Robo2", "CM_Cav3.1",  'CM_IS', "CM_Prol_1", "CM_Prol_3",
                                    "Megakeryocytes", "Proliferating_Megakeryocytes", "RBC", "Proliferating_RBC"),
                             
@@ -172,51 +172,64 @@ timepoint_specific = TRUE
 # )
 
 celltypes_BZ_timeSepcific = list(day1 = c('EC', 'EC_NOS3', "FB_TNXB", 
-                                          "CM_Cav3.1","CM_Robo2", "CM_IS", "RBC"),
-                                 day4 = c('EC', 'EC_IS_LOX',  "FB_PKD1", "Mo.Macs_FAXDC2", 'Mo.Macs_SNX22', 
-                                          'Neu_DYSF', 'CM_IS',"CM_Robo2", 'CM_Prol_IS', "Megakeryocytes" ,'RBC'),
-                                 day7 = c('EC_NOS3','EC_IS_LOX', "FB_PKD1",  "FB_TNXB", "Mo.Macs_FAXDC2",  
-                                          'Neu_DYSF', "CM_Robo2", 'CM_Prol_IS', "Megakeryocytes" ,'RBC'),
-                                 day14 = c('EC_NOS3', "FB_PKD1", "FB_TNXB", "Mo.Macs_resident", 'Neu_DYSF', 
+                                          "CM_Cav3.1", "CM_Robo2", "CM_IS", 
+                                          "Megakeryocytes", "RBC"),
+                                 day4 = c('EC', 'EC_IS_LOX', "FB_PKD1", 
+                                          "Mo.Macs_FAXDC2", 'Mo.Macs_SNX22', 
+                                          'Neu_DYSF', "CM_Robo2", 'CM_Prol_IS', "CM_IS",
+                                          "Megakeryocytes" ,'RBC'),
+                                 day7 = c('EC_NOS3', 'EC_IS_LOX', "FB_PKD1","FB_TNXB", 
+                                          "Mo.Macs_FAXDC2", 'Neu_DYSF',
+                                          "CM_Robo2", 'CM_Prol_IS', "CM_IS",
+                                          "Megakeryocytes" ,'RBC'),
+                                 day14 = c('EC_NOS3', "FB_PKD1", "FB_TNXB", 
+                                           "Mo.Macs_resident", 'Neu_DYSF', "CM_IS", 'CM_Prol_IS',
                                            "CM_Robo2", 'RBC')
 )
 
-# celltypes_RZ_timeSepcific = list(day1 = c('EC', 'EC_NOS3', 'FB_PKD1', 'FB_IS_TFPI2', 'Mo.Macs_SNX22', 
-#                                           'CM_Robo2', 'CM_IS'),
-#                                  day4 = c('EC', 'EC_NOS3', 'EC_WNT4', 'FB_PKD1', 'CM_Robo2'),
-#                                  dya7 = c('EC', 'EC_NOS3', 'EC_IS_Prol', 'FB_PKD1', 'Neu_IL1R1', 'CM_Robo2'),
-#                                  day14 = c('EC', 'EC_NOS3', 'EC_IS_Prol', 'FB_PKD1', 'CM_Robo2')
-#                                  )
+# celltypes_RZ_timeSepcific = list(day1 = c('EC', 'EC_NOS3', 'FB_PKD1', 'CM_Robo2'),
+#                                  day4 = c('EC', 'EC_NOS3', 'FB_PKD1', 'CM_Robo2'),
+#                                  dya7 = c('EC', 'EC_NOS3', 'FB_PKD1', 'CM_Robo2'),
+#                                  day14 = c('EC', 'EC_NOS3', 'FB_PKD1', 'CM_Robo2')
+# )
 
-celltypes_RZ_timeSepcific = list(day1 = c('EC', 'EC_NOS3', 'FB_PKD1', 'CM_Robo2'),
-                                 day4 = c('EC', 'EC_NOS3', 'FB_PKD1', 'CM_Robo2'),
-                                 dya7 = c('EC', 'EC_NOS3', 'FB_PKD1', 'CM_Robo2'),
-                                 day14 = c('EC', 'EC_NOS3', 'FB_PKD1', 'CM_Robo2')
-)
+celltypes_RZ_timeSepcific = list(day1 = c('EC', 'EC_NOS3', "FB_TNXB", 'Mo.Macs_SNX22',
+                                          "CM_Cav3.1", "CM_Robo2", 'RBC'),
+                                 day4 = c('EC', 'EC_NOS3', 'FB_PKD1', 'CM_Robo2', 'CM_Prol_IS', "RBC"),
+                                 dya7 = c('EC', 'EC_NOS3', 'FB_PKD1', "FB_TNXB", 'CM_Robo2'),
+                                 day14 = c('EC', 'EC_NOS3', 'FB_PKD1', 'CM_Robo2', "RBC")
+                                 )
 
-receiver_cells_BZ = 'CM_IS'
-receiver_cells_RZ = 'CM_Robo2'
+receiver_cells_BZ = list(day1 = c("CM_IS"),
+                         day4 = c('CM_Prol_IS', "CM_IS"),
+                         dya7 = c('CM_Prol_IS', "CM_IS"),
+                         day14 = c('CM_Prol_IS', "CM_IS")
+                         )
+
+receiver_cells_RZ = list(day1 = c("CM_Robo2"),
+                         day4 = c("CM_Robo2"),
+                         dya7 = c("CM_Robo2"),
+                         day14 = c("CM_Robo2")
+                         )
 
 ##########################################
 # run LIANA 
 ##########################################
 # set parameter for ligand-receptor analysis
-outDir = paste0(resDir, '/Ligand_Receptor_analysis/LIANA_v3.2_41subtypes_receiverCells.CM_IS')
-ntop = 100
+outDir = paste0(resDir, '/Ligand_Receptor_analysis/LIANA_v3.5_receiverCells_CM.IS.CM.IS.PROL')
 
 source('functions_cccInference.R')
 run_LIANA(refs, 
           timepoint_specific = timepoint_specific,
           celltypes_timeSpecific = celltypes_BZ_timeSepcific,
           receiver_cells = receiver_cells_BZ,
-          outDir = outDir, 
-          ntop = ntop)
+          outDir = outDir)
 
 ########################################################
 # diff Nichenet for ligand-receptor analysis
 # original code from https://github.com/saeyslab/nichenetr/blob/master/vignettes/seurat_steps.md
 ########################################################
-outDir = paste0(resDir, '/Ligand_Receptor_analysis/DiffNicheNet_v3.5_fixedRemoteNiche')
+outDir = paste0(resDir, '/Ligand_Receptor_analysis/DiffNicheNet_v3.6')
 system(paste0('mkdir -p ', outDir))
 
 source('functions_cccInference.R')

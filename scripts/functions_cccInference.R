@@ -15,8 +15,7 @@
 ########################################################
 run_LIANA_defined_celltype = function(subref,
                                       celltypes,
-                                      receiver_cells = NULL,
-                                      ntop = 50, 
+                                      receivers = NULL,
                                       additionalLabel = '_fixedCelltypes')
 {
   source('functions_scRNAseq.R')
@@ -56,40 +55,42 @@ run_LIANA_defined_celltype = function(subref,
                            idents_col = 'celltypes')
   
   # Liana returns a list of results, each element of which corresponds to a method
-  liana_test %>% glimpse
+  # liana_test %>% glimpse
   
   # We can aggregate these results into a tibble with consensus ranks
   liana_test <- liana_test %>%
     liana_aggregate(resource = 'Consensus')
   
   saveRDS(liana_test, file = paste0(outDir, '/res_lianaTest_Consensus', additionalLabel, '.rds'))
+  
   # liana_test = readRDS(file = paste0(outDir, '/res_lianaTest_Consensus_day1.rds'))
-  if(is.na(receiver_cells)){ # loop over all cell type candidates
-    receiver_cells = celltypes
+  if(is.na(receivers)){ # loop over all cell type candidates
+    receivers = celltypes
   }
   
-  for(m in 1:length(receiver_cells)){
+  for(m in 1:length(receivers)){
     # m = 1
     #liana_test %>%
     #  liana_dotplot(source_groups = celltypes[n],
     #                target_groups = celltypes,
     #                ntop = ntop)
-    liana_test %>%
-      liana_dotplot(source_groups = celltypes,
-                    target_groups = receiver_cells[m],
-                    ntop = ntop)
-    #liana_test_save =  liana_test %>% filter()
-    #  liana_dotplot(source_groups = celltypes,
-    #                target_groups = receiver_cells[m],
-    #                ntop = ntop)
-    
-    ggsave(filename = paste0(outDir, '/liana_LR_prediction_recieveCell', 
-                             additionalLabel, 
-                             '_receiverCells.', receiver_cells[m], 
-                             '_ntop.', ntop, '.pdf'), 
-           width = 30, height = min(c(10*ntop/20, 50)), limitsize = FALSE)
+    for(ntop in c(100, 200, 300, 500)){
+      liana_test %>%
+        liana_dotplot(source_groups = celltypes,
+                      target_groups = receivers[m],
+                      ntop = ntop)
+      #liana_test_save =  liana_test %>% filter()
+      #  liana_dotplot(source_groups = celltypes,
+      #                target_groups = receivers[m],
+      #                ntop = ntop)
+      ggsave(filename = paste0(outDir, '/liana_LR_prediction_recieveCell', 
+                               additionalLabel, 
+                               '_receiverCells.', receivers[m], 
+                               '_ntop.', ntop, '.pdf'), 
+             width = 30, height = min(c(10*ntop/20, 50)), limitsize = FALSE)
+    }
+   
   }
-  
   
   pdfname = paste0(outDir, '/liana_celltype_communication_freqHeatmap', additionalLabel, '.pdf')
   pdf(pdfname, width=20, height = 8)
@@ -112,7 +113,7 @@ run_LIANA = function(refs,
                      celltypes = NULL,
                      celltypes_timeSpecific = NULL,
                      timepoint_specific = FALSE,
-                     receiver_cells = 'CM_IS',
+                     receiver_cells = list(c('CM_IS')),
                      outDir = '../results/Ligand_Receptor_analysis',
                      ntop = 50,
                      RUN.CPDB.alone = FALSE)
@@ -200,10 +201,13 @@ run_LIANA = function(refs,
       # n = 1
       celltypes = celltypes_timeSpecific[[n]]
       timepoint = names(celltypes_timeSpecific)[n]
-      cat(n, '-- ', timepoint, '\n')
-      cat('---- ', celltypes, '\n')
+      receivers = receiver_cells[[n]]
       
-      celltypes_sel = unique(c(celltypes, receiver_cells))
+      cat(n, '-- time point : ', timepoint, '\n')
+      cat('---- celltype : ', celltypes, '\n')
+      cat('---- receiver : ', receivers, "\n")
+      
+      celltypes_sel = unique(c(celltypes, receivers))
       
       subref = subset(refs, cells = colnames(refs)[!is.na(match(refs$celltypes, celltypes_sel))])
       subref$celltypes = droplevels(as.factor(subref$celltypes))
@@ -217,8 +221,7 @@ run_LIANA = function(refs,
       # Run liana
       run_LIANA_defined_celltype(subref,
                                  celltypes = celltypes,
-                                 receiver_cells = receiver_cells,
-                                 ntop = ntop,
+                                 receivers = receivers,
                                  additionalLabel = paste0('_', timepoint))
 
     }

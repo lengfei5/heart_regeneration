@@ -47,117 +47,9 @@ if(make_annotationFile_kallisto){
   
 }
 
-##########################################
-# test eisaR and alevin 
-##########################################
-use_eisaR_alevein = FALSE
-if(use_eisaR_alevein){
-  suppressPackageStartupMessages({
-    library(Biostrings)
-    library(BSgenome)
-    library(eisaR)
-    library(GenomicFeatures)
-    library(SummarizedExperiment)
-    library(tximeta)
-    library(rjson)
-    library(reticulate)
-    library(SingleCellExperiment)
-    library(scater)
-  })
-  
-  # gtf and fa files of mouse using eisaR
-  # we load the eisaR package and extract a GRanges object 
-  # containing the genomic coordinates of each annotated transcript and intron. 
-  # In this example, we use the ‘separate’ approach to define introns separately for each transcript, 
-  # and add a flank length of 90nt to each intron.
-  
-  genomeDir = '/groups/tanaka/People/current/jiwang/Genomes/axolotl/Transcriptomics/alevin_velocity/'
-  
-  annotDir = '/groups/tanaka/People/current/jiwang/Genomes/axolotl/annotations/'
-  gtf = paste0(annotDir, 'AmexT_v47.chr.FINAL.FULL.gtf')
-  #annot = import(paste0(annotDir, 'AmexT_v47.release.gtf'))
-  #txdb <- GenomicFeatures::makeTxDbFromGFF(gtf, format = "gtf")
-  
-  #gtf <- "/groups/tanaka/People/current/jiwang/Genomes/mouse/mm10_ens/Mus_musculus.GRCm38.87.gtf"
-  genome.file = "/groups/tanaka/People/current/jiwang/Genomes/axolotl/AmexG_v6.DD.corrected.round2.chr.fa"
-  
-  ##########################################
-  # clean a bit the gtf for transcript name 
-  ##########################################
-  Clean_transcript_id = FALSE
-  if(Clean_transcript_id){
-    library('rtracklayer')
-    library(GenomicRanges)
-    library('GenomicFeatures')
-    
-    gtf = paste0(annotDir, 'AmexT_v47.release.gtf')
-    annot = rtracklayer::import(paste0(annotDir, 'AmexT_v47.release.gtf'))
-    
-    xx = annot[grep('chr', seqnames(annot))]
-    seqlevels(xx) <- seqlevelsInUse(xx)
-    
-    write.table(seqlevels(xx), file = paste0(genomeDir, 'AmexT_v47_genome.chrnames.txt'), 
-                sep = '\t', row.names = FALSE, col.names = FALSE, quote = FALSE)
-    
-    #sels = which(!is.na(xx$transcript_id))
-    
-    transcripts = xx$transcript_id
-    transcripts = sapply(transcripts, function(x) {test = unlist(strsplit(as.character(x), '[|]')); 
-    test[length(test)]})
-    xx$transcript_id = transcripts
-    
-    rtracklayer::export(xx, paste0(genomeDir, 'AmexT_v47.release_chr_transcript.id.cleaned.gtf'))
-  }
-  
-  
-  gtf = paste0(genomeDir, 'AmexT_v47.release_chr_transcript.id.cleaned.gtf')
-  
-  grl <- eisaR::getFeatureRanges(
-    gtf = gtf,
-    featureType = c("spliced", "intron"), 
-    intronType = "separate", 
-    flankLength = 90L, 
-    joinOverlappingIntrons = FALSE, 
-    verbose = TRUE
-  )
-  
-  grl[4:6]
-  
-  eisaR::exportToGtf(
-    grl, 
-    filepath = paste0(genomeDir, "AmexT_v47.annotation.expanded.gtf")
-  )
-  
-  head(metadata(grl)$corrgene)
-  
-  write.table(
-    metadata(grl)$corrgene, 
-    file = paste0(genomeDir, "AmexT_v47.annotation.expanded.features.tsv"),
-    row.names = FALSE, col.names = TRUE, quote = FALSE, sep = "\t"
-  )
-  
-  df <- eisaR::getTx2Gene(
-    grl, filepath = paste0(genomeDir, "AmexT_v47.annotation.expanded.tx2gene.tsv")
-  )
-  
-  genome <- Biostrings::readDNAStringSet(genome.file)
-  
-  names(genome) <- sapply(strsplit(names(genome), " "), .subset, 1)
-  seqs <- GenomicFeatures::extractTranscriptSeqs(
-    x = genome, 
-    transcripts = grl
-  )
-  
-  Biostrings::writeXStringSet(
-    seqs, filepath = paste0(genomeDir,  "AmexT_v47.annotation.expanded.fa")
-  )
-  
-  
-}
-
 ########################################################
 ########################################################
-# Section : process the alevin output and prepare the data for scvelo and cellrank
+# Section : process the kallisto output and prepare the data for scvelo and cellrank
 # 
 ########################################################
 ########################################################
@@ -188,6 +80,24 @@ DimPlot(aa, dims = c(1, 2), label = TRUE, repel = TRUE, group.by = 'subtypes', r
 
 ggsave(filename = paste0(outDir, 'UMAP_CMsubsets_forRNAvelocity.pdf'), width = 10, height = 8)
 
+search_optimal_umap_parameters = FALSE
+if(search_optimal_umap_parameters){
+  source("functions_scRNAseq.R")
+  explore.umap.params.combination(sub.obj = aa, resDir = outDir, 
+                                  pdfname = 'axolotl_snRNA_RNAvelocity_umap_test.pdf',
+                                  use.parallelization = FALSE,
+                                  group.by = 'condition',
+                                  nfeatures.sampling = c(1000, 2000, 3000, 5000),
+                                  nb.pcs.sampling = c(10, 30, 50, 100), 
+                                  n.neighbors.sampling = c(20, 30, 50, 100, 200),
+                                  min.dist.sampling = c(0.1, 0.3)
+                                  
+  )
+  
+}
+
+
+
 xx = aa
 xx@reductions$umap@cell.embeddings = -xx@reductions$umap@cell.embeddings
 DimPlot(xx, dims = c(1, 2), label = TRUE, repel = TRUE, group.by = 'subtypes', raster=FALSE,
@@ -195,6 +105,7 @@ DimPlot(xx, dims = c(1, 2), label = TRUE, repel = TRUE, group.by = 'subtypes', r
 )
 
 aa = xx
+
 
 ## this is how the umap was calculated
 # CM_subset_2 = aa
@@ -341,7 +252,7 @@ if(subsetting_further){
   
   source("functions_scRNAseq.R")
   explore.umap.params.combination(sub.obj = aa, resDir = outDir, 
-                                  pdfname = 'axolotl_snRNA_RNAvelocity_umap_test.pdf',
+                                  pdfname = 'axolotl_CMsubsets_RNAvelocity_umap_test.pdf',
                                   use.parallelization = FALSE,
                                   group.by = 'condition',
                                   nfeatures.sampling = c(1000, 2000, 3000, 5000),
