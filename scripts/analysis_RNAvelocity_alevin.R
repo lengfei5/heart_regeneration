@@ -9,43 +9,9 @@
 # Date of creation: Fri Oct  7 14:09:17 2022
 ##########################################################################
 ##########################################################################
-outDir = paste0(resDir, '/RNA_velocity/')
+outDir = paste0(resDir, '/RNA_velocity_alevin/')
 system(paste0('mkdir -p ', outDir))
 
-##########################################
-# test kallisto annotation using BUSpaRse
-##########################################
-# test kallisto annotation file making 
-if(make_annotationFile_kallisto){
-  library(BUSpaRse)
-  library(Seurat)
-  #library(SeuratWrappers)
-  library(BSgenome.Mmusculus.UCSC.mm10)
-  library(AnnotationHub)
-  library(zeallot) # For %<-% that unpacks lists in the Python manner
-  library(DropletUtils)
-  library(tidyverse)
-  library(GGally) # For ggpairs
-  library(velocyto.R)
-  library(SingleR)
-  library(scales)
-  library(plotly)
-  theme_set(theme_bw())
-  
-  ah <- AnnotationHub()
-  query(ah, pattern = c("Ensembl", "97", "Mus musculus", "EnsDb"))
-  
-  # Get mouse Ensembl 97 annotation
-  edb <- ah[["AH73905"]]
-  
-  require("ensembldb")
-  
-  get_velocity_files(edb, L = 91, Genome = BSgenome.Mmusculus.UCSC.mm10, 
-                     out_path = paste0("/groups/tanaka/People/current/jiwang/Genomes/",
-                                       "axolotl/Transcriptomics/kallisto_RNAvelocity_index/test"), 
-                     isoform_action = "separate")
-  
-}
 
 ##########################################
 # test eisaR and alevin 

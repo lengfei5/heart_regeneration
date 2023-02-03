@@ -313,10 +313,10 @@ assembly.liana.plot = function()
 run_Diff_NicheNet = function(refs = refs, 
                              timepoint_specific = TRUE,
                              celltypes = NULL,
-                             celltypes_BZ_timeSepcific = NULL, 
-                             celltypes_RZ_timeSepcific = NULL,
-                             receiver_cells_BZ = 'CM_IS',
-                             receiver_cells_RZ = 'CM_ROBO2',
+                             celltypes_BZ_timeSpecific = NULL, 
+                             celltypes_RZ_timeSpecific = NULL,
+                             receivers_BZ_timeSpecific = list(c('CM_IS')),
+                             receivers_RZ_timeSpecific = list(c('CM_ROBO2')), 
                              outDir = outDir,
                              ntop = c(50, 100, 150, 200))
 {
@@ -333,6 +333,94 @@ run_Diff_NicheNet = function(refs = refs,
   library(cowplot)
   source('functions_scRNAseq.R')
   source('functions_Visium.R')
+  
+  ## double check timepoint_specific and celltype 
+  if(!timepoint_specific){
+    cat(' -- no timepoint to consider -- \n')
+    if(is.null(celltypes)) {
+      stop('no cell types selected found \n')
+    }else{
+      if(is.vector(celltypes) != TRUE | length(celltypes) ==0){
+        stop('a vector of cell types expected \n')
+      }else{
+        mm = match(celltypes, refs$celltypes)
+        if(length(which(is.na(mm)))>0){
+          stop('some selected cell types not found in refs -- ', celltypes[which(is.na(mm))])
+        }else{
+          cat(celltypes, '\n')
+          cat('all selected cell types were found in the refs \n')
+        }
+      }
+    }
+  }else{
+    cat('-- time specific to consider -- \n\n')
+    
+    if(is.null(celltypes_BZ_timeSpecific)| is.null(celltypes_RZ_timeSpecific)){
+      stop('no list of time-specific cell types BZ or RZ found \n')
+    }else{
+      if(!is.list(celltypes_BZ_timeSpecific) | length(celltypes_BZ_timeSpecific) == 0 |
+         !is.list(celltypes_RZ_timeSpecific) | length(celltypes_RZ_timeSpecific) == 0){
+        stop('lists of time-specific BZ/RZ cell types expected \n')
+        
+      }else{
+        cat(length(celltypes_BZ_timeSpecific), 'time points specified for BZ  \n')
+        cat(names(celltypes_BZ_timeSpecific), '\n\n')
+        
+        cat(length(celltypes_RZ_timeSpecific), 'time points specified for RZ \n')
+        cat(names(celltypes_RZ_timeSpecific), '\n\n')
+        
+        if(length(celltypes_BZ_timeSpecific) != length(celltypes_RZ_timeSpecific)){
+          stop('not the same time points specified for BZ and RZ')
+        } 
+        
+        for(n in 1:length(celltypes_BZ_timeSpecific))
+        {
+          celltypes = celltypes_BZ_timeSpecific[[n]]
+          mm = match(celltypes, refs$celltypes)
+          if(length(which(is.na(mm)))>0){
+            stop(names(celltypes_BZ_timeSpecific)[n], 
+                 ': some selected cell types in BZ not found in refs  -- ', celltypes[which(is.na(mm))])
+          }else{
+            cat(names(celltypes_BZ_timeSpecific)[n], celltypes,'\n')
+            cat('--all selected cell types of BZ were found in the refs \n')
+          }
+        }
+        
+        for(n in 1:length(celltypes_RZ_timeSpecific))
+        {
+          celltypes = celltypes_RZ_timeSpecific[[n]]
+          mm = match(celltypes, refs$celltypes)
+          if(length(which(is.na(mm)))>0){
+            stop(names(celltypes_RZ_timeSpecific)[n], 
+                 ': some selected cell types in RZ not found in refs  -- ', celltypes[which(is.na(mm))])
+          }else{
+            cat(names(celltypes_RZ_timeSpecific)[n], celltypes,'\n')
+            cat('--all selected cell types of RZ were found in the refs \n')
+          }
+        }
+        
+        for(n in length(receivers_BZ_timeSpecific))
+        {
+          # n = 1
+          receivers = receivers_BZ_timeSpecific[[n]]
+          receivers.ctl =  receivers_RZ_timeSpecific[[n]]
+          
+          mm = match(receivers, celltypes_BZ_timeSpecific[[n]])
+          if(any(is.na(mm))){stop(receivers, ' not found in the celltypes_BZ') }
+          
+          if(length(receivers.ctl)!= 1) stop('only one control receiver is allowed at each time point')
+          mm.ctl = match(receivers.ctl, celltypes_RZ_timeSpecific[[n]])
+          if(is.na(mm.ctl)){stop(receivers.ctl, ' not found in the celltype_RZ')}
+          
+        }
+      }
+    }
+  }
+  
+  
+  # prepre for the LIANA loop
+  system(paste0('mkdir -p ', outDir))
+  Idents(refs) = as.factor(refs$celltypes)
   
   ##########################################
   # step 0):  load the Nichenet data 
@@ -364,91 +452,25 @@ run_Diff_NicheNet = function(refs = refs,
                  distinct(ligand,receptor), by = c("ligand","receptor"))
   
   
-  ## double check timepoint_specific and celltype 
-  if(!timepoint_specific){
-    cat(' -- no timepoint to consider -- \n')
-    if(is.null(celltypes)) {
-      stop('no cell types selected found \n')
-    }else{
-      if(is.vector(celltypes) != TRUE | length(celltypes) ==0){
-        stop('a vector of cell types expected \n')
-      }else{
-        mm = match(celltypes, refs$celltypes)
-        if(length(which(is.na(mm)))>0){
-          stop('some selected cell types not found in refs -- ', celltypes[which(is.na(mm))])
-        }else{
-          cat(celltypes, '\n')
-          cat('all selected cell types were found in the refs \n')
-        }
-      }
-    }
-  }else{
-    cat('-- time specific to consider -- \n')
-    if(is.null(celltypes_BZ_timeSepcific)| is.null(celltypes_RZ_timeSepcific)){
-      stop('no list of time-specific cell types BZ or RZ found \n')
-    }else{
-      if(!is.list(celltypes_BZ_timeSepcific) | length(celltypes_BZ_timeSepcific) == 0 |
-         !is.list(celltypes_RZ_timeSepcific) | length(celltypes_RZ_timeSepcific) == 0){
-        stop('lists of time-specific BZ/RZ cell types expected \n')
-        
-      }else{
-        cat(length(celltypes_BZ_timeSepcific), 'time points specified for BZ  \n')
-        cat(names(celltypes_BZ_timeSepcific), '\n')
-        
-        cat(length(celltypes_RZ_timeSepcific), 'time points specified for RZ \n')
-        cat(names(celltypes_RZ_timeSepcific), '\n')
-        
-        if(length(celltypes_BZ_timeSepcific) != length(celltypes_RZ_timeSepcific)){
-          stop('not the same time points specified for BZ and RZ')
-        } 
-        
-        for(n in 1:length(celltypes_BZ_timeSepcific))
-        {
-          celltypes = celltypes_BZ_timeSepcific[[n]]
-          mm = match(celltypes, refs$celltypes)
-          if(length(which(is.na(mm)))>0){
-            stop(names(celltypes_BZ_timeSepcific)[n], 
-                 ': some selected cell types in BZ not found in refs  -- ', celltypes[which(is.na(mm))])
-          }else{
-            cat(names(celltypes_BZ_timeSepcific)[n], celltypes,'\n')
-            cat('--all selected cell types of BZ were found in the refs \n')
-          }
-        }
-        
-        for(n in 1:length(celltypes_RZ_timeSepcific))
-        {
-          celltypes = celltypes_RZ_timeSepcific[[n]]
-          mm = match(celltypes, refs$celltypes)
-          if(length(which(is.na(mm)))>0){
-            stop(names(celltypes_RZ_timeSepcific)[n], 
-                 ': some selected cell types in RZ not found in refs  -- ', celltypes[which(is.na(mm))])
-          }else{
-            cat(names(celltypes_RZ_timeSepcific)[n], celltypes,'\n')
-            cat('--all selected cell types of RZ were found in the refs \n')
-          }
-        }
-      }
-    }
-  }
-  
-  
-  # prepre for the LIANA loop
-  system(paste0('mkdir -p ', outDir))
-  Idents(refs) = as.factor(refs$celltypes)
-  
-  for(n in 1:length(celltypes_BZ_timeSepcific))
+  ##########################################
+  # loop over the time points
+  ##########################################
+  for(n in 1:length(celltypes_BZ_timeSpecific))
   {
-    # n = 1
-    timepoint = names(celltypes_BZ_timeSepcific)[n]
-    celltypes_BZ = celltypes_BZ_timeSepcific[[n]]
-    celltypes_RZ = celltypes_RZ_timeSepcific[[n]]
+    # n = 2
+    timepoint = names(celltypes_BZ_timeSpecific)[n]
+    celltypes_BZ = celltypes_BZ_timeSpecific[[n]]
+    celltypes_RZ = celltypes_RZ_timeSpecific[[n]]
+    
+    receivers_BZ = receivers_BZ_timeSpecific[[n]]
+    receivers_RZ = receivers_RZ_timeSpecific[[n]]
     
     cat(n, '-- ', timepoint, '\n')
     cat('BZ cell types : \n ', celltypes_BZ, '\n')
     cat('RZ cell types : \n ', celltypes_RZ, '\n')
     
-    cat(' -- receiver cell of BZ niche :  ', receiver_cells_BZ, '\n')
-    cat(' -- receiver cell of RZ niche :  ', receiver_cells_RZ, '\n')
+    cat(' -- receiver cell of BZ niche :  ', receivers_BZ, '\n')
+    cat(' -- receiver cell of RZ niche :  ', receivers_RZ, '\n')
     
     ##########################################
     # from here the arguments are 
@@ -457,8 +479,8 @@ run_Diff_NicheNet = function(refs = refs,
     # - receiver cell of BZ niche
     # - receiver cell of RZ niche
     ##########################################
-    celltypes_sel = unique(c(celltypes_BZ, receiver_cells_BZ, 
-                             celltypes_RZ, receiver_cells_RZ)
+    celltypes_sel = unique(c(celltypes_BZ, receivers_BZ, 
+                             celltypes_RZ, receivers_RZ)
     )
     Idents(refs) = as.factor(refs$celltypes)
     subref = subset(refs, cells = colnames(refs)[!is.na(match(refs$celltypes, celltypes_sel))])
@@ -581,148 +603,163 @@ run_Diff_NicheNet = function(refs = refs,
     cat('cell types in RZ : ', celltypes_RZ, '\n')
     
     # receiver_cells = 'CM_BZ'
-    cat('--- receiver cells in BZ: ', receiver_cells_BZ, ' ---\n')
-    cat('--- receiver cells in RZ: ', receiver_cells_RZ, ' ---\n')
+    cat('--- receiver cells in BZ: ', receivers_BZ, ' ---\n')
+    cat('--- receiver cells in RZ: ', receivers_RZ, ' ---\n')
     
-    # define the niches
-    niches = list(
-      "BZ_niche" = list(
-        #"sender" = setdiff(celltypes_BZ, receiver_cells),
-        "sender" = celltypes_BZ, # including autocrine
-        "receiver" = receiver_cells_BZ),
-      "RZ_niche" = list(
-        #"sender" = setdiff(celltypes_noBZ, gsub('_BZ',  '', receiver_cells)),
-        "sender" = celltypes_RZ, 
-        "receiver" = receiver_cells_RZ)
-    )
     lfc_cutoff = 0.15
     expression_pct = 0.10
     top_n_target = 200
-    res = prioritize_ligands_between_niches(seurat_obj, niches,
-                                            expression_pct = expression_pct,
-                                            lfc_cutoff = lfc_cutoff,
-                                            top_n_target = top_n_target)
     
-    saveRDS(res, 
-            file = paste0(outDir, '/nichenet_prioritization_tables_output',
-                          '_receiverBZ.', receiver_cells_BZ,
-                          '_receiverRZ.', receiver_cells_RZ, 
-                          '_timepoint.', timepoint, '.rds'))
-    # res = readRDS(file = paste0(outDir, '/nichenet_prioritization_tables_output',
-    #                             '_receiverBZ.', receiver_cells_BZ,
-    #                             '_receiverRZ.', receiver_cells_RZ, 
-    #                             '_timepoint.', timepoint, '.rds'))
-      
-    prioritization_tables = res[[1]]
-    output = res[[2]]
-    
-    ##########################################
-    # 8). Visualization of the Differential NicheNet output 
-    ##########################################
-    top_ligand_niche_df = prioritization_tables$prioritization_tbl_ligand_receptor %>% 
-      select(niche, sender, receiver, ligand, receptor, prioritization_score) %>% 
-      group_by(ligand) %>% 
-      top_n(1, prioritization_score) %>% 
-      ungroup() %>% 
-      select(ligand, receptor, niche) %>% 
-      dplyr::rename(top_niche = niche)
-    
-    top_ligand_receptor_niche_df = prioritization_tables$prioritization_tbl_ligand_receptor %>% 
-      select(niche, sender, receiver, ligand, receptor, prioritization_score) %>% 
-      group_by(ligand, receptor) %>% 
-      top_n(1, prioritization_score) %>% 
-      ungroup() %>% 
-      select(ligand, receptor, niche) %>% 
-      dplyr::rename(top_niche = niche)
-    
-    for(ntop in c(50, 100, 150, 200))
+    for(receiver in receivers_BZ)
     {
-      # ntop = 50
-      cat('ntop -- ', ntop, '\n')
-      ligand_prioritized_tbl_oi = prioritization_tables$prioritization_tbl_ligand_receptor %>% 
-        select(niche, sender, receiver, ligand, prioritization_score) %>% 
-        group_by(ligand, niche) %>% top_n(1, prioritization_score) %>% 
-        ungroup() %>% distinct() %>% 
-        inner_join(top_ligand_niche_df) %>% 
-        filter(niche == top_niche) %>% 
-        group_by(niche) %>% 
-        top_n(n = ntop, prioritization_score) %>% 
-        ungroup() # get the top50 ligands per niche
+      # receiver = receivers_BZ[1]
+      receiver_ctl = receivers_RZ;
       
-      receiver_oi = receiver_cells_BZ
+      cat('-- define niches wiht receiver ', receiver, ' and control ', receiver_ctl, '--\n')
       
-      filtered_ligands = ligand_prioritized_tbl_oi %>% 
-        filter(receiver == receiver_oi) %>% 
-        pull(ligand) %>% unique()
+      # define the niches
+      niches = list(
+        "BZ_niche" = list(
+          #"sender" = setdiff(celltypes_BZ, receiver_cells),
+          "sender" = celltypes_BZ, # including autocrine
+          "receiver" = receiver),
+        "RZ_niche" = list(
+          #"sender" = setdiff(celltypes_noBZ, gsub('_BZ',  '', receiver_cells)),
+          "sender" = celltypes_RZ, 
+          "receiver" = receiver_ctl)
+      )
       
-      prioritized_tbl_oi = prioritization_tables$prioritization_tbl_ligand_receptor %>% 
-        filter(ligand %in% filtered_ligands) %>% 
-        select(niche, sender, receiver, ligand,  receptor, ligand_receptor, prioritization_score) %>% 
-        distinct() %>% 
-        inner_join(top_ligand_receptor_niche_df) %>% 
+      res = prioritize_ligands_between_niches(seurat_obj, niches,
+                                              expression_pct = expression_pct,
+                                              lfc_cutoff = lfc_cutoff,
+                                              top_n_target = top_n_target)
+      
+      saveRDS(res, file = paste0(outDir, '/nichenet_prioritization_tables_output',
+                            '_receiverBZ.', receiver,
+                            '_receiverRZ.', receiver_ctl, 
+                            '_timepoint.', timepoint, '.rds'))
+      
+      # res = readRDS(file = paste0(outDir, '/nichenet_prioritization_tables_output',
+      #                             '_receiverBZ.', receivers_BZ_timeSpecific,
+      #                             '_receiverRZ.', receivers_RZ_timeSpecific, 
+      #                             '_timepoint.', timepoint, '.rds'))
+      
+      prioritization_tables = res[[1]]
+      output = res[[2]]
+      
+      ##########################################
+      # 8). Visualization of the Differential NicheNet output 
+      ##########################################
+      top_ligand_niche_df = prioritization_tables$prioritization_tbl_ligand_receptor %>% 
+        dplyr::select(niche, sender, receiver, ligand, receptor, prioritization_score) %>% 
         group_by(ligand) %>% 
-        filter(receiver == receiver_oi) %>% 
-        top_n(2, prioritization_score) %>% ungroup() 
+        top_n(1, prioritization_score) %>% 
+        ungroup() %>% 
+        dplyr::select(ligand, receptor, niche) %>% 
+        dplyr::rename(top_niche = niche)
       
-      lfc_plot = make_ligand_receptor_lfc_plot(receiver_oi, 
-                                               prioritized_tbl_oi, 
-                                               prioritization_tables$prioritization_tbl_ligand_receptor, 
-                                               plot_legend = FALSE, 
-                                               heights = NULL, widths = NULL)
-      lfc_plot
+      top_ligand_receptor_niche_df = prioritization_tables$prioritization_tbl_ligand_receptor %>% 
+        dplyr::select(niche, sender, receiver, ligand, receptor, prioritization_score) %>% 
+        group_by(ligand, receptor) %>% 
+        top_n(1, prioritization_score) %>% 
+        ungroup() %>% 
+        dplyr::select(ligand, receptor, niche) %>% 
+        dplyr::rename(top_niche = niche)
       
-      ggsave(paste0(outDir, '/Ligand_receptors_LFC', 
-                    '_receiverBZ.', receiver_cells_BZ,
-                    '_receiverRZ.', receiver_cells_RZ, 
-                    '_timepoint.', timepoint,
-                    '_ntop.', ntop, '.pdf'), 
-             width = 12, height = 12*ntop/50, limitsize = FALSE)
-      
-      
-      exprs_activity_target_plot = 
-        make_ligand_activity_target_exprs_plot(receiver_oi, 
-                                               prioritized_tbl_oi,  
-                                               prioritization_tables$prioritization_tbl_ligand_receptor,  
-                                               prioritization_tables$prioritization_tbl_ligand_target, 
-                                               output$exprs_tbl_ligand,  
-                                               output$exprs_tbl_target, 
-                                               lfc_cutoff, 
-                                               ligand_target_matrix, 
-                                               plot_legend = FALSE, 
-                                               heights = NULL, widths = NULL)
-      
-      exprs_activity_target_plot$combined_plot
-      ggsave(paste0(outDir, '/Combined_plots_ligand_noFiltering',
-                    '_receiverBZ.', receiver_cells_BZ,
-                    '_receiverRZ.', receiver_cells_RZ, 
-                    '_timepoint.', timepoint,
-                    '_ntop.', ntop, '.pdf'), 
-             width = 60, height = 12*ntop/50, limitsize = FALSE)
+      for(ntop in c(50, 100, 150, 200))
+      {
+        # ntop = 50
+        cat('ntop -- ', ntop, '\n')
+        ligand_prioritized_tbl_oi = prioritization_tables$prioritization_tbl_ligand_receptor %>% 
+          dplyr::select(niche, sender, receiver, ligand, prioritization_score) %>% 
+          group_by(ligand, niche) %>% top_n(1, prioritization_score) %>% 
+          ungroup() %>% distinct() %>% 
+          inner_join(top_ligand_niche_df) %>% 
+          filter(niche == top_niche) %>% 
+          group_by(niche) %>% 
+          top_n(n = ntop, prioritization_score) %>% 
+          ungroup() # get the top50 ligands per niche
+        
+        receiver_oi = receiver
+        
+        filtered_ligands = ligand_prioritized_tbl_oi %>% 
+          filter(receiver == receiver_oi) %>% 
+          pull(ligand) %>% unique()
+        
+        prioritized_tbl_oi = prioritization_tables$prioritization_tbl_ligand_receptor %>% 
+          filter(ligand %in% filtered_ligands) %>% 
+          dplyr::select(niche, sender, receiver, ligand,  receptor, ligand_receptor, prioritization_score) %>% 
+          distinct() %>% 
+          inner_join(top_ligand_receptor_niche_df) %>% 
+          group_by(ligand) %>% 
+          filter(receiver == receiver_oi) %>% 
+          top_n(2, prioritization_score) %>% ungroup() 
+        
+        lfc_plot = make_ligand_receptor_lfc_plot(receiver_oi, 
+                                                 prioritized_tbl_oi, 
+                                                 prioritization_tables$prioritization_tbl_ligand_receptor, 
+                                                 plot_legend = FALSE, 
+                                                 heights = NULL, widths = NULL)
+        lfc_plot
+        
+        ggsave(paste0(outDir, '/Ligand_receptors_LFC', 
+                      '_receiverBZ.', receiver,
+                      '_receiverRZ.', receiver_ctl, 
+                      '_timepoint.', timepoint,
+                      '_ntop.', ntop, '.pdf'), 
+               width = 12, height = 12*ntop/50, limitsize = FALSE)
+        
+        
+        exprs_activity_target_plot = 
+          make_ligand_activity_target_exprs_plot(receiver_oi, 
+                                                 prioritized_tbl_oi,  
+                                                 prioritization_tables$prioritization_tbl_ligand_receptor,  
+                                                 prioritization_tables$prioritization_tbl_ligand_target, 
+                                                 output$exprs_tbl_ligand,  
+                                                 output$exprs_tbl_target, 
+                                                 lfc_cutoff, 
+                                                 ligand_target_matrix, 
+                                                 plot_legend = FALSE, 
+                                                 heights = NULL, widths = NULL)
+        
+        exprs_activity_target_plot$combined_plot
+        ggsave(paste0(outDir, '/Combined_plots_ligand_noFiltering',
+                      '_receiverBZ.', receiver,
+                      '_receiverRZ.', receiver_ctl, 
+                      '_timepoint.', timepoint,
+                      '_ntop.', ntop, '.pdf'), 
+               width = 60, height = 12*ntop/50, limitsize = FALSE)
+        
+        ## Circos plot of prioritized ligand-receptor pairs
+        Make.Circos.plot = FALSE
+        if(Make.Circos.plot){
+          filtered_ligands = ligand_prioritized_tbl_oi %>% filter(receiver == receiver_oi) %>% 
+            top_n(15, prioritization_score) %>% pull(ligand) %>% unique()
+          
+          prioritized_tbl_oi = prioritization_tables$prioritization_tbl_ligand_receptor %>% 
+            filter(ligand %in% filtered_ligands) %>% 
+            dplyr::select(niche, sender, receiver, ligand,  receptor, ligand_receptor, prioritization_score) %>% 
+            distinct() %>% inner_join(top_ligand_receptor_niche_df) %>% 
+            group_by(ligand) %>% filter(receiver == receiver_oi) %>% top_n(2, prioritization_score) %>% ungroup() 
+          
+          colors_sender = brewer.pal(n = prioritized_tbl_oi$sender %>% unique() %>% sort() %>% 
+                                       length(), name = 'Spectral') %>% 
+            magrittr::set_names(prioritized_tbl_oi$sender %>% unique() %>% sort())
+          colors_receiver = c("lavender")  %>% magrittr::set_names(prioritized_tbl_oi$receiver %>% 
+                                                                     unique() %>% sort())
+          
+          circos_output = make_circos_lr(prioritized_tbl_oi, colors_sender, colors_receiver)
+          
+        }
+        
+        
+      }
       
     }
     
   }
   
-  ## Circos plot of prioritized ligand-receptor pairs
-  Make.Circos.plot = FALSE
-  if(Make.Circos.plot){
-    filtered_ligands = ligand_prioritized_tbl_oi %>% filter(receiver == receiver_oi) %>% 
-      top_n(15, prioritization_score) %>% pull(ligand) %>% unique()
-    
-    prioritized_tbl_oi = prioritization_tables$prioritization_tbl_ligand_receptor %>% 
-      filter(ligand %in% filtered_ligands) %>% 
-      select(niche, sender, receiver, ligand,  receptor, ligand_receptor, prioritization_score) %>% 
-      distinct() %>% inner_join(top_ligand_receptor_niche_df) %>% 
-      group_by(ligand) %>% filter(receiver == receiver_oi) %>% top_n(2, prioritization_score) %>% ungroup() 
-    
-    colors_sender = brewer.pal(n = prioritized_tbl_oi$sender %>% unique() %>% sort() %>% 
-                                 length(), name = 'Spectral') %>% 
-      magrittr::set_names(prioritized_tbl_oi$sender %>% unique() %>% sort())
-    colors_receiver = c("lavender")  %>% magrittr::set_names(prioritized_tbl_oi$receiver %>% unique() %>% sort())
-    
-    circos_output = make_circos_lr(prioritized_tbl_oi, colors_sender, colors_receiver)
-    
-  }
+  
   
 }
 
@@ -767,12 +804,10 @@ prioritize_ligands_between_niches = function(seurat_obj,
                  distinct(ligand,receptor), by = c("ligand","receptor"))
   
   
-  
   ##########################################
   # step 2. Calculate differential expression between the niches 
   # issue solved because find markers for all genes, should run only for receptors and ligands
   ##########################################
-  
   # only ligands important for sender cell types
   DE_sender = calculate_niche_de(seurat_obj = seurat_obj %>% subset(features = lr_network$ligand %>% unique()), 
                                  niches = niches, 
@@ -973,6 +1008,7 @@ prioritize_ligands_between_niches = function(seurat_obj,
   features_oi = union(lr_network$ligand, lr_network$receptor) %>% 
     union(ligand_activities_targets$target) %>% setdiff(NA)
   
+  require(dplyr)
   # save dotplot 
   dotplot = suppressWarnings(Seurat::DotPlot(seurat_obj %>% subset(idents = niches %>% unlist() %>% unique()), 
                                              features = features_oi, assay = assay_oi))
@@ -982,7 +1018,7 @@ prioritize_ligands_between_niches = function(seurat_obj,
     dplyr::rename(celltype = id, gene = features.plot, expression = avg.exp, 
                   expression_scaled = avg.exp.scaled, fraction = pct.exp) %>%
     mutate(fraction = fraction/100) %>% as_tibble() %>% 
-    select(celltype, gene, expression, expression_scaled, fraction) %>% 
+    dplyr::select(celltype, gene, expression, expression_scaled, fraction) %>% 
     distinct() %>% arrange(gene) %>% mutate(gene = as.character(gene))
   
   exprs_tbl_ligand = exprs_tbl %>% filter(gene %in% lr_network$ligand) %>% 
