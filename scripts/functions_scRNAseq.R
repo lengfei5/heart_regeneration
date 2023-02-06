@@ -591,12 +591,12 @@ explore.umap.params.combination = function(sub.obj,
             if(with_legend){
               if(is.null(cols)){
                 pp = DimPlot(sub.obj, group.by = group.by, reduction = 'umap', label = TRUE, label.size = 6, 
-                             pt.size = 2, repel = TRUE) + 
+                             repel = TRUE) + 
                   ggtitle(paste0('nfeatures - ', nfeatures,  ', nb.pcs - ', nb.pcs, ', n.neighbors - ', n.neighbors, 
                                  ', min.dist - ', min.dist, ', spread - ', spread))
               }else{
                 pp = DimPlot(sub.obj, group.by = group.by, reduction = 'umap', label = TRUE, label.size = 6, 
-                             pt.size = 2, repel = TRUE, cols = cols) + 
+                             repel = TRUE, cols = cols) + 
                   ggtitle(paste0('nfeatures - ', nfeatures,  ', nb.pcs - ', nb.pcs, ', n.neighbors - ', n.neighbors, 
                                  ', min.dist - ', min.dist, ', spread - ', spread))
               }
@@ -604,13 +604,13 @@ explore.umap.params.combination = function(sub.obj,
             }else{
               if(is.null(cols)){
                 pp = DimPlot(sub.obj, group.by = group.by, reduction = 'umap', label = TRUE, label.size = 6, 
-                             pt.size = 2, repel = TRUE) + 
+                             repel = TRUE) + 
                   NoLegend() + 
                   ggtitle(paste0('nfeatures - ', nfeatures,  ', nb.pcs - ', nb.pcs, ', n.neighbors - ', n.neighbors, 
                                  ', min.dist - ', min.dist, ', spread - ', spread))
               }else{
                 pp = DimPlot(sub.obj, group.by = group.by, reduction = 'umap', label = TRUE, label.size = 6, 
-                             pt.size = 2, repel = TRUE, cols = cols) + 
+                            repel = TRUE, cols = cols) + 
                   NoLegend() + 
                   ggtitle(paste0('nfeatures - ', nfeatures,  ', nb.pcs - ', nb.pcs, ', n.neighbors - ', n.neighbors, 
                                  ', min.dist - ', min.dist, ', spread - ', spread))

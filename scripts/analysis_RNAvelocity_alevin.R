@@ -12,6 +12,8 @@
 outDir = paste0(resDir, '/RNA_velocity_alevin/')
 system(paste0('mkdir -p ', outDir))
 
+genomeDir = '/groups/tanaka/People/current/jiwang/Genomes/axolotl/Transcriptomics/alevin_velocity/'
+annotDir = '/groups/tanaka/People/current/jiwang/Genomes/axolotl/annotations/'
 
 ##########################################
 # test eisaR and alevin 
@@ -37,9 +39,6 @@ if(use_eisaR_alevein){
   # In this example, we use the ‘separate’ approach to define introns separately for each transcript, 
   # and add a flank length of 90nt to each intron.
   
-  genomeDir = '/groups/tanaka/People/current/jiwang/Genomes/axolotl/Transcriptomics/alevin_velocity/'
-  
-  annotDir = '/groups/tanaka/People/current/jiwang/Genomes/axolotl/annotations/'
   gtf = paste0(annotDir, 'AmexT_v47.chr.FINAL.FULL.gtf')
   #annot = import(paste0(annotDir, 'AmexT_v47.release.gtf'))
   #txdb <- GenomicFeatures::makeTxDbFromGFF(gtf, format = "gtf")
@@ -131,7 +130,7 @@ aa =  readRDS(file = paste0("/groups/tanaka/Collaborations/Jingkui-Elad/scMultio
 aa$time = gsub('Amex_scRNA_', '', aa$condition)
 aa$cell.ids = sapply(colnames(aa), function(x) unlist(strsplit(as.character(x), '-'))[1]) 
 aa$cell.ids = paste0(aa$cell.ids, '_', aa$time)
-
+aa$cell.id = aa$cell.ids
 
 levels = c("Amex_scRNA_d0", "Amex_scRNA_d1",
            "Amex_scRNA_d4", "Amex_scRNA_d7", 
@@ -151,7 +150,20 @@ DimPlot(aa, dims = c(1, 2), label = TRUE, repel = TRUE, group.by = 'subtypes', r
         cols = cols
 )
 
+xx = aa
+xx@reductions$umap@cell.embeddings = -xx@reductions$umap@cell.embeddings
+DimPlot(xx, dims = c(1, 2), label = TRUE, repel = TRUE, group.by = 'subtypes', raster=FALSE,
+        cols = cols
+)
+
+aa = xx
+DimPlot(aa, dims = c(1, 2), label = TRUE, repel = TRUE, group.by = 'subtypes', raster=FALSE,
+        cols = cols
+)
+
 ggsave(filename = paste0(outDir, 'UMAP_CMsubsets_forRNAvelocity.pdf'), width = 10, height = 8)
+
+saveRDS(aa, file = paste0(RdataDir, 'CM_subset_for_velocity.rds'))
 
 search_optimal_umap_parameters = FALSE
 if(search_optimal_umap_parameters){
@@ -168,17 +180,6 @@ if(search_optimal_umap_parameters){
   )
   
 }
-
-
-
-xx = aa
-xx@reductions$umap@cell.embeddings = -xx@reductions$umap@cell.embeddings
-DimPlot(xx, dims = c(1, 2), label = TRUE, repel = TRUE, group.by = 'subtypes', raster=FALSE,
-        cols = cols
-)
-
-aa = xx
-
 
 ## this is how the umap was calculated
 # CM_subset_2 = aa
@@ -209,16 +210,36 @@ library(Seurat)
 library(Seurat)
 library(DropletUtils)
 library(edgeR)
+library(tximport)
 #library(BiocParallel)
 
 source('functions_scRNAseq.R')
 
-dataDir = "../R13591_axolotl_multiome/kallisto_velocity"
+dataDir = "../R13591_axolotl_multiome/alevin_velocity"
 design = data.frame(sampleID = seq(197249, 197253), 
                     condition = c(paste0('Amex_scRNA_d', c(0, 1, 4, 7, 14))), 
                     stringsAsFactors = FALSE)
 
 design$time = gsub('Amex_scRNA_', '', design$condition)
+
+cg <- read.delim(paste0(genomeDir, "AmexT_v47.annotation.expanded.features.tsv"),
+                 header = TRUE, as.is = TRUE)
+## Rename the 'intron' column 'unspliced' to make assay names compatible with scVelo
+colnames(cg)[colnames(cg) == "intron"] <- "unspliced"
+#cg$name = g$name[match(cg$spliced, g$V1)]
+
+cat('change gene names \n')
+# change the gene names before making Seurat object
+annot = readRDS(paste0('/groups/tanaka/People/current/jiwang/Genomes/axolotl/annotations/', 
+                       'geneAnnotation_geneSymbols_cleaning_synteny_sameSymbols.hs.nr_',
+                       'curated.geneSymbol.toUse.rds'))
+
+mm = match(cg$spliced, annot$geneID)
+ggs = paste0(annot$gene.symbol.toUse[mm], '-',  annot$geneID[mm])
+cg$name = cg$spliced
+
+cg$name[!is.na(mm)] = ggs[!is.na(mm)]
+
 
 for(n in 1:nrow(design))
 {
@@ -226,74 +247,63 @@ for(n in 1:nrow(design))
   cat('-----------',n, ' : ', design$condition[n], '-------------\n')
   
   # load nf output and process
-  topdir = paste0(dataDir, '/', design$condition[n], '/')
+  topdir = paste0(dataDir, '/alevin_out_', design$sampleID[n], '/alevin/')
   
-  # aa = make_SeuratObj_scRNAseq(topdir = topdir,
-  #                              saveDir = paste0(resDir, '/', design$condition[n], '_', design$sampleID[n], '/'), 
-  #                              changeGeneName.axolotl = TRUE, 
-  #                              defaultDrops.only = TRUE)
+  # https://combine-lab.github.io/alevin-tutorial/2018/alevin-seurat/
+  txi <- tximport(paste0(topdir, 'quants_mat.gz'), type="alevin")
   
-  # unspliced and spliced 
-  for(obj in c('unspliced', 'spliced')){
-    # obj = 'spliced'
-    exp = Matrix::readMM(paste0(topdir, obj, ".mtx")) #read matrix
-    bc = read.csv(paste0(topdir, obj,  ".barcodes.txt"), header = F, stringsAsFactors = F)
-    g = read.csv(paste0(topdir, obj, ".genes.txt"), header = F, stringsAsFactors = F)
+  count.data = txi$counts
+  rm(txi);
+  
+  meta = data.frame(cell.id = paste0(colnames(count.data), "_", design$time[n]), 
+                    condition = design$condition[n],
+                    time = design$time[n])
+  
+  cell2keep = !is.na(match(meta$cell.id, aa$cell.id)) 
+  meta$cell2keep = cell2keep
+  rownames(meta) = colnames(count.data)
+  
+  mm1 = match(cg$spliced, rownames(count.data))
+  kk1 = which(!is.na(mm1))
+  xx_spliced = count.data[mm1[kk1], ]
+  rownames(xx_spliced) = cg$name[kk1]
+  
+  mm2 = match(cg$unspliced, rownames(count.data))
+  kk2 = which(!is.na(mm2))
+  xx_unspliced = count.data[mm2[kk2], ]
+  rownames(xx_unspliced) = cg$name[kk2]
+  
+  rm(count.data)
+  
+  # creat seurat object
+  aa_spliced = CreateSeuratObject(counts = xx_spliced[, cell2keep],
+                                  meta.data = meta[cell2keep, ], 
+                                  min.cells = 5, min.features = 10)
+  rm(xx_spliced)
+  
+  aa_unspliced = CreateSeuratObject(counts = xx_unspliced[, cell2keep],
+                                    meta.data = meta[cell2keep, ], 
+                                    min.cells = 5, min.features = 10)
+  rm(xx_unspliced)
+  rm(meta)
+  
+  if(n == 1) {
+    spliced = aa_spliced
+    unspliced = aa_unspliced
     
-    cat('change gene names \n')
-    # change the gene names before making Seurat object
-    annot = readRDS(paste0('/groups/tanaka/People/current/jiwang/Genomes/axolotl/annotations/', 
-                           'geneAnnotation_geneSymbols_cleaning_synteny_sameSymbols.hs.nr_',
-                           'curated.geneSymbol.toUse.rds'))
-    
-    mm = match(g$V1, annot$geneID)
-    ggs = paste0(annot$gene.symbol.toUse[mm], '-',  annot$geneID[mm])
-    g$V1[!is.na(mm)] = ggs[!is.na(mm)]
-    
-    dimnames(exp) = list(bc$V1, g$V1) # number added because of seurat format for barcodes
-    count.data = Matrix::t(exp)
-    rm(exp)
-    
-    # select only cells found in aa
-    meta = data.frame(cell.id = paste0(colnames(count.data), '_', design$time[n]),
-                      condition = design$condition[n])
-    cell2keep = !is.na(match(meta$cell.id, aa$cell.ids)) 
-    meta$cell2keep = cell2keep
-    rownames(meta) = colnames(count.data)
-    
-    mm = match(rownames(count.data), rownames(aa))
-    gene2keep = which(!is.na(mm))
-    
-    srat = CreateSeuratObject(counts = count.data[gene2keep, cell2keep],
-                              meta.data = meta[cell2keep, ], 
-                              min.cells = 5, 
-                              min.features = 10)
-    
-    if(n == 1) {
-      if(obj == 'spliced'){
-        spliced = srat
-      }else{
-        unspliced = srat
-      }
-      
-    }else{
-      if(obj == 'spliced'){
-        spliced = merge(spliced, srat)
-      }else{
-        unspliced = merge(unspliced, srat)
-      }
-    }
+  }else{
+    spliced = merge(spliced, aa_spliced)
+    unspliced = merge(unspliced, aa_unspliced)
   }
+  
+  rm(aa_spliced)
+  rm(aa_unspliced)
+  
+  
 }
 
-
 save(design, spliced, unspliced, 
-     file = paste0(RdataDir, 'seuratObject_spliced_unspliced_', species, version.analysis, '.Rdata'))
-
-rm(srat)
-rm(count.data)
-rm(meta)
-rm(g)
+     file = paste0(RdataDir, 'seuratObject_spliced_unspliced_alevin_', species, version.analysis, '.Rdata'))
 
 
 ########################################################
@@ -302,38 +312,89 @@ rm(g)
 # 
 ########################################################
 ########################################################
-# aa = readRDS(file = paste0(RdataDir, 
-#                            'seuratObject_RA.symmetry.breaking_doublet.rm_mt.ribo.filtered_regressout.nCounts_',
-#                            'cellCycleScoring_annot.v2_newUMAP_clusters_time_',
-#                            species, version.analysis, '.rds'))
+aa = readRDS(file = paste0(RdataDir, 'CM_subset_for_velocity.rds'))
 
 subsetting_further = FALSE
 if(subsetting_further){
   
-  aa = subset(aa, cells = colnames(aa)[which(aa$subtypes == 'CM_IS'|aa$subtypes == "CM_Prol_IS")])
+  aa = subset(aa, cells = colnames(aa)[which(aa$subtypes != 'CM_Prol_1' & aa$subtypes != "CM_Prol_3")])
+  aa$celltypes = droplevels(aa$subtypes)
   
-  aa <- FindVariableFeatures(aa, selection.method = "vst", nfeatures = 3000)
-  # 
+  use_SCTransform = FALSE
+  if(use_SCTransform){
+    library(sctransform)
+    aa <- SCTransform(aa, verbose = FALSE, method = "glmGamPoi", variable.features.n = 2000)
+    
+  }
+  
+  Batch_correction_timepoint = FALSE
+  if(Batch_correction_timepoint){
+    aa.list <- SplitObject(aa, split.by = "condition")
+    
+    aa.list <- lapply(X = aa.list, FUN = function(x) {
+      x<- NormalizeData(x)
+      x <- FindVariableFeatures(x, selection.method = "vst", nfeatures = 2000)
+    })
+    
+    # select features that are repeatedly variable across datasets for integration
+    features <- SelectIntegrationFeatures(object.list = aa.list)
+    
+    aa.list <- lapply(X = aa.list, FUN = function(x) {
+      x <- ScaleData(x, features = features, verbose = FALSE)
+      x <- RunPCA(x, features = features, verbose = FALSE)
+    })
+    
+    aa.anchors <- FindIntegrationAnchors(object.list = aa.list, anchor.features = features, 
+                                         reduction = "rpca")
+    
+    #aa.anchors <- FindIntegrationAnchors(object.list = aa.list, anchor.features = features)
+    
+    aa.combined <- IntegrateData(anchorset = aa.anchors)
+    
+    DefaultAssay(aa.combined) <- "integrated"
+    
+    # Run the standard workflow for visualization and clustering
+    aa.combined <- ScaleData(aa.combined, verbose = FALSE)
+    aa.combined <- RunPCA(aa.combined, npcs = 50, verbose = FALSE)
+    
+    aa.combined$condition = factor(aa.combined$condition, levels = levels(aa$condition))
+    aa.combined <- RunUMAP(aa.combined, reduction = "pca", dims = 1:30, n.neighbors = 30, min.dist = 0.3)
+    #aa.combined <- FindNeighbors(aa.combined, reduction = "pca", dims = 1:30)
+    #aa.combined <- FindClusters(aa.combined, resolution = 0.5)
+    p1 = DimPlot(aa.combined, label = TRUE, repel = TRUE, group.by = 'subtypes', raster=FALSE) 
+    p2 = DimPlot(aa.combined, label = TRUE, repel = TRUE, group.by = 'condition', raster=FALSE)
+    
+    p1 + p2
+    
+    
+  }
+  
+  
+  
+  aa <- FindVariableFeatures(aa, selection.method = "vst", nfeatures = 2000)
   aa <- ScaleData(aa)
-  # 
+  
   aa <- RunPCA(aa, features = VariableFeatures(object = aa), weight.by.var = TRUE, verbose = FALSE)
   # 
   ElbowPlot(aa, ndims = 50)
   
-  aa <- RunUMAP(aa, dims = 1:20, n.neighbors = 20, min.dist = 0.3)
-  DimPlot(aa, label = TRUE, repel = TRUE, group.by = 'condition', raster=FALSE)
+  aa <- RunUMAP(aa, dims = 1:20, n.neighbors = 30, min.dist = 0.3)
+  p1 = DimPlot(aa, label = TRUE, repel = TRUE, group.by = 'subtypes', raster=FALSE) 
+  p2 = DimPlot(aa, label = TRUE, repel = TRUE, group.by = 'condition', raster=FALSE)
+  
+  p1 + p2
   
   source("functions_scRNAseq.R")
   explore.umap.params.combination(sub.obj = aa, resDir = outDir, 
-                                  pdfname = 'axolotl_CMsubsets_RNAvelocity_umap_test.pdf',
+                                  pdfname = 'axolotl_CM.4mainSubsets_RNAvelocity_umap_test.pdf',
                                   use.parallelization = FALSE,
-                                  group.by = 'condition',
-                                  nfeatures.sampling = c(1000, 2000, 3000, 5000),
-                                  nb.pcs.sampling = c(20, 30, 50, 100), 
-                                  n.neighbors.sampling = c(20, 30, 50, 100, 200),
+                                  group.by = 'celltypes',
+                                  nfeatures.sampling = c(500, 1000, 2000, 3000),
+                                  nb.pcs.sampling = c(10, 20, 30, 50), 
+                                  n.neighbors.sampling = c(10, 20, 30, 50),
                                   min.dist.sampling = c(0.1, 0.3)
-                                  
   )
+  
   
   aa <- FindVariableFeatures(aa, selection.method = "vst", nfeatures = 5000)
   aa <- ScaleData(aa)
@@ -347,9 +408,10 @@ if(subsetting_further){
 
 
 ## load saved spliced and unspliced 
-load(file = paste0(RdataDir, 'seuratObject_spliced_unspliced_', species, version.analysis, '.Rdata'))
-aa$cell.id = aa$cell.ids
+load(file = paste0(RdataDir, 'seuratObject_spliced_unspliced_alevin_', 
+                   species, version.analysis, '.Rdata'))
 
+#aa$cell.id = aa$cell.ids
 # swapping the unspliced and spliced matrix
 #xx = spliced
 #spliced = unspliced
@@ -417,8 +479,8 @@ mnt$celltypes[which(mnt$celltypes == "CM_ven_(Cav3_1)")] = "CM_ven_Cav3_1"
 
 #saveDir = paste0("/Volumes/groups/tanaka/People/current/jiwang/projects/RA_competence/",
 #                "results/scRNAseq_R13547_10x_mNT_20220813/RA_symetryBreaking/")
-saveFile = "RNAmatrix_umap_kalisto.velocity_spliced_unspliced_CMsutypes_v1.5.h5Seurat"
-#saveFile = 'RNAmatrix_umap_kalisto.velocity_spliced_unspliced_CMsutypes_injurySpec_v2.2.h5Seurat'
+saveFile = "RNAmatrix_umap_alevin.velocity_spliced_unspliced_CMsutypes_v1.0.h5Seurat"
+#saveFile = 'RNAmatrix_umap_alevin.velocity_spliced_unspliced_CMsutypes_injurySpec_v2.2.h5Seurat'
 
 SaveH5Seurat(mnt, filename = paste0(outDir, saveFile), 
              overwrite = TRUE)
