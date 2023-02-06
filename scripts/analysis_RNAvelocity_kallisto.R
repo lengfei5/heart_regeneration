@@ -9,7 +9,7 @@
 # Date of creation: Fri Oct  7 14:09:17 2022
 ##########################################################################
 ##########################################################################
-outDir = paste0(resDir, '/RNA_velocity/')
+outDir = paste0(resDir, '/RNA_velocity_kallisto/')
 system(paste0('mkdir -p ', outDir))
 
 ##########################################
@@ -106,6 +106,13 @@ DimPlot(xx, dims = c(1, 2), label = TRUE, repel = TRUE, group.by = 'subtypes', r
 
 aa = xx
 
+DimPlot(aa, dims = c(1, 2), label = TRUE, repel = TRUE, group.by = 'subtypes', raster=FALSE,
+        cols = cols
+)
+
+ggsave(filename = paste0(outDir, 'UMAP_CMsubsets_forRNAvelocity.pdf'), width = 10, height = 8)
+
+saveRDS(aa, file = paste0(RdataDir, 'CM_subset_for_velocity.rds'))
 
 ## this is how the umap was calculated
 # CM_subset_2 = aa
@@ -229,11 +236,7 @@ rm(g)
 # 
 ########################################################
 ########################################################
-# aa = readRDS(file = paste0(RdataDir, 
-#                            'seuratObject_RA.symmetry.breaking_doublet.rm_mt.ribo.filtered_regressout.nCounts_',
-#                            'cellCycleScoring_annot.v2_newUMAP_clusters_time_',
-#                            species, version.analysis, '.rds'))
-
+aa = readRDS(file = paste0(RdataDir, 'CM_subset_for_velocity.rds'))
 subsetting_further = FALSE
 if(subsetting_further){
   
