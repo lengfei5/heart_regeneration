@@ -238,7 +238,10 @@ rm(g)
 ########################################################
 aa = readRDS(file = paste0(RdataDir, 'CM_subset_for_velocity.rds'))
 DimPlot(aa, label = TRUE, repel = TRUE, group.by = 'subtypes', raster=FALSE)
-
+aa$celltypes = droplevels(aa$subtypes)
+aa <- FindNeighbors(aa, dims = 1:20)
+aa <- FindClusters(aa, verbose = FALSE, algorithm = 3, resolution = 0.5)
+aa$time = gsub('d', '', aa$time)
 
 subsetting_further = FALSE
 if(subsetting_further){
@@ -442,6 +445,7 @@ if(subsetting_further){
 load(file = paste0(RdataDir, 'seuratObject_spliced_unspliced_', species, version.analysis, '.Rdata'))
 aa$cell.id = aa$cell.ids
 aa$celltypes = aa$subtypes
+DimPlot(aa, label = TRUE, repel = TRUE, group.by = 'celltypes', raster=FALSE) 
 
 CCA_batch = FALSE
 if(CCA_batch){
@@ -454,8 +458,6 @@ if(CCA_batch){
   
 }
 
-DimPlot(aa, label = TRUE, repel = TRUE, group.by = 'celltypes', raster=FALSE) 
-                                                     
 # swapping the unspliced and spliced matrix
 #xx = spliced
 #spliced = unspliced
@@ -524,7 +526,7 @@ mnt$celltypes[which(mnt$celltypes == "CM_ven_(Cav3_1)")] = "CM_ven_Cav3_1"
 #saveDir = paste0("/Volumes/groups/tanaka/People/current/jiwang/projects/RA_competence/",
 #                "results/scRNAseq_R13547_10x_mNT_20220813/RA_symetryBreaking/")
 #saveFile = "RNAmatrix_umap_kalisto.velocity_spliced_unspliced_CMsutypes_v1.5.h5Seurat"
-saveFile = 'RNAmatrix_umap_kalisto.velocity_spliced_unspliced_CMsutypesAll_CCA_2.0.h5Seurat'
+saveFile = 'RNAmatrix_umap_kalisto.velocity_spliced_unspliced_CMsutypesAll_2.1.h5Seurat'
 
 SaveH5Seurat(mnt, filename = paste0(outDir, saveFile), 
              overwrite = TRUE)
