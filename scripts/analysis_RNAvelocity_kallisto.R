@@ -301,20 +301,29 @@ if(subsetting_further){
     
     ggs = c(s.genes, g2m.genes)
     
-    write.csv(ggs, file = paste0(outDir, "cellcycle_gene.csv"), quote = FALSE, row.names = FALSE,
-              col.names = FALSE)
+    reRun.cellcycle_regression = FALSE
+    if(reRun.cellcycle_regression){
+      write.csv(ggs, file = paste0(outDir, "cellcycle_gene.csv"), quote = FALSE, row.names = FALSE,
+                col.names = FALSE)
+      
+      aa <- CellCycleScoring(aa, s.features = s.genes, g2m.features = g2m.genes, set.ident = FALSE)
+      
+      # view cell cycle scores and phase assignments
+      head(aa[[]])
+      
+      DimPlot(aa, label = TRUE, repel = TRUE, group.by = 'Phase', raster=FALSE)
+      
+      
+      aa <- ScaleData(aa, vars.to.regress = c("S.Score", "G2M.Score"), features = rownames(aa))
+      
+      saveRDS(aa,  file = paste0(RdataDir, 'CM_subset_4majoySubtypes_regressedOut.cellcycles.rds'))
+      
+    }
+   
+    aa = readRDS(file = paste0(RdataDir, 'CM_subset_4majoySubtypes_regressedOut.cellcycles.rds'))
     
-    aa <- CellCycleScoring(aa, s.features = s.genes, g2m.features = g2m.genes, set.ident = FALSE)
-    
-    # view cell cycle scores and phase assignments
-    head(aa[[]])
-    
-    DimPlot(aa, label = TRUE, repel = TRUE, group.by = 'Phase', raster=FALSE)
-    
-    aa <- ScaleData(aa, vars.to.regress = c("S.Score", "G2M.Score"), features = rownames(aa))
-    
-    saveRDS(aa,  file = paste0(RdataDir, 'CM_subset_4majoySubtypes_regressedOut.cellcycles.rds'))
-    
+    ## remove the cell cycle genes here
+    aa = subset(aa, features = setdiff(rownames(aa), ggs))
     ## rerun the PCA and umap
     aa <- FindVariableFeatures(aa, selection.method = "vst", nfeatures = 2000)
     #aa <- ScaleData(aa)
@@ -404,7 +413,6 @@ if(subsetting_further){
     aa.combined <- RunPCA(aa.combined, npcs = 50, verbose = FALSE)
     
     aa.combined$condition = factor(aa.combined$condition, levels = levels(aa$condition))
-    aa.combined <- RunUMAP(aa.combined, reduction = "pca", dims = 1:30, n.neighbors = 30, min.dist = 0.3)
     
     p1 = DimPlot(aa.combined, label = TRUE, repel = TRUE, group.by = 'subtypes', raster=FALSE) 
     p2 = DimPlot(aa.combined, label = TRUE, repel = TRUE, group.by = 'condition', raster=FALSE)
@@ -415,10 +423,13 @@ if(subsetting_further){
     aa.combined <- FindClusters(aa.combined, resolution = 0.5)
     
     p3 = DimPlot(aa.combined, label = TRUE, repel = TRUE, group.by = 'seurat_clusters', raster=FALSE)
+    aa.combined$cluster = aa.combined$seurat_clusters
     
+    aa.combined <- RunUMAP(aa.combined, reduction = "pca", dims = 1:30, n.neighbors = 50, min.dist = 0.1)
+    p2 = DimPlot(aa.combined, label = TRUE, repel = TRUE, group.by = 'condition', raster=FALSE)
     p1 + p2+ p3
     
-    aa.combined$cluster = aa.combined$seurat_clusters
+   
     
   }
   
@@ -430,10 +441,19 @@ if(subsetting_further){
 ##########################################
 load(file = paste0(RdataDir, 'seuratObject_spliced_unspliced_', species, version.analysis, '.Rdata'))
 aa$cell.id = aa$cell.ids
+aa$celltypes = aa$subtypes
 
-#aa$cluster = aa.combined$cluster[match(colnames(aa), colnames(aa.combined))]
-#embedding = aa.combined@reductions$umap@cell.embeddings
-#aa[['umap']] = Seurat::CreateDimReducObject(embeddings=embedding, key='UMAP_', assay='RNA')
+CCA_batch = FALSE
+if(CCA_batch){
+  
+  aa$cluster = aa.combined$cluster[match(colnames(aa), colnames(aa.combined))]
+  embedding = aa.combined@reductions$umap@cell.embeddings
+  aa[['umap']] = Seurat::CreateDimReducObject(embeddings=embedding, key='UMAP_', assay='RNA')
+  aa[['pca']] = Seurat::CreateDimReducObject(embeddings=aa.combined@reductions$pca@cell.embeddings, 
+                                           key='PC_', assay='RNA')
+  
+}
+
 DimPlot(aa, label = TRUE, repel = TRUE, group.by = 'celltypes', raster=FALSE) 
                                                      
 # swapping the unspliced and spliced matrix
@@ -456,7 +476,7 @@ colnames(counts) = colnames(mnt)
 
 # subsetting mnt with the same genes as spliced and unspliced
 DefaultAssay(mnt) = 'RNA'
-mnt = subset(mnt, features = rownames(counts))
+mnt = subset(mnt, features = intersect(rownames(counts), rownames(mnt)))
 
 counts = counts[match(rownames(mnt), rownames(counts)), ]
 mnt[["spliced"]] <- CreateAssayObject(counts = counts)
@@ -504,7 +524,7 @@ mnt$celltypes[which(mnt$celltypes == "CM_ven_(Cav3_1)")] = "CM_ven_Cav3_1"
 #saveDir = paste0("/Volumes/groups/tanaka/People/current/jiwang/projects/RA_competence/",
 #                "results/scRNAseq_R13547_10x_mNT_20220813/RA_symetryBreaking/")
 #saveFile = "RNAmatrix_umap_kalisto.velocity_spliced_unspliced_CMsutypes_v1.5.h5Seurat"
-saveFile = 'RNAmatrix_umap_kalisto.velocity_spliced_unspliced_CMsutypes_4main.cellcycle_v1.5.5.h5Seurat'
+saveFile = 'RNAmatrix_umap_kalisto.velocity_spliced_unspliced_CMsutypesAll_CCA_2.0.h5Seurat'
 
 SaveH5Seurat(mnt, filename = paste0(outDir, saveFile), 
              overwrite = TRUE)
