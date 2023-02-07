@@ -237,49 +237,205 @@ rm(g)
 ########################################################
 ########################################################
 aa = readRDS(file = paste0(RdataDir, 'CM_subset_for_velocity.rds'))
+DimPlot(aa, label = TRUE, repel = TRUE, group.by = 'subtypes', raster=FALSE)
+
+
 subsetting_further = FALSE
 if(subsetting_further){
   
-  aa = subset(aa, cells = colnames(aa)[which(aa$subtypes == 'CM_IS'|aa$subtypes == "CM_Prol_IS")])
+  #aa = subset(aa, cells = colnames(aa)[which(aa$subtypes == 'CM_IS'|aa$subtypes == "CM_Prol_IS")])
+  
+  ### select 4 major cell types
+  #aa = subset(aa, cells = colnames(aa)[which(aa$subtypes != 'CM_Prol_1' & aa$subtypes != "CM_Prol_3" &
+  #                                             aa$condition != "Amex_scRNA_d14")])
+  aa = subset(aa, cells = colnames(aa)[which(aa$subtypes != 'CM_Prol_1' & aa$subtypes != "CM_Prol_3")])
+  
+  aa$celltypes = droplevels(aa$subtypes)
+  
+  # aa <- FindVariableFeatures(aa, selection.method = "vst", nfeatures = 2000)
+  # aa <- ScaleData(aa)
+  # aa <- RunPCA(aa, features = VariableFeatures(object = aa), weight.by.var = TRUE, verbose = FALSE)
+  # ElbowPlot(aa, ndims = 50)
+  # 
+  # aa <- RunUMAP(aa, dims = 1:10, n.neighbors = 20, min.dist = 0.3)
+  # DimPlot(aa, label = TRUE, repel = TRUE, group.by = 'condition', raster=FALSE)
+  # 
+  # p1 = DimPlot(aa, label = TRUE, repel = TRUE, group.by = 'celltypes', raster=FALSE) 
+  # p2 = DimPlot(aa, label = TRUE, repel = TRUE, group.by = 'condition', raster=FALSE)
+  # 
+  # p1 + p2
   
   aa <- FindVariableFeatures(aa, selection.method = "vst", nfeatures = 3000)
-  # 
   aa <- ScaleData(aa)
-  # 
-  aa <- RunPCA(aa, features = VariableFeatures(object = aa), weight.by.var = TRUE, verbose = FALSE)
-  # 
-  ElbowPlot(aa, ndims = 50)
   
+  aa <- RunPCA(aa, features = VariableFeatures(object = aa), weight.by.var = TRUE, verbose = FALSE)
   aa <- RunUMAP(aa, dims = 1:20, n.neighbors = 20, min.dist = 0.3)
-  DimPlot(aa, label = TRUE, repel = TRUE, group.by = 'condition', raster=FALSE)
+  #DimPlot(aa, label = TRUE, repel = TRUE, group.by = 'condition', raster=FALSE)
   
-  source("functions_scRNAseq.R")
-  explore.umap.params.combination(sub.obj = aa, resDir = outDir, 
-                                  pdfname = 'axolotl_CMsubsets_RNAvelocity_umap_test.pdf',
-                                  use.parallelization = FALSE,
-                                  group.by = 'condition',
-                                  nfeatures.sampling = c(1000, 2000, 3000, 5000),
-                                  nb.pcs.sampling = c(20, 30, 50, 100), 
-                                  n.neighbors.sampling = c(20, 30, 50, 100, 200),
-                                  min.dist.sampling = c(0.1, 0.3)
-                                  
-  )
+  p1 = DimPlot(aa, label = TRUE, repel = TRUE, group.by = 'celltypes', raster=FALSE) 
+  p2 = DimPlot(aa, label = TRUE, repel = TRUE, group.by = 'condition', raster=FALSE)
   
-  aa <- FindVariableFeatures(aa, selection.method = "vst", nfeatures = 5000)
-  aa <- ScaleData(aa)
+  p1 + p2
   
-  aa <- RunPCA(aa, features = VariableFeatures(object = aa), weight.by.var = TRUE, verbose = FALSE)
-  aa <- RunUMAP(aa, dims = 1:20, n.neighbors = 30, min.dist = 0.3)
-  DimPlot(aa, label = TRUE, repel = TRUE, group.by = 'condition', raster=FALSE)
+  aa <- FindNeighbors(aa, dims = 1:20)
+  aa <- FindClusters(aa, verbose = FALSE, algorithm = 3, resolution = 0.5)
+  p3 = DimPlot(aa, label = TRUE, repel = TRUE, group.by = 'seurat_clusters', raster=FALSE)
   
+  p1 + p2+ p3
+  
+  aa$cluster = aa$seurat_clusters
+  
+  DimPlot(aa, label = TRUE, repel = TRUE, group.by = 'seurat_clusters', raster=FALSE)
+  
+  
+  regressOut_cellcycle = FALSE
+  if(regressOut_cellcycle){
+    # load s.genes and g2m.genes
+    load("/groups/tanaka/People/current/Paco/Collaborations/Elad_Paco/CellCycleGenes.RData")
+    
+    geneIDs = get_geneID(rownames(aa))
+    mm = match(geneIDs, s.genes)
+    s.genes = rownames(aa)[which(!is.na(mm))]
+    mm = match(geneIDs, g2m.genes)
+    g2m.genes = rownames(aa)[which(!is.na(mm))]
+    
+    ggs = c(s.genes, g2m.genes)
+    
+    write.csv(ggs, file = paste0(outDir, "cellcycle_gene.csv"), quote = FALSE, row.names = FALSE,
+              col.names = FALSE)
+    
+    aa <- CellCycleScoring(aa, s.features = s.genes, g2m.features = g2m.genes, set.ident = FALSE)
+    
+    # view cell cycle scores and phase assignments
+    head(aa[[]])
+    
+    DimPlot(aa, label = TRUE, repel = TRUE, group.by = 'Phase', raster=FALSE)
+    
+    aa <- ScaleData(aa, vars.to.regress = c("S.Score", "G2M.Score"), features = rownames(aa))
+    
+    saveRDS(aa,  file = paste0(RdataDir, 'CM_subset_4majoySubtypes_regressedOut.cellcycles.rds'))
+    
+    ## rerun the PCA and umap
+    aa <- FindVariableFeatures(aa, selection.method = "vst", nfeatures = 2000)
+    #aa <- ScaleData(aa)
+    
+    aa <- RunPCA(aa, features = VariableFeatures(object = aa), weight.by.var = TRUE, verbose = FALSE)
+    aa <- RunUMAP(aa, dims = 1:30, n.neighbors = 20, min.dist = 0.3)
+    #DimPlot(aa, label = TRUE, repel = TRUE, group.by = 'condition', raster=FALSE)
+    
+    p1 = DimPlot(aa, label = TRUE, repel = TRUE, group.by = 'celltypes', raster=FALSE) 
+    p2 = DimPlot(aa, label = TRUE, repel = TRUE, group.by = 'Phase', raster=FALSE)
+    
+    p1 + p2
+    
+    aa <- FindNeighbors(aa, dims = 1:20)
+    aa <- FindClusters(aa, verbose = FALSE, algorithm = 3, resolution = 0.5)
+    p3 = DimPlot(aa, label = TRUE, repel = TRUE, group.by = 'seurat_clusters', raster=FALSE)
+    
+    p1 + p2+ p3
+    
+    aa$cluster = aa$seurat_clusters
+    
+    DimPlot(aa, label = TRUE, repel = TRUE, group.by = 'seurat_clusters', raster=FALSE)
+    
+    
+  }
+  
+  Serach_for_good_umap_parameters = FALSE
+  if(search_optimal_umap_parameters){
+    source("functions_scRNAseq.R")
+    explore.umap.params.combination(sub.obj = aa, resDir = outDir, 
+                                    pdfname = 'axolotl_CMsubsets_RNAvelocity_umap_test.pdf',
+                                    use.parallelization = FALSE,
+                                    group.by = 'condition',
+                                    nfeatures.sampling = c(1000, 2000, 3000, 5000),
+                                    nb.pcs.sampling = c(20, 30, 50, 100), 
+                                    n.neighbors.sampling = c(20, 30, 50, 100, 200),
+                                    min.dist.sampling = c(0.1, 0.3)
+                                    
+    )
+    
+    aa <- FindVariableFeatures(aa, selection.method = "vst", nfeatures = 5000)
+    aa <- ScaleData(aa)
+    
+    aa <- RunPCA(aa, features = VariableFeatures(object = aa), weight.by.var = TRUE, verbose = FALSE)
+    aa <- RunUMAP(aa, dims = 1:20, n.neighbors = 30, min.dist = 0.3)
+    DimPlot(aa, label = TRUE, repel = TRUE, group.by = 'condition', raster=FALSE)
+    
+    p1 = DimPlot(aa, label = TRUE, repel = TRUE, group.by = 'celltypes', raster=FALSE) 
+    p2 = DimPlot(aa, label = TRUE, repel = TRUE, group.by = 'condition', raster=FALSE)
+    
+    p1 + p2
+    
+    
+  }
+  
+  Test_Batch_correction_timepoint = FALSE
+  if(Test_Batch_correction_timepoint){
+    aa.list <- SplitObject(aa, split.by = "condition")
+    
+    aa.list <- lapply(X = aa.list, FUN = function(x) {
+      x<- NormalizeData(x)
+      x <- FindVariableFeatures(x, selection.method = "vst", nfeatures = 3000)
+    })
+    
+    # select features that are repeatedly variable across datasets for integration
+    features <- SelectIntegrationFeatures(object.list = aa.list)
+    
+    Use.softer.rpca = FALSE
+    if(Use.softer.rpca){
+      aa.list <- lapply(X = aa.list, FUN = function(x) {
+        x <- ScaleData(x, features = features, verbose = FALSE)
+        x <- RunPCA(x, features = features, verbose = FALSE)
+      })
+      
+      aa.anchors <- FindIntegrationAnchors(object.list = aa.list, anchor.features = features, 
+                                           reduction = "rpca")
+    }else{
+      aa.anchors <- FindIntegrationAnchors(object.list = aa.list, anchor.features = features)
+    }
+    
+    aa.combined <- IntegrateData(anchorset = aa.anchors)
+    
+    DefaultAssay(aa.combined) <- "integrated"
+    
+    # Run the standard workflow for visualization and clustering
+    aa.combined <- ScaleData(aa.combined, verbose = FALSE)
+    aa.combined <- RunPCA(aa.combined, npcs = 50, verbose = FALSE)
+    
+    aa.combined$condition = factor(aa.combined$condition, levels = levels(aa$condition))
+    aa.combined <- RunUMAP(aa.combined, reduction = "pca", dims = 1:30, n.neighbors = 30, min.dist = 0.3)
+    
+    p1 = DimPlot(aa.combined, label = TRUE, repel = TRUE, group.by = 'subtypes', raster=FALSE) 
+    p2 = DimPlot(aa.combined, label = TRUE, repel = TRUE, group.by = 'condition', raster=FALSE)
+    p1 + p2
+    
+    
+    aa.combined <- FindNeighbors(aa.combined, reduction = "pca", dims = 1:30)
+    aa.combined <- FindClusters(aa.combined, resolution = 0.5)
+    
+    p3 = DimPlot(aa.combined, label = TRUE, repel = TRUE, group.by = 'seurat_clusters', raster=FALSE)
+    
+    p1 + p2+ p3
+    
+    aa.combined$cluster = aa.combined$seurat_clusters
+    
+  }
   
 }
 
-
-## load saved spliced and unspliced 
+##########################################
+# load saved spliced and unspliced 
+# and select the cells and genes to use
+##########################################
 load(file = paste0(RdataDir, 'seuratObject_spliced_unspliced_', species, version.analysis, '.Rdata'))
 aa$cell.id = aa$cell.ids
 
+#aa$cluster = aa.combined$cluster[match(colnames(aa), colnames(aa.combined))]
+#embedding = aa.combined@reductions$umap@cell.embeddings
+#aa[['umap']] = Seurat::CreateDimReducObject(embeddings=embedding, key='UMAP_', assay='RNA')
+DimPlot(aa, label = TRUE, repel = TRUE, group.by = 'celltypes', raster=FALSE) 
+                                                     
 # swapping the unspliced and spliced matrix
 #xx = spliced
 #spliced = unspliced
@@ -347,13 +503,14 @@ mnt$celltypes[which(mnt$celltypes == "CM_ven_(Cav3_1)")] = "CM_ven_Cav3_1"
 
 #saveDir = paste0("/Volumes/groups/tanaka/People/current/jiwang/projects/RA_competence/",
 #                "results/scRNAseq_R13547_10x_mNT_20220813/RA_symetryBreaking/")
-saveFile = "RNAmatrix_umap_kalisto.velocity_spliced_unspliced_CMsutypes_v1.5.h5Seurat"
-#saveFile = 'RNAmatrix_umap_kalisto.velocity_spliced_unspliced_CMsutypes_injurySpec_v2.2.h5Seurat'
+#saveFile = "RNAmatrix_umap_kalisto.velocity_spliced_unspliced_CMsutypes_v1.5.h5Seurat"
+saveFile = 'RNAmatrix_umap_kalisto.velocity_spliced_unspliced_CMsutypes_4main.cellcycle_v1.5.5.h5Seurat'
 
 SaveH5Seurat(mnt, filename = paste0(outDir, saveFile), 
              overwrite = TRUE)
 Convert(paste0(outDir, saveFile), 
         dest = "h5ad", overwrite = TRUE)
+
 
 ##########################################
 ## test umap with spliced 
