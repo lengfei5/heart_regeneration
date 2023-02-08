@@ -251,7 +251,10 @@ if(subsetting_further){
   ### select 4 major cell types
   #aa = subset(aa, cells = colnames(aa)[which(aa$subtypes != 'CM_Prol_1' & aa$subtypes != "CM_Prol_3" &
   #                                             aa$condition != "Amex_scRNA_d14")])
-  aa = subset(aa, cells = colnames(aa)[which(aa$subtypes != 'CM_Prol_1' & aa$subtypes != "CM_Prol_3")])
+  # aa = subset(aa, cells = colnames(aa)[which(aa$subtypes != 'CM_Prol_1' & aa$subtypes != "CM_Prol_3")])
+  
+  aa = subset(aa, cells = colnames(aa)[which(aa$condition == 'Amex_scRNA_d0' | 
+                                               aa$condition == "Amex_scRNA_d1")])
   
   aa$celltypes = droplevels(aa$subtypes)
   
@@ -268,11 +271,11 @@ if(subsetting_further){
   # 
   # p1 + p2
   
-  aa <- FindVariableFeatures(aa, selection.method = "vst", nfeatures = 3000)
+  aa <- FindVariableFeatures(aa, selection.method = "vst", nfeatures = 1000)
   aa <- ScaleData(aa)
   
   aa <- RunPCA(aa, features = VariableFeatures(object = aa), weight.by.var = TRUE, verbose = FALSE)
-  aa <- RunUMAP(aa, dims = 1:20, n.neighbors = 20, min.dist = 0.3)
+  aa <- RunUMAP(aa, dims = 1:10, n.neighbors = 30, min.dist = 0.1)
   #DimPlot(aa, label = TRUE, repel = TRUE, group.by = 'condition', raster=FALSE)
   
   p1 = DimPlot(aa, label = TRUE, repel = TRUE, group.by = 'celltypes', raster=FALSE) 
@@ -526,7 +529,7 @@ mnt$celltypes[which(mnt$celltypes == "CM_ven_(Cav3_1)")] = "CM_ven_Cav3_1"
 #saveDir = paste0("/Volumes/groups/tanaka/People/current/jiwang/projects/RA_competence/",
 #                "results/scRNAseq_R13547_10x_mNT_20220813/RA_symetryBreaking/")
 #saveFile = "RNAmatrix_umap_kalisto.velocity_spliced_unspliced_CMsutypes_v1.5.h5Seurat"
-saveFile = 'RNAmatrix_umap_kalisto.velocity_spliced_unspliced_CMsutypesAll_2.1.h5Seurat'
+saveFile = 'RNAmatrix_umap_kalisto.velocity_spliced_unspliced_CMsutypesAll_d0.d1_2.2.h5Seurat'
 
 SaveH5Seurat(mnt, filename = paste0(outDir, saveFile), 
              overwrite = TRUE)
