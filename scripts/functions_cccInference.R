@@ -20,6 +20,7 @@ run_LIANA_defined_celltype = function(subref,
 {
   source('functions_scRNAseq.R')
   
+  # subref = refs
   sce <- as.SingleCellExperiment(subref)
   colLabels(sce) = as.factor(sce$celltypes)
   rownames(sce) = toupper(get_geneName(rownames(sce)))
@@ -38,6 +39,7 @@ run_LIANA_defined_celltype = function(subref,
   summary(genes.to.keep)
   
   sce <- sce[genes.to.keep, ]
+  
   
   ## run the liana wrap function by specifying resource and methods
   # Resource currently included in OmniPathR (and hence `liana`) include:

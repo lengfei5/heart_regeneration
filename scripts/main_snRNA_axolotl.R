@@ -37,7 +37,6 @@ mem_used()
 
 species = 'axloltl_scRNAseq'
 
-
 ########################################################
 ########################################################
 # Section I: import the scRNAseq data by kalisto
