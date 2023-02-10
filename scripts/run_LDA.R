@@ -47,6 +47,7 @@ mem_used()
 
 library(data.table)
 require(cisTopic)
+
 ##########################################
 # start the main function 
 ##########################################
@@ -119,6 +120,8 @@ saveRDS(out.lda, file = paste0(RdataDir, 'test_LDA_saved_v1.rds'))
 Process_LDA_results = FALSE
 if(Process_LDA_results){# perplexity(out.lda)
   
+  out.lda = readRDS(file = paste0(RdataDir, 'test_LDA_saved_v1.rds'))
+  
   tm.result <- posterior(out.lda[[1]])
   tm.result <- AddTopicToTmResult(tm.result)
   topics.mat = tm.result$topics
@@ -128,26 +131,74 @@ if(Process_LDA_results){# perplexity(out.lda)
   #print("Time elapsed after LDA")
   #print(Sys.time() - jstart)
   
-  jsettings <- umap.defaults
-  jsettings$n_neighbors <- 30
-  jsettings$min_dist <- 0.1
-  jsettings$random_state <- 123
-  #umap.out <- umap(topics.mat, config = jsettings)
-  #dat.umap.long <- data.frame(cell = rownames(umap.out$layout), 
-  #                           umap1 = umap.out$layout[, 1], 
-  #                            umap2 = umap.out$layout[, 2], stringsAsFactors = FALSE)
+  plot_umap_seurat = TRUE
   
-  dat.umap <- DoUmapAndLouvain(tm.result$topics, jsettings = jsettings)
-  
-  cbPalette <- c("#696969", "#32CD32", "#56B4E9", "#FFB6C1", "#F0E442", "#0072B2", "#D55E00", 
-                 "#CC79A7", "#006400", "#FFB6C1", "#32CD32", "#0b1b7f", "#ff9f7d", "#eb9d01", "#7fbedf")
-  
-  ggplot(dat.umap, aes(x = umap1, y = umap2, color = louvain)) +
-    geom_point() +
-    theme_bw() +
-    ggtitle(paste("LDA test")) +
-    scale_color_manual(values = cbPalette) +
-    theme(aspect.ratio=0.5, panel.grid.major = element_blank(), panel.grid.minor = element_blank(), 
-          legend.position = "right") 
+  if(plot_umap_seurat){
+    # method='Z-score'
+    # #method = 'Probability'
+    # cistopicObject.reduced_space = t(cisTopic::modelMatSelection(cistopicObject,
+    #                                                              target='cell',
+    #                                                              method=method))
+    # 
+    # colnames(cistopicObject.reduced_space) = paste0('PC_', 1:ncol(cistopicObject.reduced_space))
+    # 
+    # dimensions = ncol(cistopicObject.reduced_space)
+    # 
+    # #cistopicObject.seurat = run_dim_reduction(,
+    # #                                          cistopicObject.reduced_space,
+    # #                                          dims=1:120,
+    # #                                          reduction='pca')
+    # 
+    # seurat_obj = Seurat::CreateSeuratObject(cistopicObject@binary.count.matrix, assay = 'peaks')
+    # seurat_obj[['pca']] = Seurat::CreateDimReducObject(embeddings=cistopicObject.reduced_space, 
+    #                                                    key='PC_', 
+    #                                                    assay='peaks')
+    # 
+    # seurat_obj$subtypes = srat_cr$subtypes[match(colnames(seurat_obj), colnames(srat_cr))]
+    # seurat_obj$celltypes = srat_cr$celltypes[match(colnames(seurat_obj), colnames(srat_cr))]
+    # 
+    # # seurat_obj = Seurat::L2Dim(seurat_obj, reduction='pca') 
+    # seurat_obj = Seurat::RunUMAP(seurat_obj, reduction = "pca", dims = 1:120, n.neighbors = 30, 
+    #                              min.dist = 0.05)
+    # 
+    # DimPlot(seurat_obj, reduction = 'umap', group.by = 'celltypes', label = TRUE, repel = TRUE) + 
+    #   NoLegend()
+    # 
+    # ggsave(paste0(resDir, '/UMAP_DM_cisTopic_test.pdf'), width = 8, height = 6)
+    # 
+    # DimPlot(seurat_obj, reduction = 'umap', group.by = 'subtypes', label = TRUE, repel = TRUE) + NoLegend()
+    
+    #cistopicObject.seurat = cistopicObject.seurat %>%
+    #  Seurat::FindNeighbors(reduction=reduction, nn.eps=0.25, dims=1:dimensions) %>%
+    #  Seurat::FindClusters(reduction=reduction, n.start=20, resolution=resolution)
+    
+    #srat_cr[['Topic']] = Seurat::CreateDimReducObject(embeddings=cistopicObject.reduced_space, 
+    #                                                key='Topic_', 
+    #                                                   assay='ATAC')
+    
+  }else{
+    jsettings <- umap.defaults
+    jsettings$n_neighbors <- 30
+    jsettings$min_dist <- 0.1
+    jsettings$random_state <- 123
+    #umap.out <- umap(topics.mat, config = jsettings)
+    #dat.umap.long <- data.frame(cell = rownames(umap.out$layout), 
+    #                           umap1 = umap.out$layout[, 1], 
+    #                            umap2 = umap.out$layout[, 2], stringsAsFactors = FALSE)
+    
+    dat.umap <- DoUmapAndLouvain(tm.result$topics, jsettings = jsettings)
+    
+    cbPalette <- c("#696969", "#32CD32", "#56B4E9", "#FFB6C1", "#F0E442", "#0072B2", "#D55E00", 
+                   "#CC79A7", "#006400", "#FFB6C1", "#32CD32", "#0b1b7f", "#ff9f7d", "#eb9d01", "#7fbedf")
+    
+    ggplot(dat.umap, aes(x = umap1, y = umap2, color = louvain)) +
+      geom_point() +
+      theme_bw() +
+      ggtitle(paste("LDA test")) +
+      scale_color_manual(values = cbPalette) +
+      theme(aspect.ratio=0.5, panel.grid.major = element_blank(), panel.grid.minor = element_blank(), 
+            legend.position = "right")
+    
+  }
   
 }

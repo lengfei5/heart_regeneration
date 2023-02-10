@@ -42,6 +42,7 @@ mem_used()
 
 library(data.table)
 require(cisTopic)
+
 ##########################################
 # start the main function 
 ##########################################
