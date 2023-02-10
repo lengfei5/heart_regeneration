@@ -58,6 +58,7 @@ refs$subtypes = as.factor(refs$subtypes)
 refs$celltypes = gsub('CM_ven_Robo2', 'CM_Robo2', refs$celltypes)
 refs$celltypes = gsub('CM_ven_Cav3_1', 'CM_Cav3.1', refs$celltypes)
 
+
 ########################################################
 ########################################################
 # Section : cell neighborhood analysis
@@ -216,7 +217,7 @@ receivers_RZ_timeSpecific = list(day1 = c("CM_Robo2"),
 # run LIANA 
 ##########################################
 # set parameter for ligand-receptor analysis
-outDir = paste0(resDir, '/Ligand_Receptor_analysis/LIANA_v3.7_receiverCells_CM.IS.CM.IS.PROL')
+outDir = paste0(resDir, '/Ligand_Receptor_analysis/LIANA_v4.0_receiverCells_CM.IS.CM.IS.PROL')
 
 source('functions_cccInference.R')
 run_LIANA(refs, 

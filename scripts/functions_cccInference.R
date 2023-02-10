@@ -134,57 +134,9 @@ run_LIANA = function(refs,
                                  additionalLabel = paste0('_', timepoint))
 
     }
-    
-      
+  
   }
   
-  # RUN CPDB alone
-  if(RUN.CPDB.alone){
-    cpdb_test <- liana_wrap(sce,
-                            method = 'cellphonedb',
-                            resource = c('CellPhoneDB'),
-                            permutation.params = list(nperms=1000,
-                                                      parallelize=FALSE,
-                                                      workers=4), 
-                            expr_prop=0.05)
-    
-    # Plot toy results
-    # identify interactions of interest
-    cpdb_int <- cpdb_test %>%
-      # only keep interactions with p-val <= 0.05
-      filter(pvalue <= 0.05) %>% # this reflects interactions `specificity`
-      # then rank according to `magnitude` (lr_mean in this case)
-      rank_method(method_name = "cellphonedb",
-                  mode = "magnitude") %>%
-      # keep top 20 interactions (regardless of cell type)
-      distinct_at(c("ligand.complex", "receptor.complex")) %>%
-      head(ntop)
-    
-    # Plot toy results
-    cpdp_res = cpdb_test %>%
-      # keep only the interactions of interest
-      inner_join(cpdb_int, 
-                 by = c("ligand.complex", "receptor.complex")) %>%
-      # invert size (low p-value/high specificity = larger dot size)
-      # + add a small value to avoid Infinity for 0s
-      mutate(pvalue = -log10(pvalue + 1e-10)) 
-    
-    for(n in 1:length(celltypes)){
-      # n = 1
-      cpdp_res %>% 
-        liana_dotplot(source_groups = celltypes[n],
-                      target_groups = celltypes,
-                      specificity = "pvalue",
-                      magnitude = "lr.mean",
-                      show_complex = TRUE,
-                      size.label = "-log10(p-value)", 
-                      ntop = ntop)
-      
-      ggsave(filename = paste0(outDir, '/CellPhoneDB_LR_prediction_senderCell_', celltypes[n], '.pdf'), 
-             width = 14, height = min(c(10*ntop/20, 50)), limitsize = FALSE)
-      
-    }
-  }
   
 }
 
@@ -192,7 +144,8 @@ run_LIANA = function(refs,
 run_LIANA_defined_celltype = function(subref,
                                       celltypes,
                                       receivers = NULL,
-                                      additionalLabel = '_fixedCelltypes')
+                                      additionalLabel = '_fixedCelltypes',
+                                      Test.geneExpresion = TRUE)
 {
   source('functions_scRNAseq.R')
   
@@ -223,8 +176,7 @@ run_LIANA_defined_celltype = function(subref,
   show_methods()
   
   liana_test <- liana_wrap(sce,  
-                           method = c("natmi", "connectome", "logfc", "sca", "cytotalk"  
-                                      #'cellphonedb'
+                           method = c("natmi", "connectome", "logfc", "sca", "cytotalk"
                            ),
                            resource = c("Consensus", 'CellPhoneDB', "OmniPath", "LRdb",
                                         "CellChatDB",  "CellTalkDB"), 
@@ -243,6 +195,40 @@ run_LIANA_defined_celltype = function(subref,
   # liana_test = readRDS(file = paste0(outDir, '/res_lianaTest_Consensus_day1.rds'))
   if(is.na(receivers)){ # loop over all cell type candidates
     receivers = celltypes
+  }
+  
+  df_test = liana_test %>% filter(target %in% receivers & source %in% celltypes) %>% as.data.frame() 
+  write.table(df_test, file = paste0(outDir, '/res_lianaTest_Consensus', additionalLabel, '.txt'), 
+              sep = '\t', quote = FALSE)
+  
+  
+  if(Test.geneExpresion){
+    
+    system(paste0('mkdir -p ', outDir, '/examples_plotted'))
+    
+    DimPlot(subref, group.by = 'subtypes', label = TRUE, repel = TRUE) + NoLegend()
+    ggsave(filename = paste0(outDir, '/examples_plotted/snRNA_subtypes_labeled.pdf'),
+           width = 10, height = 8)
+    
+    geneNames = get_geneName(rownames(subref))
+    
+    for(mm in 1:100)
+    {
+      cat('-- example number : ', mm, '\n')
+      #FeaturePlot(refs, features = rownames(refs)[grep('VEGFC|VIPR2', rownames(refs))])
+      features = c(df_test$ligand.complex[mm], df_test$receptor.complex[mm])
+      features = sapply(features, function(x) unlist(strsplit(as.character(x), '_')))
+      
+      features = rownames(subref)[!is.na(match(geneNames, features))]
+      FeaturePlot(subref, features = features)
+      
+      ggsave(filename = paste0(outDir, '/examples_plotted/featurePlots_ligand_receptor_', additionalLabel, 
+                               '_top_', mm, 
+                               "_" ,df_test$source[mm], 
+                               '_to_', df_test$target[mm],  '.pdf'),
+             width = 12, height = 10)
+    }
+    
   }
   
   for(m in 1:length(receivers)){
@@ -266,6 +252,7 @@ run_LIANA_defined_celltype = function(subref,
                                '_ntop.', ntop, '.pdf'), 
              width = 30, height = min(c(10*ntop/20, 50)), limitsize = FALSE)
     }
+    
     
   }
   
