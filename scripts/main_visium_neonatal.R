@@ -9,6 +9,7 @@
 ##########################################################################
 # setup for data import and sequencing QCs
 rm(list = ls())
+
 version.analysis = '_R11934_20210827_neonatal'
 
 resDir = paste0("../results/visium_neonatalMice", version.analysis)
@@ -23,7 +24,7 @@ source('functions_Visium.R')
 
 ########################################################
 ########################################################
-# Section : import the processed visium data by spaceranger
+# Section I : import the processed visium data by spaceranger
 # first start with neonatal mice samples
 ########################################################
 ########################################################
@@ -217,12 +218,13 @@ DimPlot(st, reduction = "umap", group.by = c("ident", "condition"))
 SpatialFeaturePlot(st, features = 'Cd24a', image.alpha = 0.5)
 SpatialFeaturePlot(st, features = 'Agrn', image.alpha = 0.5)
 
+
 # import marker genes
 library(openxlsx)
 #aa = read.xlsx('../data/Markers_updated_v2.xlsx', sheet = 1, colNames = TRUE)
-aa = read.csv('../data/Tzahor_geneList.csv', header = TRUE)
-
-aa = aa[-c(1), c(1:2)]
+#aa = read.csv('../data/Tzahor_geneList.csv', header = TRUE)
+aa = read.xlsx('../data/Neonate_visium_gene_Lingling.xlsx', sheet = 4, colNames = TRUE)
+#aa = aa[-c(1), c(1:2)]
 #aa = aa[-c(1), -c(1:3)]
 
 markers = c()
@@ -240,9 +242,9 @@ markers = markers[!is.na(match(markers, rownames(st)))]
 #markers = unique(c(markers, rownames(st)[grep('Ly6g', rownames(st))]))
 #markers = c('Timp1', 'Timp2', 'Timp3', 'Timp4')
 
-markers = c('F13a1', 'Apoe', 'Igfbp4', 'C1qa', 'Vldlr', 'Lrp5', 'Lrp6', 'Itga9', 'Cspg4', 'Cr1l')
+#markers = c('F13a1', 'Apoe', 'Igfbp4', 'C1qa', 'Vldlr', 'Lrp5', 'Lrp6', 'Itga9', 'Cspg4', 'Cr1l')
+#markers = c("Ntn1", "Mfap5", "Ubb", "Spon2", "Sparc", "Comp", "Ncanb", "Cthrc1", "Gpr42", "Ffr2")
 
-markers = c("Ntn1", "Mfap5", "Ubb", "Spon2", "Sparc", "Comp", "Ncanb", "Cthrc1", "Gpr42", "Ffr2")
 mm = match(markers, rownames(st))
 markers[is.na(mm)]
 
