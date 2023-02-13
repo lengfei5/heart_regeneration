@@ -207,7 +207,7 @@ run_LIANA_defined_celltype = function(subref,
     system(paste0('mkdir -p ', outDir, '/examples_plotted'))
     
     DimPlot(subref, group.by = 'subtypes', label = TRUE, repel = TRUE) + NoLegend()
-    ggsave(filename = paste0(outDir, '/examples_plotted/snRNA_subtypes_labeled.pdf'),
+    ggsave(filename = paste0(outDir, '/examples_plotted/snRNA_subtypes_labeled', additionalLabel, '.pdf'),
            width = 10, height = 8)
     
     geneNames = get_geneName(rownames(subref))

@@ -89,7 +89,6 @@ run_dim_reduction = function(atac_matrix, cell_embeddings, dims, metadata=NULL, 
   
 }
 
-
 #data(counts_mel) 
 bmat = srat_cr@assays$ATAC@counts
 coords = str_split_fixed(rownames(bmat), '-', 3)
@@ -114,54 +113,63 @@ cisTopicObject = cisTopic::runWarpLDAModels(cisTopicObject,
 
 saveRDS(cisTopicObject, file = paste0(RdataDir, 'test_cisTopic_saved_v2.rds'))
 
-# cisTopicObject = readRDS(file = paste0(RdataDir, 'test_cisTopic_saved.rds'))
-# 
-# par(mfrow=c(3,3))
-# cisTopicObject <- selectModel(cisTopicObject, type='maximum')
-# cisTopicObject <- selectModel(cisTopicObject, type='perplexity')
-# cisTopicObject <- selectModel(cisTopicObject, type='derivative')
-# 
-# cistopicObject = cisTopic::selectModel(cisTopicObject, type = 'maximum')
-# 
-# method='Z-score'
-# #method = 'Probability'
-# cistopicObject.reduced_space = t(cisTopic::modelMatSelection(cistopicObject,
-#                                                              target='cell',
-#                                                              method=method))
-# 
-# colnames(cistopicObject.reduced_space) = paste0('PC_', 1:ncol(cistopicObject.reduced_space))
-# 
-# dimensions = ncol(cistopicObject.reduced_space)
-# 
-# #cistopicObject.seurat = run_dim_reduction(,
-# #                                          cistopicObject.reduced_space,
-# #                                          dims=1:120,
-# #                                          reduction='pca')
-# 
-# seurat_obj = Seurat::CreateSeuratObject(cistopicObject@binary.count.matrix, assay = 'peaks')
-# seurat_obj[['pca']] = Seurat::CreateDimReducObject(embeddings=cistopicObject.reduced_space, 
-#                                                    key='PC_', 
-#                                                    assay='peaks')
-# 
-# seurat_obj$subtypes = srat_cr$subtypes[match(colnames(seurat_obj), colnames(srat_cr))]
-# seurat_obj$celltypes = srat_cr$celltypes[match(colnames(seurat_obj), colnames(srat_cr))]
-# 
-# # seurat_obj = Seurat::L2Dim(seurat_obj, reduction='pca') 
-# seurat_obj = Seurat::RunUMAP(seurat_obj, reduction = "pca", dims = 1:120, n.neighbors = 30, 
-#                              min.dist = 0.05)
-# 
-# DimPlot(seurat_obj, reduction = 'umap', group.by = 'celltypes', label = TRUE, repel = TRUE) + 
-#   NoLegend()
-# 
-# ggsave(paste0(resDir, '/UMAP_DM_cisTopic_test.pdf'), width = 8, height = 6)
-# 
-# DimPlot(seurat_obj, reduction = 'umap', group.by = 'subtypes', label = TRUE, repel = TRUE) + NoLegend()
-
-#cistopicObject.seurat = cistopicObject.seurat %>%
-#  Seurat::FindNeighbors(reduction=reduction, nn.eps=0.25, dims=1:dimensions) %>%
-#  Seurat::FindClusters(reduction=reduction, n.start=20, resolution=resolution)
-
-#srat_cr[['Topic']] = Seurat::CreateDimReducObject(embeddings=cistopicObject.reduced_space, 
-#                                                key='Topic_', 
-#                                                   assay='ATAC')
-
+Process_LDA_results = FALSE
+if(Process_LDA_results){
+  cisTopicObject = readRDS(file = paste0(RdataDir, 'test_cisTopic_saved_v2.rds'))
+  #
+  par(mfrow=c(3,3))
+  cisTopicObject <- selectModel(cisTopicObject, type='maximum')
+  cisTopicObject <- selectModel(cisTopicObject, type='perplexity')
+  cisTopicObject <- selectModel(cisTopicObject, type='derivative')
+  
+  #
+  cistopicObject = cisTopic::selectModel(cisTopicObject, 
+                                         select = 50,
+                                         type = 'derivative')
+  #
+  method='Z-score'
+  # #method = 'Probability'
+  cistopicObject.reduced_space = t(cisTopic::modelMatSelection(cistopicObject,
+                                                                target='cell',
+                                                                method=method))
+  
+  colnames(cistopicObject.reduced_space) = paste0('PC_', 1:ncol(cistopicObject.reduced_space))
+  dimensions = ncol(cistopicObject.reduced_space)
+  cat(dimensions, ' topics selected \n')
+  #
+  # #cistopicObject.seurat = run_dim_reduction(,
+  # #                                          cistopicObject.reduced_space,
+  # #                                          dims=1:120,
+  # #                                          reduction='pca')
+  #
+  seurat_obj = Seurat::CreateSeuratObject(cistopicObject@binary.count.matrix, assay = 'peaks')
+  seurat_obj[['pca']] = Seurat::CreateDimReducObject(embeddings=cistopicObject.reduced_space,
+                                                      key='PC_',
+                                                      assay='peaks')
+  #
+  seurat_obj$subtypes = srat_cr$subtypes[match(colnames(seurat_obj), colnames(srat_cr))]
+  seurat_obj$celltypes = srat_cr$celltypes[match(colnames(seurat_obj), colnames(srat_cr))]
+  #
+  # # seurat_obj = Seurat::L2Dim(seurat_obj, reduction='pca')
+  seurat_obj = Seurat::RunUMAP(seurat_obj, reduction = "pca", dims = 1:dimensions, n.neighbors = 30,
+                                min.dist = 0.05)
+  
+  p1 = DimPlot(seurat_obj, reduction = 'umap', group.by = 'celltypes', label = TRUE, repel = TRUE) +
+    NoLegend()
+  p2 = DimPlot(seurat_obj, reduction = 'umap', group.by = 'subtypes', label = TRUE, repel = TRUE) + 
+    NoLegend()
+  p1 + p2
+  
+  # ggsave(paste0(resDir, '/UMAP_DM_cisTopic_test.pdf'), width = 8, height = 6)
+  #
+  
+  #cistopicObject.seurat = cistopicObject.seurat %>%
+  #  Seurat::FindNeighbors(reduction=reduction, nn.eps=0.25, dims=1:dimensions) %>%
+  #  Seurat::FindClusters(reduction=reduction, n.start=20, resolution=resolution)
+  
+  #srat_cr[['Topic']] = Seurat::CreateDimReducObject(embeddings=cistopicObject.reduced_space,
+  #                                                key='Topic_',
+  #                                                   assay='ATAC')
+  
+  
+}

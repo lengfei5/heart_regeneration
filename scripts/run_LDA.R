@@ -118,63 +118,61 @@ toc()
 saveRDS(out.lda, file = paste0(RdataDir, 'test_LDA_saved_v1.rds'))
 
 Process_LDA_results = FALSE
-if(Process_LDA_results){# perplexity(out.lda)
+if(Process_LDA_results){ # perplexity(out.lda)
   
   out.lda = readRDS(file = paste0(RdataDir, 'test_LDA_saved_v1.rds'))
   
-  tm.result <- posterior(out.lda[[1]])
-  tm.result <- AddTopicToTmResult(tm.result)
-  topics.mat = tm.result$topics
-  # save output
   #print("Saving LDA")
   #save(out.lda, count.mat, count.mat.orig, file = outpath)
   #print("Time elapsed after LDA")
   #print(Sys.time() - jstart)
   
   plot_umap_seurat = TRUE
-  
   if(plot_umap_seurat){
+    
+    tm.result <- posterior(out.lda[[10]])
+    tm.result <- AddTopicToTmResult(tm.result)
+    topics.mat = tm.result$topics
+    
     # method='Z-score'
     # #method = 'Probability'
     # cistopicObject.reduced_space = t(cisTopic::modelMatSelection(cistopicObject,
     #                                                              target='cell',
     #                                                              method=method))
     # 
-    # colnames(cistopicObject.reduced_space) = paste0('PC_', 1:ncol(cistopicObject.reduced_space))
-    # 
-    # dimensions = ncol(cistopicObject.reduced_space)
-    # 
-    # #cistopicObject.seurat = run_dim_reduction(,
-    # #                                          cistopicObject.reduced_space,
-    # #                                          dims=1:120,
-    # #                                          reduction='pca')
-    # 
-    # seurat_obj = Seurat::CreateSeuratObject(cistopicObject@binary.count.matrix, assay = 'peaks')
-    # seurat_obj[['pca']] = Seurat::CreateDimReducObject(embeddings=cistopicObject.reduced_space, 
-    #                                                    key='PC_', 
-    #                                                    assay='peaks')
-    # 
-    # seurat_obj$subtypes = srat_cr$subtypes[match(colnames(seurat_obj), colnames(srat_cr))]
-    # seurat_obj$celltypes = srat_cr$celltypes[match(colnames(seurat_obj), colnames(srat_cr))]
-    # 
-    # # seurat_obj = Seurat::L2Dim(seurat_obj, reduction='pca') 
-    # seurat_obj = Seurat::RunUMAP(seurat_obj, reduction = "pca", dims = 1:120, n.neighbors = 30, 
-    #                              min.dist = 0.05)
-    # 
-    # DimPlot(seurat_obj, reduction = 'umap', group.by = 'celltypes', label = TRUE, repel = TRUE) + 
-    #   NoLegend()
-    # 
-    # ggsave(paste0(resDir, '/UMAP_DM_cisTopic_test.pdf'), width = 8, height = 6)
-    # 
-    # DimPlot(seurat_obj, reduction = 'umap', group.by = 'subtypes', label = TRUE, repel = TRUE) + NoLegend()
+    colnames(topics.mat) = paste0('PC_', 1:ncol(topics.mat))
+    dimensions = ncol(topics.mat)
     
+    seurat_obj = subset(srat_cr, cells = rownames(topics.mat))
+    
+    topics.mat = topics.mat[match(colnames(seurat_obj), rownames(topics.mat)), ]
+    seurat_obj[['pca']] = Seurat::CreateDimReducObject(embeddings=topics.mat,
+                                                        key='PC_',
+                                                        assay='ATAC')
+    
+    seurat_obj = Seurat::RunUMAP(seurat_obj, reduction = "pca", dims = 1:dimensions, n.neighbors = 30,
+                                  min.dist = 0.3)
+    
+    p1 = DimPlot(seurat_obj, reduction = 'umap', group.by = 'celltypes', label = TRUE, repel = TRUE) +
+       NoLegend()
+    
+    p2 = DimPlot(seurat_obj, reduction = 'umap', group.by = 'subtypes', label = TRUE, repel = TRUE) + 
+      NoLegend()
+    
+    p1 + p2
+    
+    ggsave(paste0(resDir, '/UMAP_DM_cisTopic_test.pdf'), width = 8, height = 6)
+    #
+   
     #cistopicObject.seurat = cistopicObject.seurat %>%
     #  Seurat::FindNeighbors(reduction=reduction, nn.eps=0.25, dims=1:dimensions) %>%
     #  Seurat::FindClusters(reduction=reduction, n.start=20, resolution=resolution)
-    
-    #srat_cr[['Topic']] = Seurat::CreateDimReducObject(embeddings=cistopicObject.reduced_space, 
-    #                                                key='Topic_', 
+
+    #srat_cr[['Topic']] = Seurat::CreateDimReducObject(embeddings=cistopicObject.reduced_space,
+    #                                                key='Topic_',
     #                                                   assay='ATAC')
+    
+    
     
   }else{
     jsettings <- umap.defaults

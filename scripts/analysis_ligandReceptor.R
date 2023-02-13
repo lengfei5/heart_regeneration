@@ -226,6 +226,7 @@ run_LIANA(refs,
           receiver_cells = receivers_BZ_timeSpecific,
           outDir = outDir)
 
+
 ########################################################
 # diff Nichenet for ligand-receptor analysis
 # original code from https://github.com/saeyslab/nichenetr/blob/master/vignettes/seurat_steps.md
