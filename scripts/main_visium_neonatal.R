@@ -13,7 +13,7 @@ rm(list = ls())
 version.analysis = '_R11934_20210827_neonatal'
 
 resDir = paste0("../results/visium_neonatalMice", version.analysis)
-RdataDir = paste0('../results/Rdata/')
+RdataDir = paste0(resDir, '/Rdata/')
 
 if(!dir.exists(resDir)) dir.create(resDir)
 if(!dir.exists(RdataDir)) dir.create(RdataDir)
@@ -146,8 +146,10 @@ for(n in 1:nrow(design))
   # normalization 
   ##########################################
   #aa <- SCTransform(aa, assay = "Spatial",  method = "glmGamPoi", verbose = FALSE)
-  # min_cells = 5 only use genes that have been detected in at least this many cells (determine the gene nb of output)
-  aa <- SCTransform(aa, assay = "Spatial", verbose = FALSE, variable.features.n = 3000, return.only.var.genes = FALSE, 
+  # min_cells = 5 only use genes that have been detected in at least this many cells 
+  # (determine the gene nb of output)
+  aa <- SCTransform(aa, assay = "Spatial", verbose = FALSE, variable.features.n = 3000, 
+                    return.only.var.genes = FALSE, 
                     min_cells=5) 
   
   aa <- RunPCA(aa, verbose = FALSE, weight.by.var = TRUE)
@@ -223,7 +225,7 @@ SpatialFeaturePlot(st, features = 'Agrn', image.alpha = 0.5)
 library(openxlsx)
 #aa = read.xlsx('../data/Markers_updated_v2.xlsx', sheet = 1, colNames = TRUE)
 #aa = read.csv('../data/Tzahor_geneList.csv', header = TRUE)
-aa = read.xlsx('../data/Neonate_visium_gene_Lingling.xlsx', sheet = 4, colNames = TRUE)
+aa = read.xlsx('../data/Neonate_visium_gene_Lingling.xlsx', sheet = 1, colNames = TRUE)
 #aa = aa[-c(1), c(1:2)]
 #aa = aa[-c(1), -c(1:3)]
 
@@ -249,7 +251,7 @@ markers = markers[!is.na(match(markers, rownames(st)))]
 mm = match(markers, rownames(st))
 markers[is.na(mm)]
 
-pdfname = paste0(resDir, "/Neondal_visium_4Lingling.pdf")
+pdfname = paste0(resDir, "/Neondal_visium_4Lingling_v2.pdf")
 pdf(pdfname, width = 8, height = 6)
 par(cex = 1.0, las = 1, mgp = c(2,0.2,0), mar = c(3,2,2,0.2), tcl = -0.3)
 
@@ -260,7 +262,7 @@ for(n in 1:length(markers))
   cat(n, '--', markers[n])
   if(length(which(rownames(st) == markers[n]))==1){
     cat('\n')
-    p3 = SpatialFeaturePlot(st, features = markers[n], image.alpha = 0.5, 
+    p3 = SpatialFeaturePlot(st, features = markers[n], image.alpha = 0., 
                             images = "neonatal.day4",
                             pt.size.factor = 2.5,
                             slot = "data",
@@ -268,7 +270,6 @@ for(n in 1:length(markers))
                             max.cutoff = 'q98')
     #+
     #ggplot2::scale_fill_continuous(limits = c(0.0,1.0),breaks = c(0.0, 0.5, 1.0))
-    
     plot(p3)
     
   }else{
