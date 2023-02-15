@@ -278,3 +278,17 @@ for(n in 1:length(markers))
 }
 
 dev.off()
+
+## test two features, there is no support for blend option
+# SpatialFeaturePlot(object = st,
+#             features = c("Egr1", "Col1a1"),
+#             image.alpha = 0., 
+#             images = "neonatal.day4",
+#             pt.size.factor = 2.5,
+#             slot = "data",
+#             #min.cutoff = 'q1', 
+#             max.cutoff = 'q98',
+#             blend = TRUE, 
+#             blend.threshold = 1, 
+#             order = T)
+
