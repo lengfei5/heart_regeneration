@@ -227,11 +227,12 @@ aa = read.xlsx('../data/Neonate_visium_gene_Lingling.xlsx', sheet = 4, colNames 
 #aa = aa[-c(1), c(1:2)]
 #aa = aa[-c(1), -c(1:3)]
 
-markers = c()
-for(n in 1:ncol(aa))
-{
-  markers = c(markers, aa[!is.na(aa[,n]), n])
-}
+markers = aa$Gene.names
+markers = markers[!is.na(markers)]
+#for(n in 1:ncol(aa))
+#{
+#  markers = c(markers, aa[!is.na(aa[,n]), 1])
+#}
 markers = markers[which(markers != '')]
 markers = firstup(tolower(unique(markers)))
 markers = gsub(' ', '', markers)
@@ -248,18 +249,30 @@ markers = markers[!is.na(match(markers, rownames(st)))]
 mm = match(markers, rownames(st))
 markers[is.na(mm)]
 
-pdfname = paste0(resDir, "/Visium_AdditionalMarkerGenes_Bern_", species, ".pdf")
-pdf(pdfname, width = 16, height = 8)
+pdfname = paste0(resDir, "/Neondal_visium_4Lingling.pdf")
+pdf(pdfname, width = 8, height = 6)
 par(cex = 1.0, las = 1, mgp = c(2,0.2,0), mar = c(3,2,2,0.2), tcl = -0.3)
 
 for(n in 1:length(markers))
+#for(n in 1:10)
 {
+  # n = 1
+  cat(n, '--', markers[n])
   if(length(which(rownames(st) == markers[n]))==1){
-    cat(markers[n], '\n')
-    p3 = SpatialFeaturePlot(st, features = markers[n], image.alpha = 0.5)
+    cat('\n')
+    p3 = SpatialFeaturePlot(st, features = markers[n], image.alpha = 0.5, 
+                            images = "neonatal.day4",
+                            pt.size.factor = 2.5,
+                            slot = "data",
+                            #min.cutoff = 'q1', 
+                            max.cutoff = 'q98')
+    #+
+    #ggplot2::scale_fill_continuous(limits = c(0.0,1.0),breaks = c(0.0, 0.5, 1.0))
+    
     plot(p3)
+    
   }else{
-    cat(markers[n], ' NOT FOUND\n')
+    cat(' NOT FOUND\n')
   }
 }
 

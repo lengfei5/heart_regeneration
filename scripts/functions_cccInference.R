@@ -451,6 +451,7 @@ run_Diff_NicheNet = function(refs = refs,
   {
     # n = 2
     timepoint = names(celltypes_BZ_timeSpecific)[n]
+    
     celltypes_BZ = celltypes_BZ_timeSpecific[[n]]
     celltypes_RZ = celltypes_RZ_timeSpecific[[n]]
     
@@ -484,6 +485,7 @@ run_Diff_NicheNet = function(refs = refs,
     #Idents(subref) = as.factor(subref$celltypes)
     table(subref$celltypes)
     
+    set.seed(0)
     subref = subset(x = subref, downsample = 3000) # downsample the CM and EC for the sake of speed
     table(subref$celltypes)
     Idents(subref) = subref$celltypes
@@ -943,6 +945,7 @@ prioritize_ligands_between_niches = function(seurat_obj,
   specificity_score_targets = "min_lfc"
   
   # here DE all genes in the receiver cells, not only for ligand and receptors as before
+  cat('find DE targets in receiver cell, may take some time \n')
   DE_receiver_targets = calculate_niche_de_targets(seurat_obj = seurat_obj, 
                                                    niches = niches, 
                                                    lfc_cutoff = lfc_cutoff, 
@@ -953,6 +956,7 @@ prioritize_ligands_between_niches = function(seurat_obj,
                                                              niches = niches, 
                                                              expression_pct = expression_pct, 
                                                              specificity_score = specificity_score_targets)
+  
   
   background = DE_receiver_processed_targets  %>% pull(target) %>% unique()
   geneset_niche1 = DE_receiver_processed_targets %>% 
@@ -989,7 +993,10 @@ prioritize_ligands_between_niches = function(seurat_obj,
                                                             top_n_target = top_n_target)
   
   head(ligand_activities_targets)
-  ligand_activities_targets %>% arrange(-activity) %>% filter(receiver %in% niches$BZ_niche$receiver)
+  ligand_activities_targets %>% arrange(-activity) %>% filter(receiver %in% niches$BZ_niche$receiver) %>%
+    filter(ligand == 'ITGA4')
+  ligand_activities_targets %>% arrange(-activity) %>% filter(receiver %in% niches$RZ_niche$receiver) %>%
+    filter(ligand == 'ITGA4')
   
   ##########################################
   # step 5. Calculate (scaled) expression of ligands, receptors and targets 
@@ -1108,10 +1115,234 @@ prioritize_ligands_between_niches = function(seurat_obj,
     head(10)
   
   prioritization_tables$prioritization_tbl_ligand_target %>% 
-    filter(receiver == niches[[1]]$receiver) %>% 
+    filter(receiver == niches[[2]]$receiver) %>% 
     head(10)
   
+  Test_by_plotting = FALSE
+  if(Test_by_plotting){
+    
+    top_ligand_niche_df = prioritization_tables$prioritization_tbl_ligand_receptor %>% 
+      dplyr::select(niche, sender, receiver, ligand, receptor, prioritization_score) %>% 
+      group_by(ligand) %>% 
+      top_n(1, prioritization_score) %>% 
+      ungroup() %>% 
+      dplyr::select(ligand, receptor, niche) %>% 
+      dplyr::rename(top_niche = niche)
+    
+    top_ligand_receptor_niche_df = prioritization_tables$prioritization_tbl_ligand_receptor %>% 
+      dplyr::select(niche, sender, receiver, ligand, receptor, prioritization_score) %>% 
+      group_by(ligand, receptor) %>% 
+      top_n(1, prioritization_score) %>% 
+      ungroup() %>% 
+      dplyr::select(ligand, receptor, niche) %>% 
+      dplyr::rename(top_niche = niche)
+    
+    ntop = 50
+    cat('ntop -- ', ntop, '\n')
+    
+   xx =  prioritization_tables$prioritization_tbl_ligand_receptor %>% 
+      filter(sender == 'RBC') %>% 
+      dplyr::group_by(ligand_receptor, niche) %>%
+      filter(ligand_receptor %in% c('FGF17--FGFR1', 'ITGA4--VCAM1', 'PTDSS1--ERBB2', 'WNT7B--LRP5')) %>% 
+      data.frame()
+    
+    ligand_prioritized_tbl_oi = prioritization_tables$prioritization_tbl_ligand_receptor %>% 
+      dplyr::select(niche, sender, receiver, ligand, prioritization_score) %>% 
+      group_by(ligand, niche) %>% top_n(1, prioritization_score) %>% 
+      ungroup() %>% distinct() %>% 
+      inner_join(top_ligand_niche_df) %>% 
+      filter(niche == top_niche) %>% 
+      group_by(niche) %>% 
+      top_n(n = ntop, prioritization_score) %>% 
+      ungroup() # get the top50 ligands per niche
+    
+    #  select top ligand-receptor pairs for cell population of interest
+    # (here, we will take the top 2 scoring receptors per prioritized ligand)
+    receiver_oi = receiver
+    filtered_ligands = ligand_prioritized_tbl_oi %>% 
+      filter(receiver == receiver_oi) %>% 
+      pull(ligand) %>% unique()
+    
+    prioritized_tbl_oi = prioritization_tables$prioritization_tbl_ligand_receptor %>% 
+      filter(ligand %in% filtered_ligands) %>% 
+      dplyr::select(niche, sender, receiver, ligand,  receptor, ligand_receptor, prioritization_score) %>% 
+      distinct() %>% 
+      inner_join(top_ligand_receptor_niche_df) %>% 
+      group_by(ligand_receptor) %>%
+      #group_by(ligand) %>% 
+      #filter(receiver == receiver_oi) %>% 
+      top_n(2, prioritization_score) %>% ungroup() 
+    
+    
+    lfc_plot = make_ligand_receptor_lfc_plot(receiver_oi, 
+                                             prioritized_tbl_oi, 
+                                             prioritization_tables$prioritization_tbl_ligand_receptor, 
+                                             plot_legend = FALSE, 
+                                             heights = NULL, widths = NULL)
+    lfc_plot
+    
+    
+  }
+  
   return(list(prioritization_tables, output))
+  
+  
+}
+
+
+make_ligand_receptor_lfc_plot_customized = function(receiver_oi, 
+                                                    prioritized_tbl_oi, 
+                                                    prioritization_tbl_ligand_receptor, 
+                                                    plot_legend = TRUE, 
+                                                    heights = NULL, 
+                                                    widths = NULL)
+{
+  # prioritization_tbl_ligand_receptor = prioritization_tables$prioritization_tbl_ligand_receptor
+  
+  filtered_ligand_receptors = prioritized_tbl_oi %>% pull(ligand_receptor) %>% unique()
+  
+  ordered_ligand_receptors = prioritization_tbl_ligand_receptor %>% 
+    filter(ligand_receptor %in% filtered_ligand_receptors) %>% 
+    select(niche, sender, ligand, receptor, ligand_receptor, prioritization_score) %>% 
+    distinct() %>% 
+    group_by(ligand_receptor) %>% 
+    summarise(prioritization_score = max(prioritization_score)) %>% 
+    inner_join(prioritization_tbl_ligand_receptor %>% 
+                 select(niche, sender, ligand, receptor, ligand_receptor, prioritization_score) %>% 
+                 distinct()) %>% 
+    arrange(sender, prioritization_score)
+  ordered_ligand_receptors_max_ligand_score = prioritization_tbl_ligand_receptor %>% 
+    filter(ligand_receptor %in% filtered_ligand_receptors) %>% 
+    select(niche, sender, ligand, prioritization_score) %>% 
+    distinct() %>% 
+    group_by(ligand) %>% 
+    summarise(prioritization_score_ligand = max(prioritization_score)) %>% 
+    inner_join(prioritization_tbl_ligand_receptor %>% 
+                 select(niche, sender, ligand, prioritization_score) %>% 
+                 distinct()) %>% 
+    arrange(sender, prioritization_score_ligand) %>% distinct()
+  
+  ordered_ligand_receptors = ordered_ligand_receptors %>% 
+    inner_join(ordered_ligand_receptors_max_ligand_score) %>% 
+    arrange(sender, prioritization_score_ligand, prioritization_score)
+  ordered_ligand_receptors = ordered_ligand_receptors %>% 
+    mutate(ligand_receptor_ordered = factor(ligand_receptor, ordered = T, 
+                                            levels = unique(ordered_ligand_receptors$ligand_receptor))) %>% 
+    distinct(ligand_receptor, ligand, receptor, ligand_receptor_ordered, niche) %>% 
+    dplyr::rename(niche_prior = niche)
+  
+  plot_data = prioritization_tbl_ligand_receptor %>% inner_join(ordered_ligand_receptors)
+  
+  p_lig_lfc = plot_data %>% 
+    mutate(scores_test = abs(scaled_activity_normalized) * abs(ligand_score)) %>%
+    #filter(receiver %in% niches[[1]]$receiver) %>%
+    #filter(niche %in% names(niches)[1]) %>% 
+    #ggplot(aes(sender, ligand_receptor_ordered, fill = ligand_score)) +
+    ggplot(aes(sender, ligand_receptor_ordered, fill = scores_test)) +
+    geom_tile(color = "black") +
+    facet_grid(~niche, scales = "free", space = "free") +
+    scale_x_discrete(position = "top") +
+    theme_light() +
+    theme(
+      axis.ticks = element_blank(),
+      axis.title.x = element_text(size = 11),
+      axis.title.y = element_text(size = 11),
+      axis.text.y = element_text(face = "bold.italic", size = 9),
+      axis.text.x = element_text(size = 9,  angle = 90,hjust = 0),
+      strip.text.x.top = element_text(angle = 0),
+      panel.grid.major = element_blank(),
+      panel.grid.minor = element_blank(),
+      panel.spacing.x = unit(0.75, "lines"),
+      panel.spacing.y = unit(0.25, "lines"),
+      strip.text.x = element_text(size = 7, color = "black", face = "bold"),
+      strip.background = element_rect(color="darkgrey", fill="whitesmoke", size=1.5, linetype="solid"),
+      strip.background.y = element_blank(),
+      strip.text.y = element_blank()
+    ) + 
+    labs(fill = "Ligand:\nmin LFC vs\nother niches") + 
+    ylab("Prioritized Ligand-Receptor pairs") + xlab("Ligand LFC\n in Sender")
+  
+  max_lfc = max(abs(plot_data$ligand_score) %>% max(), abs(plot_data$receptor_score) %>% max())
+  custom_scale_fill = scale_fill_gradientn(colours = RColorBrewer::brewer.pal(n = 7, name = "OrRd"), 
+                                           #%>% 
+                                          #   rev(),
+                                          # values = c(0, 0.350, 0.4850, 0.5, 0.5150, 0.65, 1),  
+                                           #limits = c(-1*max_lfc, max_lfc),
+                                           limits = c(0, max_lfc),
+                                           )
+  
+  p_lig_lfc = p_lig_lfc + custom_scale_fill
+  p_lig_lfc
+  
+  p_lig_lfc_ctl = plot_data %>% 
+    filter(receiver %in% niches[[2]]$receiver) %>%
+    filter(niche %in% names(niches)[2]) %>% 
+    ggplot(aes(sender, ligand_receptor_ordered, fill = ligand_score)) +
+    geom_tile(color = "black") +
+    facet_grid(~niche, scales = "free", space = "free") +
+    scale_x_discrete(position = "top") +
+    theme_light() +
+    theme(
+      axis.ticks = element_blank(),
+      axis.title.x = element_text(size = 11),
+      axis.title.y = element_text(size = 11),
+      axis.text.y = element_text(face = "bold.italic", size = 9),
+      axis.text.x = element_text(size = 9,  angle = 90,hjust = 0),
+      strip.text.x.top = element_text(angle = 0),
+      panel.grid.major = element_blank(),
+      panel.grid.minor = element_blank(),
+      panel.spacing.x = unit(0.75, "lines"),
+      panel.spacing.y = unit(0.25, "lines"),
+      strip.text.x = element_text(size = 7, color = "black", face = "bold"),
+      strip.background = element_rect(color="darkgrey", fill="whitesmoke", size=1.5, linetype="solid"),
+      strip.background.y = element_blank(),
+      strip.text.y = element_blank()
+    ) + 
+    labs(fill = "Ligand:\nmin LFC vs\nother niches")  + 
+    ylab("Prioritized Ligand-Receptor pairs") + xlab("Ligand LFC\n in Sender") +
+    custom_scale_fill
+  
+  design = "A#B"
+  p_L_niches = patchwork::wrap_plots(A = p_lig_lfc, 
+                                     B = p_lig_lfc_ctl + ylab(""), 
+                                     nrow = 1, guides = "collect", 
+                                     design = design, 
+                                     widths = c(plot_data$sender %>% unique() %>% length(), 1, 
+                                                plot_data$receiver %>% unique() %>% length() +0.5))
+  p_L_niches
+  
+  p_rec_lfc = plot_data %>%
+    ggplot(aes(receiver, ligand_receptor_ordered, fill = receptor_score)) +
+    geom_tile(color = "black") +
+    facet_grid(~receiver, scales = "free", space = "free") +
+    scale_x_discrete(position = "top") +
+    theme_light() +
+    theme(
+      axis.ticks = element_blank(),
+      axis.title.x = element_text(size = 11),
+      axis.title.y = element_text(size = 0),
+      axis.text.y = element_text(face = "bold.italic", size = 9),
+      axis.text.x = element_text(size = 9,  angle = 90,hjust = 0),
+      strip.text.x.top = element_text(angle = 0),
+      panel.grid.major = element_blank(),
+      panel.grid.minor = element_blank(),
+      panel.spacing.x = unit(0.75, "lines"),
+      panel.spacing.y = unit(0.25, "lines"),
+      strip.text.x = element_text(size = 7, color = "black", face = "bold"),
+      strip.background = element_rect(color="darkgrey", fill="whitesmoke", size=1.5, linetype="solid"),
+      strip.background.y = element_blank(),
+      strip.text.y = element_blank()
+    ) + labs(fill = "Receptor:\nmin LFC vs\nother niches")  + xlab("Receptor LFC\n in Receiver")
+  max_lfc = max(abs(plot_data$ligand_score) %>% max(), abs(plot_data$receptor_score) %>% max())
+  custom_scale_fill = scale_fill_gradientn(colours = RColorBrewer::brewer.pal(n = 7, name = "RdBu") %>% rev(),values = c(0, 0.350, 0.4850, 0.5, 0.5150, 0.65, 1),  limits = c(-1*max_lfc, max_lfc))
+  
+  p_rec_lfc = p_rec_lfc + custom_scale_fill
+  p_rec_lfc
+  
+  design = "A#B"
+  p_LR_pair = patchwork::wrap_plots(A = p_lig_lfc, B = p_rec_lfc + ylab(""), nrow = 1, guides = "collect", design = design, widths = c(plot_data$sender %>% unique() %>% length(), 1 ,plot_data$receiver %>% unique() %>% length() +0.5))
+  p_LR_pair
+  
   
   
 }

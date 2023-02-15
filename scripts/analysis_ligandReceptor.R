@@ -226,12 +226,14 @@ run_LIANA(refs,
           receiver_cells = receivers_BZ_timeSpecific,
           outDir = outDir)
 
+## double check the ligand and receptor expression distribution
+FeaturePlot(refs, features = rownames(refs)[grep('EGFC|VIPR2', rownames(refs))])
 
 ########################################################
 # diff Nichenet for ligand-receptor analysis
 # original code from https://github.com/saeyslab/nichenetr/blob/master/vignettes/seurat_steps.md
 ########################################################
-outDir = paste0(resDir, '/Ligand_Receptor_analysis/DiffNicheNet_v3.6')
+outDir = paste0(resDir, '/Ligand_Receptor_analysis/DiffNicheNet_v4.0_test')
 system(paste0('mkdir -p ', outDir))
 
 source('functions_cccInference.R')
