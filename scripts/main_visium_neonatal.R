@@ -225,11 +225,13 @@ SpatialFeaturePlot(st, features = 'Agrn', image.alpha = 0.5)
 library(openxlsx)
 #aa = read.xlsx('../data/Markers_updated_v2.xlsx', sheet = 1, colNames = TRUE)
 #aa = read.csv('../data/Tzahor_geneList.csv', header = TRUE)
-aa = read.xlsx('../data/Neonate_visium_gene_Lingling.xlsx', sheet = 1, colNames = TRUE)
+#aa = read.xlsx('../data/Neonate_visium_gene_Lingling.xlsx', sheet = 1, colNames = TRUE)
+aa = read.xlsx('../data/Neonate_visium_GeneList_Lingling_20230226.xlsx', sheet = 1, colNames = TRUE)
+
 #aa = aa[-c(1), c(1:2)]
 #aa = aa[-c(1), -c(1:3)]
 
-markers = aa$Gene.names
+markers = aa$Gene.Name
 markers = markers[!is.na(markers)]
 #for(n in 1:ncol(aa))
 #{
@@ -251,7 +253,7 @@ markers = markers[!is.na(match(markers, rownames(st)))]
 mm = match(markers, rownames(st))
 markers[is.na(mm)]
 
-pdfname = paste0(resDir, "/Neondal_visium_4Lingling_v2.pdf")
+pdfname = paste0(resDir, "/Neondal_visium_4Lingling_v20230226.pdf")
 pdf(pdfname, width = 8, height = 6)
 par(cex = 1.0, las = 1, mgp = c(2,0.2,0), mar = c(3,2,2,0.2), tcl = -0.3)
 

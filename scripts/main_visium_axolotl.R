@@ -511,7 +511,7 @@ Run.celltype.deconvolution.RCTD(st, refs,
                                 max_cores = max_cores,
                                 RCTD_out = RCTD_out,
                                 plot.RCTD.summary = FALSE, 
-                                PLOT.scatterpie = FALSE,
+                                PLOT.scatterpie = FALSE
 )
 
 saveRDS(condition.specific_celltypes, 'RCTD_refs_condition_specificity.rds')

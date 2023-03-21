@@ -70,23 +70,33 @@ if(Filter.cells.with.scATAC){
       nucleosome_signal < 6 &
       TSS.enrichment > 1
   )
-  
 }
 
 Idents(srat_cr) = as.factor(srat_cr$condition)
 
 # srat_cr = subset(srat_cr,  downsample = 500)
+srat_cr <- RunTFIDF(srat_cr)
+
+srat_cr = FindTopFeatures(srat_cr, min.cutoff = 'q5')
+srat_cr = subset(srat_cr, features = VariableFeatures(srat_cr, assay = 'ATAC'))
 
 # Run LDA on count matrix -------------------------------------------------
 cat("Running LDA \n")
 count.mat = srat_cr@assays$ATAC@counts
-#count.mat = count.mat[c(1:5000), ] # subset peaks 
+#count.mat = count.mat[c(1:10000), ] # subset peaks 
 
 # remove empty cols
 print("Removing empty cells...")
 print(dim(count.mat))
+
 cols.empty <- colSums(count.mat) == 0
+#rows.empty = rowSums(count.mat) == 0
 count.mat <- count.mat[, !cols.empty]
+print(dim(count.mat))
+
+term_freq = rowSums(count.mat>0)/ncol(count.mat)
+#peak.mean = apply()
+count.mat <- count.mat[which(term_freq > 10^-3 & term_freq<10^-2), ] # filtered the terms with low and high freq
 print(dim(count.mat))
 
 # binarize matrix
@@ -94,7 +104,7 @@ count.mat.orig <- count.mat
 count.mat <- BinarizeMatrix(count.mat)
 print(paste('Max count after binarizing', max(count.mat)))
 
-topic.vec = c(seq(6, 18, by = 2), seq(20,  100, by = 10))
+topic.vec = c(seq(6, 18, by = 2), 30, 50, seq(20,  200, by = 20))
 
 tic("LDA running time")
 if (length(topic.vec) > 1){
@@ -102,25 +112,35 @@ if (length(topic.vec) > 1){
   print(topic.vec)
   
   out.lda <- parallel::mclapply(topic.vec, function(nc)
-    {topicmodels::LDA(x = t(count.mat), k = nc, method = "Gibbs", control=list(seed=0))}, 
+    {topicmodels::LDA(x = t(count.mat), 
+                      k = nc, 
+                      method = "Gibbs", 
+                      control=list(seed=0,
+                                   burnin = 500))}, 
     mc.cores = length(topic.vec)
   )
-
+  
 }else{
   print("Running single LDA for topics:")
   print(topic.vec)
   
-  out.lda <- topicmodels::LDA(x = t(count.mat), k = topic.vec, method = "Gibbs", control=list(seed=0))
+  out.lda <- topicmodels::LDA(x = t(count.mat), 
+                              k = topic.vec, 
+                              method = "Gibbs", 
+                              control=list(seed=0,
+                                           burnin = 500))
+  
 }
 
 toc()
 
-saveRDS(out.lda, file = paste0(RdataDir, 'test_LDA_saved_v1.rds'))
+saveRDS(out.lda, file = paste0(RdataDir, 'test_LDA_saved_topFeatures.q5.term.freq_burnin500_v6.rds'))
 
 Process_LDA_results = FALSE
 if(Process_LDA_results){ # perplexity(out.lda)
   
-  out.lda = readRDS(file = paste0(RdataDir, 'test_LDA_saved_v1.rds'))
+  #out.lda = readRDS(file = paste0(RdataDir, 'test_LDA_saved_v1.rds'))
+  out.lda = readRDS(file = paste0(RdataDir, 'test_LDA_saved_peaks.all_v4.rds'))
   
   #print("Saving LDA")
   #save(out.lda, count.mat, count.mat.orig, file = outpath)
@@ -130,40 +150,51 @@ if(Process_LDA_results){ # perplexity(out.lda)
   plot_umap_seurat = TRUE
   if(plot_umap_seurat){
     
-    tm.result <- posterior(out.lda[[10]])
-    tm.result <- AddTopicToTmResult(tm.result)
-    topics.mat = tm.result$topics
+    for(n in 9:length(topic.vec)){
+      cat(n, '\n')
+      tm.result <- posterior(out.lda[[n]])
+      #xx = out.lda[[16]]
+      
+      tm.result <- AddTopicToTmResult(tm.result)
+      topics.mat = tm.result$topics
+      
+      # method='Z-score'
+      # #method = 'Probability'
+      # cistopicObject.reduced_space = t(cisTopic::modelMatSelection(cistopicObject,
+      #                                                              target='cell',
+      #                                                              method=method))
+      colnames(topics.mat) = paste0('PC_', 1:ncol(topics.mat))
+      dimensions = ncol(topics.mat)
+      
+      seurat_obj = subset(srat_cr, cells = rownames(topics.mat))
+      
+      topics.mat = topics.mat[match(colnames(seurat_obj), rownames(topics.mat)), ]
+      
+      #topics.mat <- scale(topics.mat, center = TRUE, scale = TRUE)
+      
+      seurat_obj[['pca']] = Seurat::CreateDimReducObject(embeddings=topics.mat,
+                                                         key='PC_',
+                                                         assay='ATAC')
+      seurat_obj = Seurat::RunUMAP(seurat_obj, 
+                                   #metric = "euclidean",
+                                   reduction = "pca", dims = 1:dimensions, n.neighbors = 30,
+                                   min.dist = 0.1)
+      
+      DimPlot(seurat_obj, reduction = 'umap', group.by = 'subtypes', label = TRUE, repel = TRUE) +
+        NoLegend() + ggtitle(paste0('celltypes - with nb.topics : ', topic.vec[n]))
+      
+      
+      p1 = DimPlot(seurat_obj, reduction = 'umap', group.by = 'celltypes', label = TRUE, repel = TRUE) +
+        NoLegend() + ggtitle(paste0('celltypes - with nb.topics : ', topic.vec[n]))
+      p2 = DimPlot(seurat_obj, reduction = 'umap', group.by = 'subtypes', label = TRUE, repel = TRUE) + 
+        NoLegend() + ggtitle(paste0('subtypes - with nb.topics : ', topic.vec[n]))
+      p1 + p2
+      
+      ggsave(paste0(resDir, '/UMAP_LDA_nb.topics', topic.vec[n], '.pdf'), width = 16, height = 6)
+      
+      
+    }
     
-    # method='Z-score'
-    # #method = 'Probability'
-    # cistopicObject.reduced_space = t(cisTopic::modelMatSelection(cistopicObject,
-    #                                                              target='cell',
-    #                                                              method=method))
-    # 
-    colnames(topics.mat) = paste0('PC_', 1:ncol(topics.mat))
-    dimensions = ncol(topics.mat)
-    
-    seurat_obj = subset(srat_cr, cells = rownames(topics.mat))
-    
-    topics.mat = topics.mat[match(colnames(seurat_obj), rownames(topics.mat)), ]
-    seurat_obj[['pca']] = Seurat::CreateDimReducObject(embeddings=topics.mat,
-                                                        key='PC_',
-                                                        assay='ATAC')
-    
-    seurat_obj = Seurat::RunUMAP(seurat_obj, reduction = "pca", dims = 1:dimensions, n.neighbors = 30,
-                                  min.dist = 0.3)
-    
-    p1 = DimPlot(seurat_obj, reduction = 'umap', group.by = 'celltypes', label = TRUE, repel = TRUE) +
-       NoLegend()
-    
-    p2 = DimPlot(seurat_obj, reduction = 'umap', group.by = 'subtypes', label = TRUE, repel = TRUE) + 
-      NoLegend()
-    
-    p1 + p2
-    
-    ggsave(paste0(resDir, '/UMAP_DM_cisTopic_test.pdf'), width = 8, height = 6)
-    #
-   
     #cistopicObject.seurat = cistopicObject.seurat %>%
     #  Seurat::FindNeighbors(reduction=reduction, nn.eps=0.25, dims=1:dimensions) %>%
     #  Seurat::FindClusters(reduction=reduction, n.start=20, resolution=resolution)
@@ -172,6 +203,24 @@ if(Process_LDA_results){ # perplexity(out.lda)
     #                                                key='Topic_',
     #                                                   assay='ATAC')
     
+    ## compare the umap from Seurat
+    srat_cr <- RunTFIDF(srat_cr)
+    srat_cr = FindTopFeatures(srat_cr, min.cutoff = 'q5')
+    srat_cr <- RunSVD(srat_cr)
+    
+    DepthCor(srat_cr, n = 30)
+    
+    #cordat = DepthCor(srat_cr, reduction = "lsi", n = 30)$data
+    #dims_use = cordat$Component[abs(cordat$counts)<0.3]
+    
+    dims_use = c(2:30)
+    print(dims_use)
+    
+    srat_cr <- RunUMAP(object = srat_cr, reduction = 'lsi', dims = 2:30, n.neighbors = 30, min.dist = 0.1, 
+                       reduction.name = "umap_lsi")
+    
+    DimPlot(object = srat_cr, label = TRUE, reduction = 'umap_lsi', group.by = 'celltypes') + NoLegend()
+    ggsave(paste0(resDir, '/UMAP_seurat_tfidf.pdf'), width = 8, height = 6)
     
     
   }else{

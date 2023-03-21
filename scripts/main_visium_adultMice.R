@@ -265,6 +265,9 @@ source('functions_Visium.R')
 obj.list <- SplitObject(st, split.by = "condition")
 # select day4
 aa = obj.list[[2]]
+
+saveRDS(aa, file = paste0('data_examples/st_visium.rds'))
+
 aa$sampleID = design$sampleID[which(design$condition == names(table(aa$condition)))]
 
 # import manually defined spatial domain by Elad
@@ -285,6 +288,8 @@ refs = readRDS(file = paste0('../results/Rdata/',
 
 refs$celltype[which(refs$celltype == 'immune.others')] = 'Mphage.MCT'
 refs = subset(refs, cells = colnames(refs)[which(refs$celltype != 'SMC')])
+
+saveRDS(refs, file = paste0('data_examples/ref_scRNAseq.rds'))
 
 st = Run.celltype.deconvolution.RCTD(st, refs)
 

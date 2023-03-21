@@ -14,7 +14,6 @@ version.analysis = '_R13591_atac_reseq_20221115'
 resDir = paste0("../results/sc_multiome", version.analysis)
 RdataDir = paste0(resDir, '/Rdata/')
 
-
 if(!dir.exists(resDir)) dir.create(resDir)
 if(!dir.exists(RdataDir)) dir.create(RdataDir)
 
