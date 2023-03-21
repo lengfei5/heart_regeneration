@@ -41,7 +41,7 @@ library(hash)
 library(igraph)
 library(umap)
 
-options(future.globals.maxSize = 80000 * 1024^2)
+options(future.globals.maxSize = 80 * 1024^3)
 set.seed(1234)
 mem_used()
 
@@ -142,6 +142,8 @@ if(Process_LDA_results){ # perplexity(out.lda)
   #out.lda = readRDS(file = paste0(RdataDir, 'test_LDA_saved_v1.rds'))
   out.lda = readRDS(file = paste0(RdataDir, 'test_LDA_saved_peaks.all_v4.rds'))
   
+  out.lda = readRDS(file = paste0(RdataDir, 'test_LDA_saved_topFeatures.q10_v5.rds'))
+  
   #print("Saving LDA")
   #save(out.lda, count.mat, count.mat.orig, file = outpath)
   #print("Time elapsed after LDA")
@@ -150,10 +152,15 @@ if(Process_LDA_results){ # perplexity(out.lda)
   plot_umap_seurat = TRUE
   if(plot_umap_seurat){
     
-    for(n in 9:length(topic.vec)){
-      cat(n, '\n')
+    for(n in 1:length(out.lda))
+    {
+      # n = 1
+      xx = out.lda[[n]]
+      nb_topics = xx@k
+      cat(n,  '-- nb of topics : ', nb_topics, '\n')
+      
       tm.result <- posterior(out.lda[[n]])
-      #xx = out.lda[[16]]
+      rm(xx)
       
       tm.result <- AddTopicToTmResult(tm.result)
       topics.mat = tm.result$topics
@@ -181,17 +188,15 @@ if(Process_LDA_results){ # perplexity(out.lda)
                                    min.dist = 0.1)
       
       DimPlot(seurat_obj, reduction = 'umap', group.by = 'subtypes', label = TRUE, repel = TRUE) +
-        NoLegend() + ggtitle(paste0('celltypes - with nb.topics : ', topic.vec[n]))
-      
+        NoLegend() + ggtitle(paste0('celltypes - nb.topics : ', nb_topics))
       
       p1 = DimPlot(seurat_obj, reduction = 'umap', group.by = 'celltypes', label = TRUE, repel = TRUE) +
-        NoLegend() + ggtitle(paste0('celltypes - with nb.topics : ', topic.vec[n]))
+        NoLegend() + ggtitle(paste0('celltypes - nb.topics : ', nb_topics))
       p2 = DimPlot(seurat_obj, reduction = 'umap', group.by = 'subtypes', label = TRUE, repel = TRUE) + 
-        NoLegend() + ggtitle(paste0('subtypes - with nb.topics : ', topic.vec[n]))
+        NoLegend() + ggtitle(paste0('subtypes - nb.topics : ', nb_topics))
       p1 + p2
       
-      ggsave(paste0(resDir, '/UMAP_LDA_nb.topics', topic.vec[n], '.pdf'), width = 16, height = 6)
-      
+      ggsave(paste0(resDir, '/UMAP_LDA_peaks.q25_nb.topics_', nb_topics, '.pdf'), width = 16, height = 6)
       
     }
     

@@ -22,12 +22,14 @@ dataDir = '../R14353_ax_snATAC_reseq'
 source('functions_scATAC.R')
 source('functions_scRNAseq.R')
 source('functions_Visium.R')
+#source('functions_scRNAseq.R')
 
 library(Signac)
 library(Seurat)
 library(GenomeInfoDb)
 library(patchwork)
 require(SeuratObject)
+library(data.table)
 
 library(pryr) # monitor the memory usage
 require(ggplot2)
@@ -35,17 +37,14 @@ require(dplyr)
 require(stringr)
 require(tidyr)
 require(tictoc)
-options(future.globals.maxSize = 80000 * 1024^2)
+library(future)
+options(future.globals.maxSize = 80 * 1024^3)
 set.seed(1234)
 mem_used()
-
-library(data.table)
-
 
 ##########################################
 # axoltol genome and annotation (fragmented version) 
 ##########################################
-
 # this (bespoke) package hosts the axolotl genome (comments from Tomas)
 # package is very large, cannot be installed in home directory and should be in a fast disk
 #install.packages("/groups/tanaka/People/current/jiwang/scripts/axolotl_multiome
@@ -74,9 +73,6 @@ species = 'axloltl_scATAC'
 design = data.frame(sampleID = seq(197254, 197258), 
                     condition = c(paste0('Amex_scATAC_d', c(0, 1, 4, 7, 14))), stringsAsFactors = FALSE)
 design$timepoint = gsub('Amex_scATAC_', '', design$condition) 
-
-source('functions_scRNAseq.R')
-library(future)
 
 
 ########################################################

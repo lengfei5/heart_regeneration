@@ -36,7 +36,7 @@ require(dplyr)
 require(stringr)
 require(tidyr)
 require(tictoc)
-options(future.globals.maxSize = 80000 * 1024^2)
+options(future.globals.maxSize = 80 * 1024^3)
 set.seed(1234)
 mem_used()
 
@@ -115,6 +115,7 @@ saveRDS(cisTopicObject, file = paste0(RdataDir, 'test_cisTopic_saved_v2.rds'))
 
 Process_LDA_results = FALSE
 if(Process_LDA_results){
+  
   cisTopicObject = readRDS(file = paste0(RdataDir, 'test_cisTopic_saved_v2.rds'))
   #
   par(mfrow=c(3,3))
@@ -124,11 +125,10 @@ if(Process_LDA_results){
   
   #
   cistopicObject = cisTopic::selectModel(cisTopicObject, 
-                                         select = 50,
+                                         select = 20,
                                          type = 'derivative')
-  #
-  method='Z-score'
-  # #method = 'Probability'
+  #method='Z-score'
+  method = 'Probability'
   cistopicObject.reduced_space = t(cisTopic::modelMatSelection(cistopicObject,
                                                                 target='cell',
                                                                 method=method))
@@ -152,7 +152,7 @@ if(Process_LDA_results){
   #
   # # seurat_obj = Seurat::L2Dim(seurat_obj, reduction='pca')
   seurat_obj = Seurat::RunUMAP(seurat_obj, reduction = "pca", dims = 1:dimensions, n.neighbors = 30,
-                                min.dist = 0.05)
+                                min.dist = 0.1)
   
   p1 = DimPlot(seurat_obj, reduction = 'umap', group.by = 'celltypes', label = TRUE, repel = TRUE) +
     NoLegend()
@@ -170,6 +170,5 @@ if(Process_LDA_results){
   #srat_cr[['Topic']] = Seurat::CreateDimReducObject(embeddings=cistopicObject.reduced_space,
   #                                                key='Topic_',
   #                                                   assay='ATAC')
-  
   
 }
