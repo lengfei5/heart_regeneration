@@ -78,7 +78,7 @@ Idents(srat_cr) = as.factor(srat_cr$condition)
 # srat_cr = subset(srat_cr,  downsample = 500)
 srat_cr <- RunTFIDF(srat_cr)
 
-srat_cr = FindTopFeatures(srat_cr, min.cutoff = 'q5')
+srat_cr = FindTopFeatures(srat_cr, min.cutoff = 'q25')
 srat_cr = subset(srat_cr, features = VariableFeatures(srat_cr, assay = 'ATAC'))
 
 # Run LDA on count matrix -------------------------------------------------
@@ -105,7 +105,7 @@ count.mat.orig <- count.mat
 count.mat <- BinarizeMatrix(count.mat)
 print(paste('Max count after binarizing', max(count.mat)))
 
-topic.vec = c(seq(6, 18, by = 2), 30, 50, seq(20,  200, by = 20))
+topic.vec = c(10, 30, 50, seq(20,  300, by = 20))
 
 tic("LDA running time")
 if (length(topic.vec) > 1){
@@ -160,19 +160,10 @@ if(Process_LDA_results){ # perplexity(out.lda)
       nb_topics = xx@k
       cat(n,  '-- nb of topics : ', nb_topics, '\n')
       
-      method='Z-score'
-      # #method = 'Probability'
-      if(Probability.use){
-        tm.result <- posterior(out.lda[[n]])
-        rm(xx)
-        
-        tm.result <- AddTopicToTmResult(tm.result)
-        topics.mat = tm.result$topics
-      }else{
-       tm.result <- scale(xx@documents, center=TRUE, scale=TRUE)
-      }
-      
-      
+      tm.result <- posterior(out.lda[[n]])
+      tm.result <- AddTopicToTmResult(tm.result)
+      topics.mat = tm.result$topics
+      rm(xx)
       
       # cistopicObject.reduced_space = t(cisTopic::modelMatSelection(cistopicObject,
       #                                                              target='cell',
@@ -185,16 +176,33 @@ if(Process_LDA_results){ # perplexity(out.lda)
       topics.mat = topics.mat[match(colnames(seurat_obj), rownames(topics.mat)), ]
       
       #topics.mat <- scale(topics.mat, center = TRUE, scale = TRUE)
+      #method ='Z-score'
+      method = 'Probability'
+      if(method == "Z-score"){
+        #topics.mat_zscore = log10(topics.mat)
+        topics.mat_zscore <- apply(topics.mat, 2, scale, center=TRUE, scale=TRUE)
+        rownames(topics.mat_zscore) = rownames(topics.mat)
+        seurat_obj[['pca']] = Seurat::CreateDimReducObject(embeddings=topics.mat_zscore,
+                                                           key='PC_',
+                                                           assay='ATAC')
+        
+      }else{
+        seurat_obj[['pca']] = Seurat::CreateDimReducObject(embeddings=topics.mat,
+                                                           key='PC_',
+                                                           assay='ATAC')
+      }
       
-      seurat_obj[['pca']] = Seurat::CreateDimReducObject(embeddings=topics.mat,
-                                                         key='PC_',
-                                                         assay='ATAC')
-      seurat_obj = Seurat::RunUMAP(seurat_obj, 
-                                   #metric = "euclidean",
-                                   reduction = "pca", dims = 1:dimensions, n.neighbors = 30,
-                                   min.dist = 0.1)
+      reduction='pca.l2'
+      seurat_obj = seurat_obj %>%
+        Seurat::L2Dim(reduction='pca') %>%
+        Seurat::RunUMAP(#metric = "euclidean",
+                        #metric = "cosine",
+                        reduction = reduction, 
+                        dims = 1:dimensions, 
+                        n.neighbors = 30,
+                        min.dist = 0.1)
       
-      DimPlot(seurat_obj, reduction = 'umap', group.by = 'subtypes', label = TRUE, repel = TRUE) +
+      DimPlot(seurat_obj, reduction = 'umap', group.by = 'celltypes', label = TRUE, repel = TRUE) +
         NoLegend() + ggtitle(paste0('celltypes - nb.topics : ', nb_topics))
       
       p1 = DimPlot(seurat_obj, reduction = 'umap', group.by = 'celltypes', label = TRUE, repel = TRUE) +
@@ -203,7 +211,8 @@ if(Process_LDA_results){ # perplexity(out.lda)
         NoLegend() + ggtitle(paste0('subtypes - nb.topics : ', nb_topics))
       p1 + p2
       
-      ggsave(paste0(resDir, '/UMAP_LDA_peaks.q25_nb.topics_', nb_topics, '.pdf'), width = 16, height = 6)
+      ggsave(paste0(resDir, '/UMAP_LDA_peaks.q25_methods.', method, '_pca.l2_nb.topics.', nb_topics, '.pdf'), 
+             width = 16, height = 6)
       
     }
     
@@ -236,6 +245,12 @@ if(Process_LDA_results){ # perplexity(out.lda)
     
     
   }else{
+    #philentropy::getDistMethods()
+    #dists = philentropy::distance(topics.mat, method = "jensen-shannon")
+    
+    dists = sccore::jsDist(t(topics.mat))
+    
+    
     jsettings <- umap.defaults
     jsettings$n_neighbors <- 30
     jsettings$min_dist <- 0.1
