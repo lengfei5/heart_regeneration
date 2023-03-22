@@ -74,6 +74,7 @@ if(Filter.cells.with.scATAC){
 
 Idents(srat_cr) = as.factor(srat_cr$condition)
 
+
 # srat_cr = subset(srat_cr,  downsample = 500)
 srat_cr <- RunTFIDF(srat_cr)
 
@@ -140,9 +141,9 @@ Process_LDA_results = FALSE
 if(Process_LDA_results){ # perplexity(out.lda)
   
   #out.lda = readRDS(file = paste0(RdataDir, 'test_LDA_saved_v1.rds'))
-  out.lda = readRDS(file = paste0(RdataDir, 'test_LDA_saved_peaks.all_v4.rds'))
+  #out.lda = readRDS(file = paste0(RdataDir, 'test_LDA_saved_peaks.all_v4.rds'))
+  out.lda = readRDS(file = paste0(RdataDir, 'test_LDA_saved_topFeatures.q25_v5.rds'))
   
-  out.lda = readRDS(file = paste0(RdataDir, 'test_LDA_saved_topFeatures.q10_v5.rds'))
   
   #print("Saving LDA")
   #save(out.lda, count.mat, count.mat.orig, file = outpath)
@@ -154,19 +155,25 @@ if(Process_LDA_results){ # perplexity(out.lda)
     
     for(n in 1:length(out.lda))
     {
-      # n = 1
+      # n = 17
       xx = out.lda[[n]]
       nb_topics = xx@k
       cat(n,  '-- nb of topics : ', nb_topics, '\n')
       
-      tm.result <- posterior(out.lda[[n]])
-      rm(xx)
-      
-      tm.result <- AddTopicToTmResult(tm.result)
-      topics.mat = tm.result$topics
-      
-      # method='Z-score'
+      method='Z-score'
       # #method = 'Probability'
+      if(Probability.use){
+        tm.result <- posterior(out.lda[[n]])
+        rm(xx)
+        
+        tm.result <- AddTopicToTmResult(tm.result)
+        topics.mat = tm.result$topics
+      }else{
+       tm.result <- scale(xx@documents, center=TRUE, scale=TRUE)
+      }
+      
+      
+      
       # cistopicObject.reduced_space = t(cisTopic::modelMatSelection(cistopicObject,
       #                                                              target='cell',
       #                                                              method=method))
