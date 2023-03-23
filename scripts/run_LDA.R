@@ -73,9 +73,8 @@ if(Filter.cells.with.scATAC){
 }
 
 Idents(srat_cr) = as.factor(srat_cr$condition)
+srat_cr = subset(srat_cr,  downsample = 1000)
 
-
-# srat_cr = subset(srat_cr,  downsample = 500)
 srat_cr <- RunTFIDF(srat_cr)
 
 srat_cr = FindTopFeatures(srat_cr, min.cutoff = 'q25')
@@ -97,7 +96,7 @@ print(dim(count.mat))
 
 term_freq = rowSums(count.mat>0)/ncol(count.mat)
 #peak.mean = apply()
-count.mat <- count.mat[which(term_freq > 10^-3 & term_freq<10^-2), ] # filtered the terms with low and high freq
+#count.mat <- count.mat[which(term_freq > 10^-3 & term_freq<10^-2), ] # filtered the terms with low and high freq
 print(dim(count.mat))
 
 # binarize matrix
@@ -105,7 +104,7 @@ count.mat.orig <- count.mat
 count.mat <- BinarizeMatrix(count.mat)
 print(paste('Max count after binarizing', max(count.mat)))
 
-topic.vec = c(10, 30, 50, seq(20,  300, by = 20))
+topic.vec = c(seq(20,  300, by = 100))
 
 tic("LDA running time")
 if (length(topic.vec) > 1){
@@ -113,29 +112,40 @@ if (length(topic.vec) > 1){
   print(topic.vec)
   
   out.lda <- parallel::mclapply(topic.vec, function(nc)
-    {topicmodels::LDA(x = t(count.mat), 
-                      k = nc, 
-                      method = "Gibbs", 
-                      control=list(seed=0,
-                                   burnin = 500))}, 
-    mc.cores = length(topic.vec)
+  {topicmodels::LDA(x = t(count.mat), k = nc, method = "Gibbs", control=list(seed=0))}, 
+  mc.cores = length(topic.vec)
   )
+  
+  out.lda <- parallel::mclapply(topic.vec, function(nc)
+  {topicmodels::LDA(x = t(count.mat), k = nc, method = "Gibbs", control=list(seed=0))}, 
+  mc.cores = length(topic.vec)
+  )
+  
+  out.lda <- parallel::mclapply(topic.vec, function(nc)
+  {topicmodels::LDA(x = t(count.mat), k = nc, method = "Gibbs", control=list(seed=0))}, 
+  mc.cores = length(topic.vec)
+  )
+  
+  
+  #out.lda <- parallel::mclapply(topic.vec, function(nc){
+  #  LDA(x = t(count.mat), k = nc, method = "Gibbs", control=list(seed=0))            
+  #}, mc.cores = length(topic.vec))
+  
   
 }else{
   print("Running single LDA for topics:")
   print(topic.vec)
-  
+  # topic.vec = 20
   out.lda <- topicmodels::LDA(x = t(count.mat), 
                               k = topic.vec, 
                               method = "Gibbs", 
-                              control=list(seed=0,
-                                           burnin = 500))
+                              control=list(seed=0))
   
 }
 
 toc()
 
-saveRDS(out.lda, file = paste0(RdataDir, 'test_LDA_saved_topFeatures.q5.term.freq_burnin500_v6.rds'))
+saveRDS(out.lda, file = paste0(RdataDir, 'test_LDA_saved_topFeatures.q25.term.freq_burnin500_v6.rds'))
 
 Process_LDA_results = FALSE
 if(Process_LDA_results){ # perplexity(out.lda)
@@ -143,7 +153,7 @@ if(Process_LDA_results){ # perplexity(out.lda)
   #out.lda = readRDS(file = paste0(RdataDir, 'test_LDA_saved_v1.rds'))
   #out.lda = readRDS(file = paste0(RdataDir, 'test_LDA_saved_peaks.all_v4.rds'))
   out.lda = readRDS(file = paste0(RdataDir, 'test_LDA_saved_topFeatures.q25_v5.rds'))
-  
+  out.lda = readRDS(file = paste0(RdataDir, 'test_LDA_saved_topFeatures.q10_v5.rds'))
   
   #print("Saving LDA")
   #save(out.lda, count.mat, count.mat.orig, file = outpath)
@@ -151,7 +161,12 @@ if(Process_LDA_results){ # perplexity(out.lda)
   #print(Sys.time() - jstart)
   
   plot_umap_seurat = TRUE
+  
   if(plot_umap_seurat){
+    
+    reduction='pca'  
+    #method ='Z-score'
+    method = 'Probability'
     
     for(n in 1:length(out.lda))
     {
@@ -176,8 +191,7 @@ if(Process_LDA_results){ # perplexity(out.lda)
       topics.mat = topics.mat[match(colnames(seurat_obj), rownames(topics.mat)), ]
       
       #topics.mat <- scale(topics.mat, center = TRUE, scale = TRUE)
-      #method ='Z-score'
-      method = 'Probability'
+      
       if(method == "Z-score"){
         #topics.mat_zscore = log10(topics.mat)
         topics.mat_zscore <- apply(topics.mat, 2, scale, center=TRUE, scale=TRUE)
@@ -192,7 +206,7 @@ if(Process_LDA_results){ # perplexity(out.lda)
                                                            assay='ATAC')
       }
       
-      reduction='pca.l2'
+      
       seurat_obj = seurat_obj %>%
         Seurat::L2Dim(reduction='pca') %>%
         Seurat::RunUMAP(#metric = "euclidean",
@@ -211,7 +225,8 @@ if(Process_LDA_results){ # perplexity(out.lda)
         NoLegend() + ggtitle(paste0('subtypes - nb.topics : ', nb_topics))
       p1 + p2
       
-      ggsave(paste0(resDir, '/UMAP_LDA_peaks.q25_methods.', method, '_pca.l2_nb.topics.', nb_topics, '.pdf'), 
+      ggsave(paste0(resDir, '/UMAP_LDA_peaks.q10_methods.', method, '_', reduction, 
+                    '_nb.topics.', nb_topics, '.pdf'), 
              width = 16, height = 6)
       
     }

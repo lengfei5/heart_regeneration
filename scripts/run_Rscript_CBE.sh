@@ -1,13 +1,13 @@
 #!/bin/bash
 
-#SBATCH --time=4-00:00:00
+#SBATCH --time=2-00:00:00
 #SBATCH --nodes=1
 #SBATCH --cpus-per-task=32
 #SBATCH --mem=500G
 #SBATCH --job-name="sc_Rscript"
-#SBATCH --output="logs/slurm-%x_%j.out"
-#SBATCH --error="logs/slurm-%x_%j.err"
-#SBATCH --qos=long
+#SBATCH --output="logs/slurm_%x_%j.out"
+#SBATCH --error="logs/slurm_%x_%j.err"
+#SBATCH --qos=medium
 #SBATCH --partition=m
 
 mkdir -p logs/
