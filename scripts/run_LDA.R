@@ -73,7 +73,7 @@ if(Filter.cells.with.scATAC){
 }
 
 Idents(srat_cr) = as.factor(srat_cr$condition)
-srat_cr = subset(srat_cr,  downsample = 1000)
+#srat_cr = subset(srat_cr,  downsample = 1000)
 
 srat_cr <- RunTFIDF(srat_cr)
 
@@ -89,14 +89,15 @@ count.mat = srat_cr@assays$ATAC@counts
 print("Removing empty cells...")
 print(dim(count.mat))
 
+term_freq = rowSums(count.mat>0)/ncol(count.mat)
+#peak.mean = apply()
+jj = which(term_freq > 5/ncol(count.mat) & term_freq<10^-1) 
+count.mat <- count.mat[jj, ] # filtered the terms with low (>5 cells) and high freq (<0.1)
+print(dim(count.mat))
+
 cols.empty <- colSums(count.mat) == 0
 #rows.empty = rowSums(count.mat) == 0
 count.mat <- count.mat[, !cols.empty]
-print(dim(count.mat))
-
-term_freq = rowSums(count.mat>0)/ncol(count.mat)
-#peak.mean = apply()
-#count.mat <- count.mat[which(term_freq > 10^-3 & term_freq<10^-2), ] # filtered the terms with low and high freq
 print(dim(count.mat))
 
 # binarize matrix
@@ -104,7 +105,7 @@ count.mat.orig <- count.mat
 count.mat <- BinarizeMatrix(count.mat)
 print(paste('Max count after binarizing', max(count.mat)))
 
-topic.vec = c(seq(20,  300, by = 100))
+topic.vec = unique(c(seq(50, 300, by=50), seq(20,  300, by = 20)))
 
 tic("LDA running time")
 if (length(topic.vec) > 1){
@@ -116,16 +117,15 @@ if (length(topic.vec) > 1){
   mc.cores = length(topic.vec)
   )
   
-  out.lda <- parallel::mclapply(topic.vec, function(nc)
-  {topicmodels::LDA(x = t(count.mat), k = nc, method = "Gibbs", control=list(seed=0))}, 
-  mc.cores = length(topic.vec)
-  )
-  
-  out.lda <- parallel::mclapply(topic.vec, function(nc)
-  {topicmodels::LDA(x = t(count.mat), k = nc, method = "Gibbs", control=list(seed=0))}, 
-  mc.cores = length(topic.vec)
-  )
-  
+  # out.lda <- parallel::mclapply(topic.vec, function(nc)
+  # {topicmodels::LDA(x = t(count.mat), k = nc, method = "Gibbs", control=list(seed=0))}, 
+  # mc.cores = length(topic.vec)
+  # )
+  # 
+  # out.lda <- parallel::mclapply(topic.vec, function(nc)
+  # {topicmodels::LDA(x = t(count.mat), k = nc, method = "Gibbs", control=list(seed=0))}, 
+  # mc.cores = length(topic.vec)
+  # )
   
   #out.lda <- parallel::mclapply(topic.vec, function(nc){
   #  LDA(x = t(count.mat), k = nc, method = "Gibbs", control=list(seed=0))            
@@ -145,7 +145,7 @@ if (length(topic.vec) > 1){
 
 toc()
 
-saveRDS(out.lda, file = paste0(RdataDir, 'test_LDA_saved_topFeatures.q25.term.freq_burnin500_v6.rds'))
+saveRDS(out.lda, file = paste0(RdataDir, 'test_LDA_saved_topFeatures.q25_v7.rds'))
 
 Process_LDA_results = FALSE
 if(Process_LDA_results){ # perplexity(out.lda)
