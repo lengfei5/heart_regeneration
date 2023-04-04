@@ -7,7 +7,6 @@
 # Date of creation: Tue Mar 21 10:27:06 2023
 ##########################################################################
 ##########################################################################
-
 rm(list = ls())
 version.analysis = '_R13591_atac_reseq_20221115'
 
@@ -152,10 +151,34 @@ library(BSgenome.Amexicanum.axolotlomics.AmexGv6cut500M)
 library(patchwork)
 set.seed(1234)
 
+## seurat object after filtering
 srat_cr = readRDS(file = paste0(RdataDir, 
               'seuratObj_multiome_snRNA.annotated.normalized.umap_',
               'scATAC.merged.peaks.cr_filtered_lsi.umap_',
               '584K.annot_38280cells.rds'))
+
+seurat_obj = readRDS(file = paste0(RdataDir, 
+                                   'seuratObj_multiome_snRNA.annotated.normalized.umap_',
+                                   'scATAC.merged.peaks.cr_584K.features_38247cells_200topics.rds')) 
+
+umap.topics = seurat_obj@reductions$umap@cell.embeddings
+
+colnames(umap.topics) = paste0('umaptopic_', 1:ncol(umap.topics))
+dimensions = ncol(umap.topics)
+
+srat_cr = subset(srat_cr, cells = rownames(umap.topics))
+
+umap.topics = umap.topics[match(colnames(srat_cr), rownames(umap.topics)), ]
+srat_cr[['umap_topics']] = Seurat::CreateDimReducObject(embeddings=umap.topics,
+                                                   key='UMAPTOPICS_',
+                                                   assay='ATAC')
+rm(seurat_obj)
+
+saveRDS(srat_cr, file = paste0(RdataDir, 
+                               'seuratObj_multiome_snRNA.annotated.normalized.umap_',
+                               'scATAC.merged.peaks.cr_filtered_umap.lsi',
+                               '584K.features_38247cells_umap.topics.rds'))
+
 
 DefaultAssay(srat_cr) <- 'ATAC'
 
@@ -197,7 +220,6 @@ if(Plot.motif.activity.ChromVar){
   srat_cr = subset(srat_cr, cells = colnames(srat_cr)[which(!is.na(ss))])
   
   # look at the activity of Mef2c
-  
   p2 <- FeaturePlot(
     object = srat_cr,
     #features = "MA0019.1",
@@ -208,8 +230,6 @@ if(Plot.motif.activity.ChromVar){
   )
   
   p1 + p2
-  
-  
   
   
 }
