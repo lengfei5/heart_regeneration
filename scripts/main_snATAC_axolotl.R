@@ -479,6 +479,7 @@ ggsave(filename = paste0(resDir, '/multiome_snRNA_snATAC_filtered.pdf'), height 
 
 FeaturePlot(srat_cr, features = c('nCount_ATAC', 'nucleosome_signal'), reduction = 'umap_lsi')
 
+
 ##########################################
 # link peaks and coveragePlots
 # 

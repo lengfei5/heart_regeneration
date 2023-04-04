@@ -76,7 +76,6 @@ Idents(srat_cr) = as.factor(srat_cr$condition)
 #srat_cr = subset(srat_cr,  downsample = 1000)
 
 srat_cr <- RunTFIDF(srat_cr)
-
 srat_cr = FindTopFeatures(srat_cr, min.cutoff = 'q25')
 srat_cr = subset(srat_cr, features = VariableFeatures(srat_cr, assay = 'ATAC'))
 
@@ -145,15 +144,16 @@ if (length(topic.vec) > 1){
 
 toc()
 
-saveRDS(out.lda, file = paste0(RdataDir, 'test_LDA_saved_topFeatures.q25_v7.rds'))
+saveRDS(out.lda, file = paste0(RdataDir, 'test_LDA_saved_topFeatures.q25_filtered.termFreq_v7.rds'))
 
 Process_LDA_results = FALSE
 if(Process_LDA_results){ # perplexity(out.lda)
   
   #out.lda = readRDS(file = paste0(RdataDir, 'test_LDA_saved_v1.rds'))
   #out.lda = readRDS(file = paste0(RdataDir, 'test_LDA_saved_peaks.all_v4.rds'))
-  out.lda = readRDS(file = paste0(RdataDir, 'test_LDA_saved_topFeatures.q25_v5.rds'))
-  out.lda = readRDS(file = paste0(RdataDir, 'test_LDA_saved_topFeatures.q10_v5.rds'))
+  #out.lda = readRDS(file = paste0(RdataDir, 'test_LDA_saved_topFeatures.q25_v5.rds'))
+  #out.lda = readRDS(file = paste0(RdataDir, 'test_LDA_saved_topFeatures.q10_v5.rds'))
+  out.lda = readRDS(file = paste0(RdataDir, 'test_LDA_saved_topFeatures.q25_filtered.termFreq_v7.rds'))
   
   #print("Saving LDA")
   #save(out.lda, count.mat, count.mat.orig, file = outpath)
@@ -164,13 +164,14 @@ if(Process_LDA_results){ # perplexity(out.lda)
   
   if(plot_umap_seurat){
     
-    reduction='pca'  
+    reduction='pca'
+    
     #method ='Z-score'
     method = 'Probability'
     
     for(n in 1:length(out.lda))
     {
-      # n = 17
+      # n = 4
       xx = out.lda[[n]]
       nb_topics = xx@k
       cat(n,  '-- nb of topics : ', nb_topics, '\n')
@@ -206,18 +207,19 @@ if(Process_LDA_results){ # perplexity(out.lda)
                                                            assay='ATAC')
       }
       
-      
+      reduction = 'pca.l2'
       seurat_obj = seurat_obj %>%
         Seurat::L2Dim(reduction='pca') %>%
         Seurat::RunUMAP(#metric = "euclidean",
                         #metric = "cosine",
                         reduction = reduction, 
                         dims = 1:dimensions, 
-                        n.neighbors = 30,
-                        min.dist = 0.1)
+                        n.neighbors = 20,
+                        min.dist = 0.05)
       
       DimPlot(seurat_obj, reduction = 'umap', group.by = 'celltypes', label = TRUE, repel = TRUE) +
-        NoLegend() + ggtitle(paste0('celltypes - nb.topics : ', nb_topics))
+        #NoLegend() + 
+        ggtitle(paste0('celltypes - nb.topics : ', nb_topics))
       
       p1 = DimPlot(seurat_obj, reduction = 'umap', group.by = 'celltypes', label = TRUE, repel = TRUE) +
         NoLegend() + ggtitle(paste0('celltypes - nb.topics : ', nb_topics))
@@ -225,11 +227,17 @@ if(Process_LDA_results){ # perplexity(out.lda)
         NoLegend() + ggtitle(paste0('subtypes - nb.topics : ', nb_topics))
       p1 + p2
       
-      ggsave(paste0(resDir, '/UMAP_LDA_peaks.q10_methods.', method, '_', reduction, 
+      ggsave(paste0(resDir, '/UMAP_LDA_peaks.topFeatures.q25_filtered.termFreq_v7_methods.', method, '_', 
+                    reduction, 
                     '_nb.topics.', nb_topics, '.pdf'), 
              width = 16, height = 6)
       
     }
+    
+    saveRDS(seurat_obj, file = paste0(RdataDir,
+                                      'seuratObj_multiome_snRNA.annotated.normalized.umap_',
+                                      'scATAC.merged.peaks.cr_',
+                                      '584K.features_38247cells_200topics.rds'))
     
     #cistopicObject.seurat = cistopicObject.seurat %>%
     #  Seurat::FindNeighbors(reduction=reduction, nn.eps=0.25, dims=1:dimensions) %>%
