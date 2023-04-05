@@ -41,36 +41,27 @@ options(future.globals.maxSize = 80 * 1024^3)
 set.seed(1234)
 mem_used()
 
-##########################################
-# import annotation and metadata
-##########################################
+###  import annotation and metadata
 library(BSgenome.Amexicanum.axolotlomics.AmexGv6cut500M)
-
 library(ballgown)
 gtf_axolotl = paste0("/groups/tanaka/People/current/jiwang/scripts/axolotl_multiome/r_package/", 
                      "AmexT_v47.FULL_corr_chr_cut.gtf")
 
 granges_axolotl = ballgown::gffReadGR(gtf_axolotl)
+
 # adding a gene biotype, as that's necessary for TSS metaprofile
 granges_axolotl$gene_biotype = "protein_coding"
 
-# with need to add the "proper" gene name
-# basedir = "/links/groups/treutlein/USERS/tomasgomes/gene_refs/axolotl/Amex_T_v47/"
-# gene_name_match = read.table(paste0(basedir, "AmexT_v47.FULL_t2g_note.txt"), sep = "\t")[,2:3]
-# gene_name_match = gene_name_match[!duplicated(gene_name_match$V2), ]
-# rownames(gene_name_match) = gene_name_match$V2
-# newgenenames = gene_name_match[granges_axolotl$gene_id,2]
-# granges_axolotl$gene_name = newgenenames
-
 species = 'axloltl_scATAC'
 
-#design = data.frame(sampleID = seq(197254, 197258), 
-#                    condition = c(paste0('Amex_scATAC_d', c(0, 1, 4, 7, 14))), stringsAsFactors = FALSE)
-#design$timepoint = gsub('Amex_scATAC_', '', design$condition) 
+########################################################
+########################################################
+# Section :  import data  
+# process the scATAC-seq data: add UMAP from topic model 
+# # update the celltypes and subtypes
 
-##########################################
-# import data  
-##########################################
+########################################################
+########################################################
 Processing.scATAC = FALSE
 if(Processing.scATAC){
   srat_cr = readRDS(file = paste0(RdataDir, 
@@ -132,12 +123,100 @@ if(Processing.scATAC){
                                  'seuratObj_multiome_snRNA.annotated.normalized.umap_',
                                  'scATAC.merged.peaks.cr_filtered_lsi.umap_',
                                  '584K.annot_38280cells.rds'))
-    
+  
+  
+  ##########################################
+  # add topic umap  
+  ##########################################
+  ## seurat object after filtering
+  srat_cr = readRDS(file = paste0(RdataDir, 
+                                  'seuratObj_multiome_snRNA.annotated.normalized.umap_',
+                                  'scATAC.merged.peaks.cr_filtered_lsi.umap_',
+                                  '584K.annot_38280cells.rds'))
+  
+  seurat_obj = readRDS(file = paste0(RdataDir, 
+                                     'seuratObj_multiome_snRNA.annotated.normalized.umap_',
+                                     'scATAC.merged.peaks.cr_584K.features_38247cells_200topics.rds')) 
+  
+  umap.topics = seurat_obj@reductions$umap@cell.embeddings
+  
+  colnames(umap.topics) = paste0('umaptopic_', 1:ncol(umap.topics))
+  dimensions = ncol(umap.topics)
+  
+  srat_cr = subset(srat_cr, cells = rownames(umap.topics))
+  
+  umap.topics = umap.topics[match(colnames(srat_cr), rownames(umap.topics)), ]
+  srat_cr[['umap_topics']] = Seurat::CreateDimReducObject(embeddings=umap.topics,
+                                                          key='UMAPTOPICS_',
+                                                          assay='ATAC')
+  rm(seurat_obj)
+  
+  saveRDS(srat_cr, file = paste0(RdataDir, 
+                                 'seuratObj_multiome_snRNA.annotated.normalized.umap_',
+                                 'scATAC.merged.peaks.cr_filtered_umap.lsi',
+                                 '584K.features_38247cells_umap.topics.rds'))
+  
+  
+  ##########################################
+  # update the celltype, subtypes and umap from Elad 
+  ##########################################
+  srat_cr = readRDS(file = paste0(RdataDir, 
+                                  'seuratObj_multiome_snRNA.annotated.normalized.umap_',
+                                  'scATAC.merged.peaks.cr_filtered_umap.lsi',
+                                  '584K.features_38247cells_umap.topics.rds'))
+  
+  aa = readRDS(file = 
+                 '/groups/tanaka/Collaborations/Jingkui-Elad/scMultiome/aa_annotated_no_doublets_2022_10_17.rds')
+  
+  Idents(aa) = aa$subtypes
+  DimPlot(aa, label = TRUE, group.by = 'subtypes',  repel = TRUE) + NoLegend()
+  
+  cells = intersect(colnames(aa), colnames(srat_cr))
+  srat_cr = subset(srat_cr, cells = cells)
+  
+  # replace the subtypes 
+  srat_cr$subtypes = aa$subtypes[match(colnames(srat_cr), colnames(aa))]
+  DimPlot(srat_cr, reduction = 'umap',  
+          label = TRUE, group.by = 'subtypes',  repel = TRUE) + NoLegend()
+  
+  # keep the same umap 
+  umap.mat = aa@reductions$umap@cell.embeddings
+  umap.mat = umap.mat[match(colnames(srat_cr), rownames(umap.mat)), ]
+  #colnames(umap.topics) = paste0('umaptopic_', 1:ncol(umap.topics))
+  #dimensions = ncol(umap.topics)
+  srat_cr[['umap']] = Seurat::CreateDimReducObject(embeddings=umap.mat,
+                                                          key='UMAP_',
+                                                          assay='RNA')
+  
+  DefaultAssay(srat_cr) <- 'RNA'
+  
+  DimPlot(srat_cr, reduction = 'umap',  
+          label = TRUE, group.by = 'subtypes',  repel = TRUE) + NoLegend()
+  
+  saveRDS(srat_cr, file = paste0(RdataDir, 
+                                 'seuratObj_multiome_snRNA.annotated.normalized.umap_',
+                                 'scATAC.merged.peaks.cr_filtered_umap.lsi',
+                                 '584K.features_37680cells_umap.topics_updated.umap.subtypes.rds'))
+  
+        
 }
 
 ########################################################
 ########################################################
-# Section : Find differentially accessible peaks and motif enrichment analysis  
+# Section II : Differential Accessible Regions (DAR analysis)
+# 
+########################################################
+########################################################
+srat_cr = readRDS(file = paste0(RdataDir, 
+                                'seuratObj_multiome_snRNA.annotated.normalized.umap_',
+                                'scATAC.merged.peaks.cr_filtered_umap.lsi',
+                                '584K.features_37680cells_umap.topics_updated.umap.subtypes.rds'))
+
+
+
+########################################################
+########################################################
+# Section III: Motif enrichment analysis  
 # 
 ########################################################
 ########################################################
@@ -151,36 +230,19 @@ library(BSgenome.Amexicanum.axolotlomics.AmexGv6cut500M)
 library(patchwork)
 set.seed(1234)
 
-## seurat object after filtering
+
 srat_cr = readRDS(file = paste0(RdataDir, 
-              'seuratObj_multiome_snRNA.annotated.normalized.umap_',
-              'scATAC.merged.peaks.cr_filtered_lsi.umap_',
-              '584K.annot_38280cells.rds'))
+                                'seuratObj_multiome_snRNA.annotated.normalized.umap_',
+                                'scATAC.merged.peaks.cr_filtered_umap.lsi',
+                                '584K.features_37680cells_umap.topics_updated.umap.subtypes.rds'))
 
-seurat_obj = readRDS(file = paste0(RdataDir, 
-                                   'seuratObj_multiome_snRNA.annotated.normalized.umap_',
-                                   'scATAC.merged.peaks.cr_584K.features_38247cells_200topics.rds')) 
-
-umap.topics = seurat_obj@reductions$umap@cell.embeddings
-
-colnames(umap.topics) = paste0('umaptopic_', 1:ncol(umap.topics))
-dimensions = ncol(umap.topics)
-
-srat_cr = subset(srat_cr, cells = rownames(umap.topics))
-
-umap.topics = umap.topics[match(colnames(srat_cr), rownames(umap.topics)), ]
-srat_cr[['umap_topics']] = Seurat::CreateDimReducObject(embeddings=umap.topics,
-                                                   key='UMAPTOPICS_',
-                                                   assay='ATAC')
-rm(seurat_obj)
-
-saveRDS(srat_cr, file = paste0(RdataDir, 
-                               'seuratObj_multiome_snRNA.annotated.normalized.umap_',
-                               'scATAC.merged.peaks.cr_filtered_umap.lsi',
-                               '584K.features_38247cells_umap.topics.rds'))
-
+DefaultAssay(srat_cr) <- 'RNA'
+DimPlot(srat_cr, label = TRUE, group.by = 'subtypes',  repel = TRUE) + NoLegend()
 
 DefaultAssay(srat_cr) <- 'ATAC'
+DimPlot(srat_cr, label = TRUE, reduction = 'umap_topics',
+        group.by = 'subtypes',  repel = TRUE) + NoLegend()
+
 
 # Get a list of motif position frequency matrices from the JASPAR database
 pfm <- getMatrixSet(
@@ -189,35 +251,55 @@ pfm <- getMatrixSet(
               all_versions = FALSE)
 )
 
-# add motif information
-srat_cr <- AddMotifs(
-  object = srat_cr,
-  genome = BSgenome.Amexicanum.axolotlomics.AmexGv6cut500M,
-  pfm = pfm
+
+Save_motif_to_tfs = FALSE
+if(Save_motif_to_tfs){
+  motif_tfs = data.frame(motif = names(pfm), tf = name(pfm), stringsAsFactors = FALSE)
+  motif_tfs$tf = toupper(motif_tfs$tf)
+  motif_tfs$tf = gsub('::', '_', motif_tfs$tf)
+  motif_tfs$tf = gsub("\\s*\\([^\\)]+\\)","",as.character(motif_tfs$tf))
   
-)
+  saveRDS(motif_tfs, file = paste0(RdataDir, 
+                                   'motif_to_tfs_pfm_JASPAR2020_CORE_vertebrate.rds'))
+  
+}
 
-library(BiocParallel)
-#register(MulticoreParam(32)) # Use multiple cores
-register(SerialParam())
 
-srat_cr <- RunChromVAR(
-  object = srat_cr,
-  genome = BSgenome.Amexicanum.axolotlomics.AmexGv6cut500M
-)
+Run_ChromVar = TRUE
+if(Run_ChromVar){
+  
+  # add motif information
+  srat_cr <- AddMotifs(
+    object = srat_cr,
+    genome = BSgenome.Amexicanum.axolotlomics.AmexGv6cut500M,
+    pfm = pfm
+    
+  )
+  
+  library(BiocParallel)
+  #register(MulticoreParam(32)) # Use multiple cores
+  register(SerialParam())
+  
+  srat_cr <- RunChromVAR(
+    object = srat_cr,
+    genome = BSgenome.Amexicanum.axolotlomics.AmexGv6cut500M
+  )
+  
+  saveRDS(srat_cr, file = paste0(RdataDir, 'atac_seuratObject_motifClass_chromVAR_v3.rds'))
+  
+}
 
-saveRDS(srat_cr, file = paste0(RdataDir, 'atac_seuratObject_motifClass_chromVAR_v2.1.rds'))
 
 Plot.motif.activity.ChromVar = FALSE
 if(Plot.motif.activity.ChromVar){
   
-  srat_cr = readRDS(file = paste0(RdataDir, 'atac_seuratObject_motifClass_chromVAR_v2.1.rds'))
+  aa = readRDS(file = paste0(RdataDir, 'atac_seuratObject_motifClass_chromVAR_v2.1.rds'))
     
-  DefaultAssay(srat_cr) <- 'chromvar'
+  DefaultAssay(aa) <- 'chromvar'
   
-  ss = colSums(srat_cr@assays$chromvar@data)
+  ss = colSums(aa@assays$chromvar@data)
   
-  srat_cr = subset(srat_cr, cells = colnames(srat_cr)[which(!is.na(ss))])
+  aa = subset(aa, cells = colnames(aa)[which(!is.na(ss))])
   
   # look at the activity of Mef2c
   p2 <- FeaturePlot(
@@ -233,10 +315,4 @@ if(Plot.motif.activity.ChromVar){
   
   
 }
-
-
-
-
-
-
 
