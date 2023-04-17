@@ -1387,3 +1387,43 @@ compute.motif.enrichment = function(seurat.cistopic)
 # save(pbmc, file = paste0(RdataDir, 'pbmc_Seurat_TFIDtransform_pca_umap.Rdata'))
 # 
 
+########################################################
+########################################################
+# Section II: new functions for axolotl scATAC-seq 
+# 
+########################################################
+########################################################
+aggregate_peak_signals_by_groups = function(seurat_obj, group_by = 'celltypes', assay = 'ATAC')
+{
+  # seurat_obj = srat_cr; group_by = 'celltypes'; assay = 'ATAC'
+  require(scuttle)
+  require(DESeq2)
+  sce = as.SingleCellExperiment(seurat_obj, assay = assay)
+  sce <- aggregateAcrossCells(sce, ids = colData(sce)[, group_by])
+  peak_mat = sce@assays@data$counts
+  
+  library("DESeq2")
+  condition = factor(colnames(peak_mat))
+  dds <- DESeqDataSetFromMatrix(countData = peak_mat,
+                                DataFrame(condition),
+                                design = ~ 1)
+  ss = rowMax(counts(dds))
+  hist(log10(ss), breaks = 60)
+  abline(v = log10(c(20, 50, 100)))
+  #length(which(ss>20))
+  cat(length(which(ss>50)), ' peaks selected to normalized the pseudo-bulk \n')
+  #length(which(ss>100))
+  
+  dd0 = dds[which(ss > 50), ]
+  dd0 = estimateSizeFactors(dd0)
+  
+  sizeFactors(dds) = sizeFactors(dd0)
+  
+  dds = estimateSizeFactors(dds)
+  vst = varianceStabilizingTransformation(dds, blind = TRUE)
+  vst = assay(vst)
+  #xx = as.data.frame(vst@assays@data@listData)
+  return(vst)
+  
+}
+

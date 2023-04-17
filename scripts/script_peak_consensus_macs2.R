@@ -323,7 +323,6 @@ length(peaks)
 saveRDS(peaks, file = paste0(RdataDir, 'merged_peaks_macs2_secondRound_800K_pval5.rds'))
 
 
-
 ########################################################
 ########################################################
 # Section II: 

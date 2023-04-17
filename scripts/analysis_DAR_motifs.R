@@ -37,6 +37,8 @@ require(stringr)
 require(tidyr)
 require(tictoc)
 library(future)
+require(pheatmap)
+require(RColorBrewer)
 options(future.globals.maxSize = 80 * 1024^3)
 set.seed(1234)
 mem_used()
@@ -212,14 +214,135 @@ srat_cr = readRDS(file = paste0(RdataDir,
                                 'scATAC.merged.peaks.cr_filtered_umap.lsi',
                                 '584K.features_37680cells_umap.topics_updated.umap.subtypes.rds'))
 
+DefaultAssay(srat_cr) <- 'RNA'
+DimPlot(srat_cr, label = TRUE, group.by = 'subtypes',  repel = TRUE) + NoLegend()
+
+DefaultAssay(srat_cr) <- 'ATAC'
+DimPlot(srat_cr, label = TRUE, reduction = 'umap',
+        group.by = 'celltypes',  repel = TRUE) + NoLegend()
 
 
-########################################################
-########################################################
-# Section III: Motif enrichment analysis  
-# 
-########################################################
-########################################################
+# identify the DARs using the celltypes 
+DefaultAssay(srat_cr) <- 'ATAC'
+
+srat_cr = subset(srat_cr, cells = colnames(srat_cr)[which(srat_cr$celltypes != 'Neuronal')])
+Idents(srat_cr) = srat_cr$celltypes
+
+da_peaks <- FindAllMarkers(
+  object = srat_cr,
+  #ident.1 = cc,
+  #ident.2 = ,
+  min.pct = 0.05,
+  test.use = 'LR',
+  latent.vars = 'atac_peak_region_fragments'
+)
+
+# saveRDS(da_peaks, file = paste0(RdataDir, 'DAR_major.celltype_v2.rds'))
+da_peaks = readRDS(file = paste0(RdataDir, 'DAR_major.celltype_v2.rds'))
+
+cat(length(unique(da_peaks$gene)), 'unique peaks found \n')
+
+#da_peaks = da_peaks[which(da_peaks$cluster != 'Neuronal'), ]
+#subs = subset(srat_cr, cells = colnames(srat_cr)[which(srat_cr$celltypes != 'Neuronal')])
+
+source('functions_scATAC.R')
+library(ArchR)
+
+peak.mat = aggregate_peak_signals_by_groups(srat_cr, group_by = 'celltypes', assay = 'ATAC') 
+peak.mat = peak.mat[which(!is.na(match(rownames(peak.mat), da_peaks$gene))), ]
+
+pheatmap(peak.mat, 
+         cluster_rows=TRUE,
+         #cutree_rows = 6,
+         show_rownames=FALSE, 
+         fontsize_row = 4,
+         #color = colorRampPalette(rev(brewer.pal(n = 8, name ="RdBu")))(8), 
+         color = ArchR::paletteContinuous(set = "solarExtra", n = 100),
+         show_colnames = TRUE,
+         scale = 'row',
+         cluster_cols=TRUE, 
+         #annotation_col=df,
+         #gaps_col = gaps_col,
+         legend = TRUE,
+         treeheight_row = 15,
+         annotation_legend = FALSE, 
+         #annotation_colors = annot_colors,
+         #clustering_callback = callback,
+         #breaks = seq(-2, 2, length.out = 8),
+         clustering_method = 'complete', 
+         #cutree_rows = ,
+         #breaks = seq(-range, range, length.out = 20),
+         #gaps_row =  c(22, 79),
+         legend_labels = FALSE,
+         width = 4, height = 12, 
+         filename = paste0(resDir, '/heatmap_DAR_v2.pdf'))
+
+##########################################
+# motif activities
+##########################################
+aa = readRDS(file = paste0(RdataDir, 'atac_seuratObject_motifClass_chromVAR_v3.rds'))
+
+
+
+
+##########################################
+# DAR of CM subtypes 
+##########################################
+Idents(srat_cr) = srat_cr$celltypes
+sub.obj = subset(srat_cr, idents = 'CM')
+
+Idents(sub.obj) = sub.obj$subtypes
+
+da_peaks <- FindAllMarkers(
+  object = sub.obj,
+  #ident.1 = cc,
+  #ident.2 = ,
+  min.pct = 0.05,
+  test.use = 'LR',
+  latent.vars = 'atac_peak_region_fragments'
+)
+
+# saveRDS(da_peaks, file = paste0(RdataDir, 'DAR_subtypes_CM_v1.rds'))
+da_peaks = readRDS(file = paste0(RdataDir, 'DAR_subtypes_CM_v1.rds'))
+
+cat(length(unique(da_peaks$gene)), 'unique peaks found \n')
+
+#da_peaks = da_peaks[which(da_peaks$cluster != 'Neuronal'), ]
+#subs = subset(srat_cr, cells = colnames(srat_cr)[which(srat_cr$celltypes != 'Neuronal')])
+
+source('functions_scATAC.R')
+library(ArchR)
+
+peak.mat = aggregate_peak_signals_by_groups(sub.obj, group_by = 'subtypes', assay = 'ATAC') 
+peak.mat = peak.mat[which(!is.na(match(rownames(peak.mat), da_peaks$gene))), ]
+
+pheatmap(peak.mat, 
+         cluster_rows=TRUE,
+         #cutree_rows = 6,
+         show_rownames=FALSE, 
+         fontsize_row = 4,
+         #color = colorRampPalette(rev(brewer.pal(n = 8, name ="RdBu")))(8), 
+         color = ArchR::paletteContinuous(set = "solarExtra", n = 100),
+         show_colnames = TRUE,
+         scale = 'row',
+         cluster_cols=TRUE, 
+         #annotation_col=df,
+         #gaps_col = gaps_col,
+         legend = TRUE,
+         treeheight_row = 15,
+         annotation_legend = FALSE, 
+         #annotation_colors = annot_colors,
+         #clustering_callback = callback,
+         #breaks = seq(-2, 2, length.out = 8),
+         clustering_method = 'complete', 
+         #cutree_rows = ,
+         #breaks = seq(-range, range, length.out = 20),
+         #gaps_row =  c(22, 79),
+         legend_labels = FALSE,
+         width = 4, height = 12, 
+         filename = paste0(resDir, '/heatmap_DAR_CM_subtypesv2.pdf'))
+
+
 library(Signac)
 library(Seurat)
 library(JASPAR2020)
