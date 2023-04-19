@@ -1427,3 +1427,22 @@ aggregate_peak_signals_by_groups = function(seurat_obj, group_by = 'celltypes', 
   
 }
 
+aggregate_chromVar_scores_by_groups = function(seurat_obj, group_by = 'celltypes', assay = 'chromvar')
+{
+  # seurat_obj = aa; group_by = 'celltypes'; assay = 'chromvar'
+  data = GetAssayData(seurat_obj, slot = 'data', assay = assay)
+  groups = as.character(unlist(seurat_obj[[group_by]]))
+  res = matrix(NA, nrow = nrow(data), ncol = length(unique(groups)))
+  rownames(res) = rownames(data)
+  colnames(res) = unique(groups)
+  
+  for(n in 1:ncol(res))
+  {
+    res[, n] = apply(data[, which(groups == colnames(res)[n])], 1, median)
+  }
+  
+  
+  return(res)
+  
+  
+}
