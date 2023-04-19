@@ -438,66 +438,217 @@ DimPlot(aa, group.by = 'subtypes')
 
 ########################################################
 ########################################################
-# Section : trajectory analysis to serach for the CM drivers 
+# Section II: CM subset
 # 
 ########################################################
 ########################################################
-aa = readRDS(file = paste0(RdataDir, 'atac_seuratObject_motifClass_chromVAR_v3.rds'))
-aa = subset(aa, cells = colnames(srat_cr))
+srat_cr = readRDS(file = paste0(RdataDir, 
+                                'seuratObj_multiome_snRNA.annotated.normalized.umap_',
+                                'scATAC.merged.peaks.cr_filtered_umap.lsi',
+                                '584K.features_37680cells_umap.topics_updated.umap.subtypes.rds'))
+
+DefaultAssay(srat_cr) <- 'RNA'
+DimPlot(srat_cr, label = TRUE, group.by = 'subtypes',  repel = TRUE) + NoLegend()
+
+DefaultAssay(srat_cr) <- 'ATAC'
+DimPlot(srat_cr, label = TRUE, reduction = 'umap',
+        group.by = 'celltypes',  repel = TRUE) + NoLegend()
+
+
+# identify the DARs using the celltypes 
+DefaultAssay(srat_cr) <- 'ATAC'
+
+srat_cr = subset(srat_cr, cells = colnames(srat_cr)[which(srat_cr$celltypes != 'Neuronal')])
+Idents(srat_cr) = srat_cr$celltypes
+
+aa =subset(srat_cr, cells = colnames(srat_cr)[which(srat_cr$celltypes == 'CM')])
+aa$subtypes = droplevels(aa$subtypes)
+
+ref =  readRDS(file = paste0("/groups/tanaka/Collaborations/Jingkui-Elad/scMultiome/", 
+                             "CM_subset_for_velocity.rds"))
+
+mm = match(colnames(aa), colnames(ref))
+cells_CM = colnames(aa)[which(!is.na(mm))]
+mm = mm[which(!is.na(mm))]
+aa = subset(aa, cells = cells_CM)
+aa$subtypes = ref$subtypes[mm]
+
+CMmyLevels <- c("CM_ven_(Robo2)", "CM_ven_(Cav3_1)", "CM_IS","CM_Prol_IS", "CM_Prol_1", "CM_Prol_3")
+aa$subtypes = factor(aa$subtypes, levels = CMmyLevels)
+
+
+DefaultAssay(aa) <- 'RNA'
+DimPlot(aa, label = TRUE, group.by = 'subtypes',  repel = TRUE) + NoLegend()
+
+DefaultAssay(aa) <- 'ATAC'
+DimPlot(aa, label = TRUE, reduction = 'umap_topics',
+        group.by = 'subtypes',  repel = TRUE) + NoLegend()
+
+
+# identify the DARs using the celltypes 
+DefaultAssay(aa) <- 'ATAC'
+
+#aa = subset(aa, cells = colnames(aa)[which(aa$celltypes != 'Neuronal')])
+Idents(aa) = aa$subtypes
+
+da_peaks <- FindAllMarkers(
+  object = aa,
+  #ident.1 = cc,
+  #ident.2 = ,
+  min.pct = 0.05,
+  test.use = 'LR',
+  latent.vars = 'atac_peak_region_fragments'
+)
+
+# saveRDS(da_peaks, file = paste0(RdataDir, 'DAR_major.celltype_v2.rds'))
+da_peaks = readRDS(file = paste0(RdataDir, 'DAR_subtypes_CMsubet_v1.rds'))
+
+cat(length(unique(da_peaks$gene)), 'unique peaks found \n')
+
+#da_peaks = da_peaks[which(da_peaks$cluster != 'Neuronal'), ]
+#subs = subset(aa, cells = colnames(aa)[which(aa$celltypes != 'Neuronal')])
+
+source('functions_scATAC.R')
+library(ArchR)
+
+peak.mat = aggregate_peak_signals_by_groups(aa, group_by = 'subtypes', assay = 'ATAC') 
+peak.mat = peak.mat[which(!is.na(match(rownames(peak.mat), da_peaks$gene))), ]
+
+pheatmap(peak.mat, 
+         cluster_rows=TRUE,
+         #cutree_rows = 6,
+         show_rownames=FALSE, 
+         fontsize_row = 4,
+         #color = colorRampPalette(rev(brewer.pal(n = 8, name ="RdBu")))(8), 
+         color = ArchR::paletteContinuous(set = "solarExtra", n = 100),
+         show_colnames = TRUE,
+         scale = 'row',
+         cluster_cols=TRUE, 
+         #annotation_col=df,
+         #gaps_col = gaps_col,
+         legend = TRUE,
+         treeheight_row = 15,
+         annotation_legend = FALSE, 
+         #annotation_colors = annot_colors,
+         #clustering_callback = callback,
+         #breaks = seq(-2, 2, length.out = 8),
+         clustering_method = 'complete', 
+         #cutree_rows = ,
+         #breaks = seq(-range, range, length.out = 20),
+         #gaps_row =  c(22, 79),
+         legend_labels = FALSE,
+         width = 4, height = 12, 
+         filename = paste0(resDir, '/heatmap_DAR_CMsubset.pdf'))
 
 ##########################################
-# test different methods for CM trajectory analysis 
+# motif activities for major cell types
 ##########################################
-Test_trajectory_DM_EPgraph = FALSE
-if(Test_trajectory_DM_EPgraph){
-  aa = subset(aa, cells = colnames(aa)[which(aa$celltypes == 'CM')])
-  aa$subtypes = droplevels(aa$subtypes)
-  
-  ref =  readRDS(file = paste0("/groups/tanaka/Collaborations/Jingkui-Elad/scMultiome/", 
-                              "CM_subset_for_velocity.rds"))
-  
-  mm = match(colnames(aa), colnames(ref))
-  cells_CM = colnames(aa)[which(!is.na(mm))]
-  mm = mm[which(!is.na(mm))]
-  aa = subset(aa, cells = cells_CM)
-  aa$subtypes = ref$subtypes[mm]
-  
-  CMmyLevels <- c("CM_ven_(Robo2)", "CM_ven_(Cav3_1)", "CM_IS","CM_Prol_IS", "CM_Prol_1", "CM_Prol_3")
-  aa$subtypes = factor(aa$subtypes, levels = CMmyLevels)
-  
-  cols = c("#4CC9F0", "#49A2F0",
-           "#941F56", "#C61010",  
-           "#4361EE",  "#3F37C9")
-  
-  
-  DimPlot(aa, dims = c(1, 2), label = TRUE, repel = TRUE, group.by = 'subtypes', raster=FALSE,
-          cols = cols
+source('functions_scATAC.R')
+#motif_tf = readRDS(paste0(RdataDir, 'motif_to_tfs_pfm_JASPAR2020_CORE_vertebrate.rds'))
+#motif_tf$name = paste0(motif_tf$tf, '_', motif_tf$motif)
+motif_tf = readRDS(file = paste0(RdataDir, 'motif_to_tfs_pfm_JASPAR2020_CORE_vertebrate_v1.rds'))
+
+
+chromvar = readRDS(file = paste0(RdataDir, 'atac_seuratObject_motifClass_chromVAR_v3.rds'))
+chromvar = subset(chromvar, cells = colnames(aa))
+
+chromvar$subtypes = aa$subtypes[match(colnames(chromvar), colnames(aa))]
+
+aa = chromvar
+## motif enrichment analysis by groups
+DefaultAssay(aa) <- 'ATAC'
+Idents(aa) = aa$subtypes
+
+groups = unique(as.character(aa$subtypes))
+
+motif.mat = matrix(NA, ncol = length(groups), nrow = nrow(motif_tf))
+colnames(motif.mat) = groups
+rownames(motif.mat) = motif_tf$motif
+
+for(n in 1:length(groups))
+{
+  # n = 1
+  cat(n, '--', groups[n], '\n')
+  da_peaks <- FindMarkers(
+    object = aa,
+    ident.1 = groups[n],
+    ident.2 = NULL,
+    only.pos = TRUE,
+    test.use = 'LR',
+    min.pct = 0.05,
+    latent.vars = 'nCount_ATAC'
   )
   
-  #aa = subset(aa, cells = colnames(aa)[which(aa$subtypes == 'CM_IS'|aa$subtypes == "CM_Prol_IS")])
+  # get top differentially accessible peaks
+  top.da.peak <- rownames(da_peaks[da_peaks$p_val < 0.05, ])
   
-  aa <- FindVariableFeatures(aa, selection.method = "vst", nfeatures = 3000)
-  # 
-  aa <- ScaleData(aa)
-  # 
-  aa <- RunPCA(aa, features = VariableFeatures(object = aa), weight.by.var = TRUE, verbose = FALSE)
-  # 
-  ElbowPlot(aa, ndims = 50)
+  # test enrichment
+  enriched.motifs <- FindMotifs(
+    object = aa,
+    features = top.da.peak
+  )
   
-  aa <- RunUMAP(aa, dims = 1:20, n.neighbors = 20, min.dist = 0.3)
-  DimPlot(aa, label = TRUE, repel = TRUE, group.by = 'condition', raster=FALSE)
-  
-  
-  aa <- FindVariableFeatures(aa, selection.method = "vst", nfeatures = 5000)
-  aa <- ScaleData(aa)
-  
-  aa <- RunPCA(aa, features = VariableFeatures(object = aa), weight.by.var = TRUE, verbose = FALSE)
-  aa <- RunUMAP(aa, dims = 1:20, n.neighbors = 30, min.dist = 0.3)
-  DimPlot(aa, label = TRUE, repel = TRUE, group.by = 'condition', raster=FALSE)
-  
+  motif.mat[,n] = enriched.motifs$pvalue[match(rownames(motif.mat), enriched.motifs$motif)]
   
 }
 
+saveRDS(motif.mat, file = paste0(RdataDir, 'enriched_motif_pvalues_CMsubset_v1.rds'))
+
+# motif.mat = readRDS(file = paste0(RdataDir, 'enriched_motif_pvalues_CMsubset_v1.rds'))
+
+motif.mat = -log10(motif.mat)
+
+rownames(motif.mat) = motif_tf$name[match(rownames(motif.mat), motif_tf$motif)]
+
+maxs = apply(motif.mat, 1, max)
+o1 = order(-maxs)
+
+motif.mat = motif.mat[o1, ]
+
+#cat(length(which(maxs>10)), ' enrichment motifs \n')
+
+ntop.per.group = 10
+kk = c()
+for(n in 1:ncol(motif.mat))
+{
+  # n = 1
+  test = motif.mat[order(-motif.mat[,n]), ]
+  test = test[1:ntop.per.group, ]
+  kk = c(kk, match(rownames(test), rownames(motif.mat)))  
+  
+}
+kk = unique(kk)
+
+max.limit = 40
+res = motif.mat[kk, ]
+res[which(res>max.limit)] = max.limit
+
+pheatmap(res, 
+         cluster_rows=TRUE,
+         #cutree_rows = 6,
+         show_rownames=TRUE, 
+         fontsize_row = 8,
+         #color = colorRampPalette(rev(brewer.pal(n = 8, name ="RdBu")))(8), 
+         #color = ArchR::paletteContinuous(set = "solarExtra", n = 100),
+         color = ArchR::paletteContinuous(set = "comet", n = 100),
+         show_colnames = TRUE,
+         #scale = 'row',
+         cluster_cols=TRUE, 
+         #annotation_col=df,
+         #gaps_col = gaps_col,
+         legend = TRUE,
+         treeheight_row = 15,
+         annotation_legend = FALSE, 
+         #annotation_colors = annot_colors,
+         #clustering_callback = callback,
+         #breaks = seq(-2, 2, length.out = 8),
+         clustering_method = 'complete', 
+         #cutree_rows = ,
+         #breaks = seq(-range, range, length.out = 20),
+         #gaps_row =  c(22, 79),
+         legend_labels = FALSE,
+         width = 5, height = 12, 
+         filename = paste0(resDir, '/heatmap_enrichmentMotifs_v1.pdf'))
 
 
 
@@ -505,8 +656,8 @@ if(Test_trajectory_DM_EPgraph){
 ##########################################
 # DAR of CM subtypes 
 ##########################################
-Idents(srat_cr) = srat_cr$celltypes
-sub.obj = subset(srat_cr, idents = 'CM')
+Idents(aa) = aa$celltypes
+sub.obj = subset(aa, idents = 'CM')
 
 Idents(sub.obj) = sub.obj$subtypes
 
@@ -525,7 +676,7 @@ da_peaks = readRDS(file = paste0(RdataDir, 'DAR_subtypes_CM_v1.rds'))
 cat(length(unique(da_peaks$gene)), 'unique peaks found \n')
 
 #da_peaks = da_peaks[which(da_peaks$cluster != 'Neuronal'), ]
-#subs = subset(srat_cr, cells = colnames(srat_cr)[which(srat_cr$celltypes != 'Neuronal')])
+#subs = subset(aa, cells = colnames(aa)[which(aa$celltypes != 'Neuronal')])
 
 source('functions_scATAC.R')
 library(ArchR)

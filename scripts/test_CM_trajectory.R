@@ -182,8 +182,7 @@ toc()
 
 cells = names(dm$DC1)
 metadata = aa@meta.data
-dcs = data.frame(DC1 = dm$DC1, DC2 = dm$DC2, DC3 = dm$DC3, 
-                 DC4 = dm$DC4, DC5 = dm$DC5, stringsAsFactors = FALSE)
+dcs = data.frame(dm@eigenvectors, stringsAsFactors = FALSE)
 
 dcs = dcs[match(rownames(metadata), cells), ]
 
@@ -192,6 +191,10 @@ dcs = as.matrix(dcs)
 aa[["DC"]] <- CreateDimReducObject(embeddings = as.matrix(dcs), key = "DC_", assay = DefaultAssay(aa))
 
 rm(metadata)
+
+#aa = RunUMAP(aa, reduction = "DC", dims = 1:30, n.neighbors = 100, min.dist = 0.3, metric = 'euclidean',
+#             reduction.name = "dc_umap")
+#DimPlot(aa, reduction = 'dc_umap', label = TRUE, repel = TRUE, group.by = 'subtypes', raster=FALSE)
 
 ## try to make 3d for DC1, DC2 and DC3
 ## example from https://plotly-r.com/d-charts.html
