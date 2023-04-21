@@ -548,7 +548,6 @@ source('functions_scATAC.R')
 #motif_tf$name = paste0(motif_tf$tf, '_', motif_tf$motif)
 motif_tf = readRDS(file = paste0(RdataDir, 'motif_to_tfs_pfm_JASPAR2020_CORE_vertebrate_v1.rds'))
 
-
 chromvar = readRDS(file = paste0(RdataDir, 'atac_seuratObject_motifClass_chromVAR_v3.rds'))
 chromvar = subset(chromvar, cells = colnames(aa))
 
@@ -556,8 +555,10 @@ chromvar$subtypes = aa$subtypes[match(colnames(chromvar), colnames(aa))]
 
 aa = chromvar
 ## motif enrichment analysis by groups
-DefaultAssay(aa) <- 'ATAC'
+DefaultAssay(aa) <- 'chromvar'
 Idents(aa) = aa$subtypes
+
+FeaturePlot(aa, features = 'MA0002.2')
 
 groups = unique(as.character(aa$subtypes))
 
@@ -594,7 +595,7 @@ for(n in 1:length(groups))
 
 saveRDS(motif.mat, file = paste0(RdataDir, 'enriched_motif_pvalues_CMsubset_v1.rds'))
 
-# motif.mat = readRDS(file = paste0(RdataDir, 'enriched_motif_pvalues_CMsubset_v1.rds'))
+motif.mat = readRDS(file = paste0(RdataDir, 'enriched_motif_pvalues_CMsubset_v1.rds'))
 
 motif.mat = -log10(motif.mat)
 
@@ -617,6 +618,7 @@ for(n in 1:ncol(motif.mat))
   kk = c(kk, match(rownames(test), rownames(motif.mat)))  
   
 }
+
 kk = unique(kk)
 
 res = motif.mat[kk, ]
