@@ -386,8 +386,8 @@ for(n in 1:length(clusters))
   }
     
 }
-saveRDS(da_peaks, file = paste0(RdataDir, 'DAR_major.celltype_v3.5.rds'))
 
+saveRDS(da_peaks, file = paste0(RdataDir, 'DAR_major.celltype_v3.5.rds'))
 
 
 da_peaks = readRDS(file = paste0(RdataDir, 'DAR_major.celltype_v2.rds'))

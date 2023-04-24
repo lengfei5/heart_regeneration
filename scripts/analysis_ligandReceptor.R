@@ -43,6 +43,7 @@ load(file = paste0(RdataDir, 'seuratObject_design_variableGenes_umap.clustered_m
 
 table(st$segmentation, st$condition)
 
+
 ## snRNA-seq reference  
 refs = readRDS(file = paste0(RdataDir, 'RCTD_refs_subtypes_final_20221117.rds'))
 refs$subtypes = refs$celltype_toUse # clean the special symbols
@@ -246,4 +247,7 @@ run_Diff_NicheNet(refs = refs,
                   receivers_RZ_timeSpecific = receivers_RZ_timeSpecific, 
                   outDir = outDir
                   )
+
+extract_tables_from_res_Diff_NicheNet(outDir)
+
 

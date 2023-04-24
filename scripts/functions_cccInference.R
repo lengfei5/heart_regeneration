@@ -754,7 +754,6 @@ run_Diff_NicheNet = function(refs = refs,
   }
   
   
-  
 }
 
 
@@ -1347,6 +1346,49 @@ make_ligand_receptor_lfc_plot_customized = function(receiver_oi,
   
 }
 
+
+
+##########################################
+# post-analysis of NicheNet 
+##########################################
+extract_tables_from_res_Diff_NicheNet = function(outDir)
+{
+  saved_list = list.files(path = outDir, 
+                          pattern = '*.rds', full.names = TRUE)
+  
+  for(n in 1:length(saved_list))
+  {
+    # n = 1
+    cat(n, ' -- ', basename(saved_list[n]), '\n')
+    res = readRDS(file = saved_list[n])
+    prioritization_tables = res[[1]]
+    output = res[[2]]
+    
+    file_name = gsub('.rds','', basename(saved_list[n]))
+    out_Res = paste0(outDir, '/', file_name, '/')
+    system(paste0('mkdir -p ', out_Res))
+    
+    #table_targets = output$ligand_activities_targets
+    write.table(output$ligand_activities_targets, 
+                file = paste0(out_Res, 'ligand_activities_targets.txt'), 
+                sep = '\t', row.names = FALSE, col.names = TRUE, quote = FALSE)
+    
+    
+    write.table(prioritization_tables$prioritization_tbl_ligand_receptor, 
+                file = paste0(out_Res, 'prioritization_tbl_ligand_receptor.txt'), 
+                sep = '\t', row.names = FALSE, col.names = TRUE, quote = FALSE)
+    
+    write.table(prioritization_tables$prioritization_tbl_ligand_target, 
+                file = paste0(out_Res, 'prioritization_tbl_ligand_target.txt'), 
+                sep = '\t', row.names = FALSE, col.names = TRUE, quote = FALSE)
+    
+    
+  }
+  
+}
+
+
+
 ########################################################
 ########################################################
 # Section III : combine LIANA and NicheNet 
@@ -1484,3 +1526,6 @@ run_liana_nitchenet = function()
             align = "h", nrow = 1, rel_widths = c(0.8,0.3))
   
 }
+
+
+

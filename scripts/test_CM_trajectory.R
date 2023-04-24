@@ -245,11 +245,11 @@ saveRDS(aa, file = paste0(RdataDir, 'CMsubset_batch_corrected_DM.rds'))
 ##########################################
 aa = readRDS(file = paste0(RdataDir, 'CMsubset_batch_corrected_DM.rds'))
 
-library(plotly)
 dcs = as.data.frame(aa@reductions$DC@cell.embeddings)
 dcs$subtypes = aa$subtypes[match(rownames(dcs), colnames(aa))]
 dcs$condition = aa$condition[match(rownames(dcs), colnames(aa))]
 
+library(plotly)
 plot_ly(data.frame(dcs), x = ~DC_1, y = ~DC_2, z = ~DC_4, size = 3) %>%
   add_markers(color = ~ subtypes)
 
@@ -263,9 +263,16 @@ plot_ly(data.frame(dcs), x = ~DC_1, y = ~DC_2, z = ~DC_3, size = 3) %>%
 library("ElPiGraph.R")
 
 #CurveEPG <- computeElasticPrincipalCurve(X = curve_data, NumNodes = 10)
-TreeEPG <- computeElasticPrincipalTree(X = as.matrix(dcs[, c(1:3)]), 
+TreeEPG <- computeElasticPrincipalTree(X = as.matrix(dcs[, c(1:5)]), 
                                        NumNodes = 60, 
                                        Lambda = .03, Mu = .01, 
+                                       Do_PCA = FALSE,
+                                       ShowTimer = FALSE, ReduceDimension = NULL)
+
+graphEPG = computeElasticPrincipalGraph(Data = as.matrix(dcs[, c(1:5)]), 
+                                       NumNodes = 60, 
+                                       Lambda = .03, 
+                                       Mu = .01, 
                                        Do_PCA = FALSE,
                                        ShowTimer = FALSE, ReduceDimension = NULL)
 
