@@ -245,6 +245,21 @@ saveRDS(aa, file = paste0(RdataDir, 'CMsubset_batch_corrected_DM.rds'))
 ##########################################
 aa = readRDS(file = paste0(RdataDir, 'CMsubset_batch_corrected_DM.rds'))
 
+library(plotly)
+dcs = as.data.frame(aa@reductions$DC@cell.embeddings)
+dcs$subtypes = aa$subtypes[match(rownames(dcs), colnames(aa))]
+dcs$condition = aa$condition[match(rownames(dcs), colnames(aa))]
+
+plot_ly(data.frame(dcs), x = ~DC_1, y = ~DC_2, z = ~DC_4, size = 3) %>%
+  add_markers(color = ~ subtypes)
+
+plot_ly(data.frame(dcs), x = ~DC_2, y = ~DC_3, z = ~DC_4, size = 3) %>%
+  add_markers(color = ~ subtypes)
+
+plot_ly(data.frame(dcs), x = ~DC_1, y = ~DC_2, z = ~DC_3, size = 3) %>%
+  add_markers(color = ~ condition)
+
+
 library("ElPiGraph.R")
 
 #CurveEPG <- computeElasticPrincipalCurve(X = curve_data, NumNodes = 10)
