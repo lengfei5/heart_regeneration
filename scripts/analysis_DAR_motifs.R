@@ -307,6 +307,10 @@ saveRDS(refs, file = paste0(RdataDir,
                             'scATAC.merged.peaks.cr_filtered_umap.lsi',
                             '584K.features_37680cells_umap.topics_updated.umap.subtypes_celltypes.rds'))
 
+#srat_cr = refs
+#rm(refs)
+
+
 
 ########################################################
 ########################################################
@@ -322,8 +326,14 @@ srat_cr = readRDS(file = paste0(RdataDir,
 DefaultAssay(srat_cr) <- 'RNA'
 DimPlot(srat_cr, label = TRUE, group.by = 'subtypes',  repel = TRUE) + NoLegend()
 
+DimPlot(srat_cr, reduction = 'umap_topics',
+        label = TRUE, group.by = 'subtypes',  repel = TRUE) + NoLegend()
+
 DefaultAssay(srat_cr) <- 'ATAC'
 DimPlot(srat_cr, label = TRUE, reduction = 'umap',
+        group.by = 'celltypes',  repel = TRUE) + NoLegend()
+
+DimPlot(srat_cr, label = TRUE, reduction = 'umap_topics',
         group.by = 'celltypes',  repel = TRUE) + NoLegend()
 
 
@@ -333,6 +343,10 @@ DefaultAssay(srat_cr) <- 'ATAC'
 srat_cr = subset(srat_cr, cells = colnames(srat_cr)[which(srat_cr$celltypes != 'Neuronal')])
 Idents(srat_cr) = srat_cr$celltypes
 
+
+##########################################
+# DA analysis either using FindAllMarkers or FindMarkers 
+##########################################
 da_peaks <- FindAllMarkers(
   object = srat_cr,
   #ident.1 = cc,
@@ -340,9 +354,42 @@ da_peaks <- FindAllMarkers(
   min.pct = 0.05,
   test.use = 'LR',
   latent.vars = 'atac_peak_region_fragments'
+  
 )
 
-# saveRDS(da_peaks, file = paste0(RdataDir, 'DAR_major.celltype_v2.rds'))
+saveRDS(da_peaks, file = paste0(RdataDir, 'DAR_major.celltype_v3.rds'))
+
+da_peaks = readRDS( file = paste0(RdataDir, 'DAR_major.celltype_v3.rds'))
+
+clusters = unique(srat_cr$celltypes)
+da_peaks = c()
+for(n in 1:length(clusters))
+{
+  # n = 6; m = 7
+  for(m in setdiff(1:length(clusters), n))
+  {
+    cat(clusters[n], ' vs. ', clusters[m], '\n')
+    
+    da_test <- FindMarkers(
+      object = srat_cr,
+      ident.1 = clusters[n],
+      ident.2 = clusters[m],
+      min.pct = 0.05,
+      test.use = 'LR', 
+      latent.vars = 'atac_peak_region_fragments'
+    )
+    
+    da_test$cluster = clusters[n]
+    da_test$gene = rownames(da_test)
+    da_peaks = rbind(da_peaks, da_test)
+    
+  }
+    
+}
+saveRDS(da_peaks, file = paste0(RdataDir, 'DAR_major.celltype_v3.5.rds'))
+
+
+
 da_peaks = readRDS(file = paste0(RdataDir, 'DAR_major.celltype_v2.rds'))
 
 cat(length(unique(da_peaks$gene)), 'unique peaks found \n')
@@ -381,6 +428,7 @@ pheatmap(peak.mat,
          legend_labels = FALSE,
          width = 4, height = 12, 
          filename = paste0(resDir, '/heatmap_DAR_v2.pdf'))
+
 
 ##########################################
 # motif activities for major cell types
