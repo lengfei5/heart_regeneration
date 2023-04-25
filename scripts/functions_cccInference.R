@@ -1361,6 +1361,7 @@ extract_tables_from_res_Diff_NicheNet = function(outDir)
     # n = 1
     cat(n, ' -- ', basename(saved_list[n]), '\n')
     res = readRDS(file = saved_list[n])
+    
     prioritization_tables = res[[1]]
     output = res[[2]]
     
@@ -1381,12 +1382,9 @@ extract_tables_from_res_Diff_NicheNet = function(outDir)
     write.table(prioritization_tables$prioritization_tbl_ligand_target, 
                 file = paste0(out_Res, 'prioritization_tbl_ligand_target.txt'), 
                 sep = '\t', row.names = FALSE, col.names = TRUE, quote = FALSE)
-    
-    
   }
   
 }
-
 
 
 ########################################################

@@ -251,3 +251,48 @@ run_Diff_NicheNet(refs = refs,
 extract_tables_from_res_Diff_NicheNet(outDir)
 
 
+## quick construction of GAS6-AXL to targets 
+library(nichenetr)
+library(tidyverse)
+
+weighted_networks = readRDS(url("https://zenodo.org/record/3260758/files/weighted_networks.rds"))
+ligand_tf_matrix = readRDS(url("https://zenodo.org/record/3260758/files/ligand_tf_matrix.rds"))
+
+lr_network = readRDS(url("https://zenodo.org/record/3260758/files/lr_network.rds"))
+sig_network = readRDS(url("https://zenodo.org/record/3260758/files/signaling_network.rds"))
+gr_network = readRDS(url("https://zenodo.org/record/3260758/files/gr_network.rds"))
+
+
+ligands_all = "GAS6" # this can be a list of multiple ligands if required
+targets_all = unique(table_targets$target[which(table_targets$ligand == ligands_all)])
+
+targets_all = c("EGFR", "ETS1","LEF1", 'MYH9', 'SMAD3', 'STAT1')
+
+
+active_signaling_network = get_ligand_signaling_path(ligand_tf_matrix = ligand_tf_matrix, 
+                                                     ligands_all = ligands_all, 
+                                                     targets_all = targets_all, 
+                                                     weighted_networks = weighted_networks)
+
+# For better visualization of edge weigths: normalize edge weights to make them comparable between signaling and gene regulatory interactions
+active_signaling_network_min_max = active_signaling_network
+active_signaling_network_min_max$sig = active_signaling_network_min_max$sig %>% 
+  mutate(weight = ((weight-min(weight))/(max(weight)-min(weight))) + 0.75)
+active_signaling_network_min_max$gr = active_signaling_network_min_max$gr %>% 
+  mutate(weight = ((weight-min(weight))/(max(weight)-min(weight))) + 0.75)
+
+graph_min_max = diagrammer_format_signaling_graph(signaling_graph_list = active_signaling_network_min_max, 
+                                                  ligands_all = ligands_all, 
+                                                  targets_all = targets_all, 
+                                                  sig_color = "indianred", 
+                                                  gr_color = "steelblue")
+
+# To render the graph: uncomment following line of code
+DiagrammeR::render_graph(graph_min_max, layout = "kk")
+
+
+data_source_network = infer_supporting_datasources(signaling_graph_list = active_signaling_network, 
+                                                   lr_network = lr_network, 
+                                                   sig_network = sig_network, 
+                                                   gr_network = gr_network)
+head(data_source_network) 

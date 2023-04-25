@@ -347,51 +347,57 @@ Idents(srat_cr) = srat_cr$celltypes
 ##########################################
 # DA analysis either using FindAllMarkers or FindMarkers 
 ##########################################
-da_peaks <- FindAllMarkers(
-  object = srat_cr,
-  #ident.1 = cc,
-  #ident.2 = ,
-  min.pct = 0.05,
-  test.use = 'LR',
-  latent.vars = 'atac_peak_region_fragments'
-  
-)
-
-saveRDS(da_peaks, file = paste0(RdataDir, 'DAR_major.celltype_v3.rds'))
-
-da_peaks = readRDS( file = paste0(RdataDir, 'DAR_major.celltype_v3.rds'))
-
-clusters = unique(srat_cr$celltypes)
-da_peaks = c()
-for(n in 1:length(clusters))
+for(pct_cutoff in  c(0.04, 0.03))
 {
-  # n = 6; m = 7
-  for(m in setdiff(1:length(clusters), n))
-  {
-    cat(clusters[n], ' vs. ', clusters[m], '\n')
+  pct_cutoff = 0.04
+  cat('pct cutoff --- ', pct_cutoff, '---\n')
+  da_peaks <- FindAllMarkers(
+    object = srat_cr,
+    #ident.1 = cc,
+    #ident.2 = ,
+    min.pct = pct_cutoff,
+    test.use = 'LR',
+    latent.vars = 'atac_peak_region_fragments'
     
-    da_test <- FindMarkers(
-      object = srat_cr,
-      ident.1 = clusters[n],
-      ident.2 = clusters[m],
-      min.pct = 0.05,
-      test.use = 'LR', 
-      latent.vars = 'atac_peak_region_fragments'
-    )
+  )
+  saveRDS(da_peaks, file = paste0(RdataDir, 'DAR_major.celltype_FindAllMarkers_v4_pct.',
+                                  pct_cutoff, '.rds'))
+  
+  ## too much time consuming 
+  # clusters = unique(srat_cr$celltypes)
+  # da_peaks = c()
+  # for(n in 1:length(clusters))
+  # {
+  #   # n = 6; m = 7
+  #   for(m in setdiff(1:length(clusters), n))
+  #   {
+  #     cat(clusters[n], ' vs. ', clusters[m], '\n')
+  #     
+  #     da_test <- FindMarkers(
+  #       object = srat_cr,
+  #       ident.1 = clusters[n],
+  #       ident.2 = clusters[m],
+  #       min.pct = pct_cutoff,
+  #       test.use = 'LR', 
+  #       latent.vars = 'atac_peak_region_fragments'
+  #     )
+  #     
+  #     da_test$cluster = clusters[n]
+  #     da_test$gene = rownames(da_test)
+  #     da_peaks = rbind(da_peaks, da_test)
+  #     
+  #   }
     
-    da_test$cluster = clusters[n]
-    da_test$gene = rownames(da_test)
-    da_peaks = rbind(da_peaks, da_test)
-    
-  }
-    
+  #}
+  #saveRDS(da_peaks, file = paste0(RdataDir, 'DAR_major.celltype_FindMarkers_subtypes.one.vs.one_v4_pct.',
+  #                                pct_cutoff, '.rds'))
+  
 }
 
-saveRDS(da_peaks, file = paste0(RdataDir, 'DAR_major.celltype_v3.5.rds'))
+#da_xx = readRDS(file = paste0(RdataDir, 'DAR_major.elltype_v3.rds'))
+#da_peaks = readRDS(file = paste0(RdataDir, 'DAR_major.celltype_v2.rds'))
 
-
-da_peaks = readRDS(file = paste0(RdataDir, 'DAR_major.celltype_v2.rds'))
-
+da_peaks = readRDS(file = paste0(RdataDir, 'DAR_major.celltype_FindAllMarkers_v4_pct.0.04.rds'))
 cat(length(unique(da_peaks$gene)), 'unique peaks found \n')
 
 #da_peaks = da_peaks[which(da_peaks$cluster != 'Neuronal'), ]
@@ -402,33 +408,36 @@ library(ArchR)
 
 peak.mat = aggregate_peak_signals_by_groups(srat_cr, group_by = 'celltypes', assay = 'ATAC') 
 peak.mat = peak.mat[which(!is.na(match(rownames(peak.mat), da_peaks$gene))), ]
+#groups = c("CM", "EC", "FB", "Mo.Macs", 'Neu', "Megakeryocytes", 'B', 'T', 'RBC')
 
-pheatmap(peak.mat, 
-         cluster_rows=TRUE,
+# scale the matrix 
+mat = binarySort_matrix(mat = peak.mat, limits = c(-2, 2), cutOff = 1, clusterCols = TRUE)
+  
+pheatmap(mat, 
+         cluster_rows=FALSE,
          #cutree_rows = 6,
-         show_rownames=FALSE, 
-         fontsize_row = 4,
+         show_rownames=TRUE, 
+         fontsize_row = 10,
          #color = colorRampPalette(rev(brewer.pal(n = 8, name ="RdBu")))(8), 
          color = ArchR::paletteContinuous(set = "solarExtra", n = 100),
-         show_colnames = TRUE,
-         scale = 'row',
-         cluster_cols=TRUE, 
+         show_colnames = FALSE,
+         scale = 'none',
+         cluster_cols=FALSE, 
          #annotation_col=df,
          #gaps_col = gaps_col,
          legend = TRUE,
-         treeheight_row = 15,
+         #treeheight_row = 15,
          annotation_legend = FALSE, 
          #annotation_colors = annot_colors,
          #clustering_callback = callback,
          #breaks = seq(-2, 2, length.out = 8),
-         clustering_method = 'complete', 
+         #clustering_method = 'complete', 
          #cutree_rows = ,
          #breaks = seq(-range, range, length.out = 20),
          #gaps_row =  c(22, 79),
          legend_labels = FALSE,
-         width = 4, height = 12, 
-         filename = paste0(resDir, '/heatmap_DAR_v2.pdf'))
-
+         width = 10, height = 4, 
+         filename = paste0(resDir, '/heatmap_DAR_majoy.celltypes_v4.pdf'))
 
 ##########################################
 # motif activities for major cell types
@@ -438,8 +447,10 @@ source('functions_scATAC.R')
 #motif_tf$name = paste0(motif_tf$tf, '_', motif_tf$motif)
 motif_tf = readRDS(file = paste0(RdataDir, 'motif_to_tfs_pfm_JASPAR2020_CORE_vertebrate_v1.rds'))
 
-aa = readRDS(file = paste0(RdataDir, 'atac_seuratObject_motifClass_chromVAR_v3.rds'))
-aa = subset(aa, cells = colnames(srat_cr))
+#aa = readRDS(file = paste0(RdataDir, 'atac_seuratObject_motifClass_chromVAR_v3.rds'))
+#aa = subset(aa, cells = colnames(srat_cr))
+
+aa = srat_cr
 
 ## motif enrichment analysis by groups
 DefaultAssay(aa) <- 'ATAC'
@@ -478,10 +489,8 @@ for(n in 1:length(groups))
   
 }
 
-saveRDS(motif.mat, file = paste0(RdataDir, 'enriched_motif_pvalues_v1.rds'))
+saveRDS(motif.mat, file = paste0(RdataDir, 'enriched_motif_pvalues_v2.rds'))
 
-#motif.mat = aggregate_chromVar_scores_by_groups(aa, group_by = 'celltypes', assay = 'chromvar') 
-#motif.mat = peak.mat[which(!is.na(match(rownames(peak.mat), da_peaks$gene))), ]
 motif.mat = readRDS(file = paste0(RdataDir, 'enriched_motif_pvalues_v1.rds'))
 
 motif.mat = -log10(motif.mat)

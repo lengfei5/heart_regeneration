@@ -1444,5 +1444,82 @@ aggregate_chromVar_scores_by_groups = function(seurat_obj, group_by = 'celltypes
   
   return(res)
   
+}
+
+##########################################
+# binarySort function original from 
+# https://rdrr.io/github/GreenleafLab/ArchR/src/R/ArchRHeatmap.R
+##########################################
+binarySort <- function(m = NULL, scale = FALSE, cutOff = 1, lmat = NULL, clusterCols = TRUE){
+  # m = peak.mat
+  if(is.null(lmat)){
+    #Compute Row-Zscores
+    if(scale){
+      lmat <- sweep(m - rowMeans(m), 1, matrixStats::rowSds(m), `/`)
+    }else{
+      lmat <- m
+    }
+    
+    lmat <- lmat >= cutOff
+    
+  }
+  
+  #Transpose
+  m <- t(m)
+  lmat <- t(lmat)
+  
+  #Identify Column Ordering
+  if(clusterCols){
+    hc <- hclust(dist(m))
+    colIdx <- hc$order
+    m <- t(m[colIdx,])
+    lmat <- t(lmat[colIdx,])
+  }else{
+    m <- t(m)
+    lmat <- t(lmat)
+    hc <- NULL
+  }
+  
+  #Identify Row Ordering
+  rowIdx <- do.call("order", c(as.data.frame(lmat)[seq_len(ncol(lmat))], list(decreasing = TRUE)))
+  m <- t(m[rowIdx,])
+  lmat <- t(lmat[rowIdx,])
+  
+  #Transpose
+  m <- t(m)
+  lmat <- t(lmat)
+  
+  return(list(mat = m, hclust = hc))
   
 }
+
+binarySort_matrix = function(mat, limits = c(-2, 2), cutOff = 1, clusterCols = TRUE)
+{
+  #mat = mat[,match(groups, colnames(mat))]
+  mat <- sweep(mat - rowMeans(mat), 1, matrixStats::rowSds(mat), `/`)
+  
+  mat[mat > max(limits)] <- max(limits)
+  mat[mat < min(limits)] <- min(limits)
+  
+  bS <- binarySort(mat, lmat = NULL, cutOff = cutOff, clusterCols = clusterCols)
+  
+  mat <- bS[[1]][, colnames(mat), drop=FALSE]
+  clusterCols <- bS[[2]]
+  
+  #idx <- which(rowSums(passMat, na.rm = TRUE) > 0 & 
+  #               matrixStats::rowVars(mat) != 0 & !is.na(matrixStats::rowVars(mat)))
+  
+  #peak.mat = t(apply(peak.mat, 1, scale))
+  #range = 2.5
+  #peak.mat[which(peak.mat>range)] = range 
+  #peak.mat[which(peak.mat<(-range))] = -range 
+  
+  mat <- t(mat[seq_len(nrow(mat)), clusterCols$order, drop = FALSE])
+  
+  return(mat)
+  
+  
+}
+
+
+
