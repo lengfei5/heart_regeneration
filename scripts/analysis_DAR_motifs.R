@@ -411,7 +411,7 @@ peak.mat = peak.mat[which(!is.na(match(rownames(peak.mat), da_peaks$gene))), ]
 #groups = c("CM", "EC", "FB", "Mo.Macs", 'Neu', "Megakeryocytes", 'B', 'T', 'RBC')
 
 # scale the matrix 
-mat = binarySort_matrix(mat = peak.mat, limits = c(-2, 2), cutOff = 1, clusterCols = TRUE)
+mat = binarySort_peaks(mat = peak.mat, limits = c(-2, 2), cutOff = 1, clusterCols = TRUE)
   
 pheatmap(mat, 
          cluster_rows=FALSE,
@@ -447,10 +447,11 @@ source('functions_scATAC.R')
 #motif_tf$name = paste0(motif_tf$tf, '_', motif_tf$motif)
 motif_tf = readRDS(file = paste0(RdataDir, 'motif_to_tfs_pfm_JASPAR2020_CORE_vertebrate_v1.rds'))
 
-#aa = readRDS(file = paste0(RdataDir, 'atac_seuratObject_motifClass_chromVAR_v3.rds'))
-#aa = subset(aa, cells = colnames(srat_cr))
+aa = readRDS(file = paste0(RdataDir, 'atac_seuratObject_motifClass_chromVAR_v3.rds'))
+aa = subset(aa, cells = colnames(srat_cr))
+#aa = srat_cr
 
-aa = srat_cr
+aa$celltypes = srat_cr$celltypes[match(colnames(aa), colnames(srat_cr))]
 
 ## motif enrichment analysis by groups
 DefaultAssay(aa) <- 'ATAC'
@@ -491,38 +492,15 @@ for(n in 1:length(groups))
 
 saveRDS(motif.mat, file = paste0(RdataDir, 'enriched_motif_pvalues_v2.rds'))
 
-motif.mat = readRDS(file = paste0(RdataDir, 'enriched_motif_pvalues_v1.rds'))
+motif.mat = readRDS(file = paste0(RdataDir, 'enriched_motif_pvalues_v2.rds'))
 
 motif.mat = -log10(motif.mat)
 
 rownames(motif.mat) = motif_tf$name[match(rownames(motif.mat), motif_tf$motif)]
 
-maxs = apply(motif.mat, 1, max)
-o1 = order(-maxs)
-
-motif.mat = motif.mat[o1, ]
-
-#cat(length(which(maxs>10)), ' enrichment motifs \n')
-
-
-ntop.per.group = 10
-kk = c()
-for(n in 1:ncol(motif.mat))
-{
-  # n = 1
-  test = motif.mat[order(-motif.mat[,n]), ]
-  test = test[1:ntop.per.group, ]
-  kk = c(kk, match(rownames(test), rownames(motif.mat)))  
-  
-}
-kk = unique(kk)
-
-max.limit = 40
-res = motif.mat[kk, ]
-res[which(res>max.limit)] = max.limit
-
-pheatmap(res, 
-         cluster_rows=TRUE,
+mat = binarySort_enrichedMotif(mat = motif.mat, cutOff = 10)
+pheatmap(mat, 
+         cluster_rows=FALSE,
          #cutree_rows = 6,
          show_rownames=TRUE, 
          fontsize_row = 8,
@@ -531,11 +509,11 @@ pheatmap(res,
          color = ArchR::paletteContinuous(set = "comet", n = 100),
          show_colnames = TRUE,
          #scale = 'row',
-         cluster_cols=TRUE, 
+         cluster_cols=FALSE, 
          #annotation_col=df,
          #gaps_col = gaps_col,
          legend = TRUE,
-         treeheight_row = 15,
+         #treeheight_row = 15,
          annotation_legend = FALSE, 
          #annotation_colors = annot_colors,
          #clustering_callback = callback,
@@ -545,8 +523,8 @@ pheatmap(res,
          #breaks = seq(-range, range, length.out = 20),
          #gaps_row =  c(22, 79),
          legend_labels = FALSE,
-         width = 5, height = 12, 
-         filename = paste0(resDir, '/heatmap_enrichmentMotifs_v1.pdf'))
+         width = 10, height = 4, 
+         filename = paste0(resDir, '/heatmap_enrichmentMotifs_v3.pdf'))
 
 
 ##########################################
@@ -596,17 +574,17 @@ DimPlot(aa, group.by = 'subtypes')
 #  
 ########################################################
 ########################################################
-aa = readRDS(file = paste0(RdataDir, 
+aa = readRDS(file = paste0(RdataDir,
                            'seuratObj_multiome_snRNA.annotated.normalized.umap_',
                            'scATAC.merged.peaks.cr_filtered_umap.lsi',
-                           '_motifs_chromvar_subtypes.final.rds'))
+                           '584K.features_37680cells_umap.topics_updated.umap.subtypes_celltypes.rds'))
 
+                                     
 # identify the DARs using the celltypes 
 DefaultAssay(aa) <- 'ATAC'
 
 aa = subset(aa, cells = colnames(aa)[which(aa$celltypes != 'Neuronal')])
 Idents(aa) = aa$celltypes
-
 
 PLOT_chromVar_example = FALSE
 if(PLOT_chromVar_example){

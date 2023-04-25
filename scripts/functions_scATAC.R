@@ -1459,7 +1459,6 @@ binarySort <- function(m = NULL, scale = FALSE, cutOff = 1, lmat = NULL, cluster
     }else{
       lmat <- m
     }
-    
     lmat <- lmat >= cutOff
     
   }
@@ -1493,7 +1492,7 @@ binarySort <- function(m = NULL, scale = FALSE, cutOff = 1, lmat = NULL, cluster
   
 }
 
-binarySort_matrix = function(mat, limits = c(-2, 2), cutOff = 1, clusterCols = TRUE)
+binarySort_peaks = function(mat,  limits = c(-2, 2), cutOff = 1, lmat = NULL, clusterCols = TRUE)
 {
   #mat = mat[,match(groups, colnames(mat))]
   mat <- sweep(mat - rowMeans(mat), 1, matrixStats::rowSds(mat), `/`)
@@ -1521,5 +1520,73 @@ binarySort_matrix = function(mat, limits = c(-2, 2), cutOff = 1, clusterCols = T
   
 }
 
+rowScale_matrix <- function(mat = NULL, min = NULL, max = NULL){
+  if(!is.null(min)){
+    rMin <- min
+  }else{
+    rMin <- matrixStats::rowMins(mat)
+  }
+  if(!is.null(max)){
+    rMax <- max
+  }else{
+    rMax <- matrixStats::rowMaxs(mat)
+  }
+  rScale <- rMax - rMin
+  matDiff <- mat - rMin
+  matScale <- matDiff/rScale
+  out <- list(mat=matScale, min=rMin, max=rMax)
+  return(out)
+}
 
+binarySort_enrichedMotif = function(mat = NULL,
+                                    cutOff = 5,
+                                    pMax = Inf,
+                                    clusterCols = TRUE,
+                                    binaryClusterRows = TRUE,
+                                    labelRows = TRUE,
+                                    rastr = TRUE,
+                                    transpose = TRUE)
+{
+  keep <- lapply(seq_len(ncol(mat)), function(x){
+    idx <- head(order(mat[, x], decreasing = TRUE), n)
+    rownames(mat)[idx[which(mat[idx, x] > cutOff)]]
+  }) %>% unlist %>% unique
+  mat <- mat[keep, ,drop = FALSE]
+  
+  passMat <- lapply(seq_len(nrow(mat)), function(x){
+    (mat[x, ] >= 0.9*max(mat[x, ])) * 1
+  }) %>% Reduce("rbind", .) %>% data.frame
+  colnames(passMat) <- colnames(mat)
+  
+  mat[mat > pMax] <- pMax
+  mat <- rowScale_matrix(as.matrix(mat), min = 0)
+  
+  if(pMax != 100){
+    rownames(mat[[1]]) <- paste0(rownames(mat[[1]]), " (",round(mat$max),")")
+    rownames(passMat) <- rownames(mat[[1]])
+  }
+  
+  mat2 <- mat[[1]] * 100
+  
+  if(nrow(mat2) > 1 & ncol(mat2) > 1){
+    if(binaryClusterRows){
+      #cn <- order(colMeans(mat2), decreasing=TRUE)
+      bS <- binarySort(mat2, lmat = passMat[rownames(mat2), colnames(mat2)], 
+                       clusterCols = clusterCols)
+      mat2 <- bS[[1]][, colnames(mat2)]
+      clusterRows <- FALSE
+      clusterCols <- bS[[2]]
+    }
+  }
+  
+  
+  if(!is.null(clusterCols)){
+    mat2 <- t(mat2[, clusterCols$order,drop=FALSE])
+  }else{
+    mat2 <- t(mat2)
+  }
+  
+  return(mat2)
+  
+}
 
