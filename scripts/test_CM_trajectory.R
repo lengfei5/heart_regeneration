@@ -38,6 +38,7 @@ system(paste0('mkdir -p ', outDir))
 ##########################################
 aa =  readRDS(file = paste0("/groups/tanaka/Collaborations/Jingkui-Elad/scMultiome/", 
                             "CM_subset_for_velocity.rds"))
+
 aa$time = gsub('Amex_scRNA_', '', aa$condition)
 aa$cell.ids = sapply(colnames(aa), function(x) unlist(strsplit(as.character(x), '-'))[1]) 
 aa$cell.ids = paste0(aa$cell.ids, '_', aa$time)
@@ -61,8 +62,6 @@ DimPlot(aa, dims = c(1, 2), label = TRUE, repel = TRUE, group.by = 'subtypes', r
         cols = cols
 )
 
-
-
 xx = aa
 xx@reductions$umap@cell.embeddings = -xx@reductions$umap@cell.embeddings
 DimPlot(xx, dims = c(1, 2), label = TRUE, repel = TRUE, group.by = 'subtypes', raster=FALSE,
@@ -75,6 +74,7 @@ rm(xx)
 ggsave(filename = paste0(outDir, 'UMAP_CMsubsets_for.trajectory.test.pdf'), width = 10, height = 8)
 
 saveRDS(aa, file = paste0(RdataDir, '"CM_subset_for_trajectory_analysis.rds"'))
+
 ########################################################
 ########################################################
 # Section : test DM first 
@@ -91,10 +91,9 @@ library(RColorBrewer)
 
 aa = readRDS(file = paste0(RdataDir, '"CM_subset_for_trajectory_analysis.rds"'))
 
-Remove_CM.prol.1_CM.prol.3 = TRUE
+Remove_CM.prol.1_CM.prol.3 = FALSE
 if(Remove_CM.prol.1_CM.prol.3){
-  aa = subset(aa, cells = colnames(aa)[which(aa$subtypes != 'CM_Prol_1' & aa$subtypes != 'CM_Prol_3'
-                                             & aa$condition != 'Amex_scRNA_d14')]) 
+  aa = subset(aa, cells = colnames(aa)[which(aa$subtypes != 'CM_Prol_1' & aa$subtypes != 'CM_Prol_3')]) 
   
   #aa = subset(aa, cells = colnames(aa)[which(aa$subtypes != 'CM_Prol_1' & aa$subtypes != 'CM_Prol_3')]) 
   aa$subtypes = droplevels(aa$subtypes)
@@ -146,6 +145,7 @@ dcs = as.data.frame(dcs)
 dcs$subtypes = aa$subtypes[match(rownames(dcs), colnames(aa))]
 dcs$condition = aa$condition[match(rownames(dcs), colnames(aa))]
 
+
 plot_ly(data.frame(dcs), x = ~DC1, y = ~DC2, z = ~DC4, size = 3) %>%
   add_markers(color = ~ subtypes)
 
@@ -153,7 +153,7 @@ plot_ly(data.frame(dcs), x = ~DC2, y = ~DC3, z = ~DC4, size = 3) %>%
   add_markers(color = ~ subtypes)
 
 plot_ly(data.frame(dcs), x = ~DC1, y = ~DC2, z = ~DC3, size = 3) %>%
-  add_markers(color = ~ condition)
+  add_markers(color = ~ subtypes)
 
 p1 = DimPlot(aa, reduction = 'DC', dims = c(1, 2), cols = cols)
 p2 = DimPlot(aa, reduction = 'DC', dims = c(1, 3), cols = cols)
@@ -163,23 +163,27 @@ p1 / p2 / p3
 DimPlot(aa, reduction = 'DC', dims = c(2, 3), label = TRUE, repel = TRUE,
         group.by = 'subtypes')
 
-DimPlot(aa, reduction = 'DC', dims = c(1, 3), label = TRUE, repel = TRUE,
+DimPlot(aa, reduction = 'DC', dims = c(1, 2), label = TRUE, repel = TRUE,
         group.by = 'subtypes')
 
 
-ggsave(filename = paste0(outDir, 'CMsubsets_DM__no.day14.2D_batchCorrected.pdf'), width = 10, height = 8)
+
 
 p1 = DimPlot(aa, reduction = 'DC', dims = c(1, 2), label = TRUE, repel = TRUE,
-        group.by = 'subtypes', cols = cols)
+        group.by = 'subtypes')
 p2 = DimPlot(aa, reduction = 'DC', dims = c(1, 3), label = TRUE, repel = TRUE,
              group.by = 'subtypes')
+
+p1 / p2
+
+ggsave(filename = paste0(outDir, 'trajectory_test_DM_CM_subtypes.no.prol1.prol3_timepoints.all.pdf'), 
+       width = 8, height = 16)
 
 DimPlot(aa, reduction = 'DC', dims = c(2, 3), label = TRUE, repel = TRUE,
         group.by = 'subtypes')
 
-p1 / p2
-
-saveRDS(aa, file = paste0(RdataDir, 'CMsubset_batch_corrected_DM.rds'))
+save(aa, dcs, file = paste0(RdataDir, 
+                            'trajectory_test_DM_CM_subtypes.no.prol1.prol3_timepoints.all.Rdata'))
 
 
 ##########################################
