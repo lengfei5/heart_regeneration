@@ -97,64 +97,7 @@ if(Remove_CM.prol.1_CM.prol.3){
                                              & aa$condition != 'Amex_scRNA_d14')]) 
   
   #aa = subset(aa, cells = colnames(aa)[which(aa$subtypes != 'CM_Prol_1' & aa$subtypes != 'CM_Prol_3')]) 
-  
   aa$subtypes = droplevels(aa$subtypes)
-}
-
-
-Test_Batch_correction_timepoint = FALSE
-if(Test_Batch_correction_timepoint){
-  aa.list <- SplitObject(aa, split.by = "condition")
-  
-  aa.list <- lapply(X = aa.list, FUN = function(x) {
-    x<- NormalizeData(x)
-    x <- FindVariableFeatures(x, selection.method = "vst", nfeatures = 3000)
-  })
-  
-  # select features that are repeatedly variable across datasets for integration
-  features <- SelectIntegrationFeatures(object.list = aa.list)
-  
-  Use.softer.rpca = TRUE
-  if(Use.softer.rpca){
-    aa.list <- lapply(X = aa.list, FUN = function(x) {
-      x <- ScaleData(x, features = features, verbose = FALSE)
-      x <- RunPCA(x, features = features, verbose = FALSE)
-    })
-    
-    aa.anchors <- FindIntegrationAnchors(object.list = aa.list, anchor.features = features, 
-                                         reduction = "rpca")
-  }else{
-    aa.anchors <- FindIntegrationAnchors(object.list = aa.list, anchor.features = features)
-  }
-  
-  aa.combined <- IntegrateData(anchorset = aa.anchors)
-  
-  DefaultAssay(aa.combined) <- "integrated"
-  
-  # Run the standard workflow for visualization and clustering
-  aa.combined <- ScaleData(aa.combined, verbose = FALSE)
-  aa.combined <- RunPCA(aa.combined, npcs = 50, verbose = FALSE, weight.by.var = FALSE)
-  
-  aa.combined$condition = factor(aa.combined$condition, levels = levels(aa$condition))
-  
-  p1 = DimPlot(aa.combined, label = TRUE, repel = TRUE, group.by = 'subtypes', raster=FALSE) 
-  p2 = DimPlot(aa.combined, label = TRUE, repel = TRUE, group.by = 'condition', raster=FALSE)
-  p1 + p2
-  
-  aa.combined <- FindNeighbors(aa.combined, reduction = "pca", dims = 1:30)
-  aa.combined <- FindClusters(aa.combined, resolution = 0.5)
-  
-  p3 = DimPlot(aa.combined, label = TRUE, repel = TRUE, group.by = 'seurat_clusters', raster=FALSE)
-  aa.combined$cluster = aa.combined$seurat_clusters
-  
-  aa.combined <- RunUMAP(aa.combined, reduction = "pca", dims = 1:30, n.neighbors = 100, min.dist = 0.3)
-  #DimPlot(aa.combined, label = TRUE, repel = TRUE, group.by = 'condition', raster=FALSE)
-  #p1 + p2+ p3
-  DimPlot(aa.combined, label = TRUE, repel = TRUE, group.by = 'subtypes', raster=FALSE)
-  
-  saveRDS(aa.combined, file = paste0(RdataDir, 'CMsubset_batch_corrected.rds'))
-  
-  aa = readRDS(file = paste0(RdataDir, 'CMsubset_batch_corrected.rds'))
   
 }
 
@@ -455,4 +398,68 @@ if(Trajectory_pseudotime_principlecurve){
   
   
 }
+
+########################################################
+########################################################
+# Section : not used 
+# 
+########################################################
+########################################################
+Test_Batch_correction_timepoint = FALSE
+if(Test_Batch_correction_timepoint){
+  aa.list <- SplitObject(aa, split.by = "condition")
+  
+  aa.list <- lapply(X = aa.list, FUN = function(x) {
+    x<- NormalizeData(x)
+    x <- FindVariableFeatures(x, selection.method = "vst", nfeatures = 3000)
+  })
+  
+  # select features that are repeatedly variable across datasets for integration
+  features <- SelectIntegrationFeatures(object.list = aa.list)
+  
+  Use.softer.rpca = TRUE
+  if(Use.softer.rpca){
+    aa.list <- lapply(X = aa.list, FUN = function(x) {
+      x <- ScaleData(x, features = features, verbose = FALSE)
+      x <- RunPCA(x, features = features, verbose = FALSE)
+    })
+    
+    aa.anchors <- FindIntegrationAnchors(object.list = aa.list, anchor.features = features, 
+                                         reduction = "rpca")
+  }else{
+    aa.anchors <- FindIntegrationAnchors(object.list = aa.list, anchor.features = features)
+  }
+  
+  aa.combined <- IntegrateData(anchorset = aa.anchors)
+  
+  DefaultAssay(aa.combined) <- "integrated"
+  
+  # Run the standard workflow for visualization and clustering
+  aa.combined <- ScaleData(aa.combined, verbose = FALSE)
+  aa.combined <- RunPCA(aa.combined, npcs = 50, verbose = FALSE, weight.by.var = FALSE)
+  
+  aa.combined$condition = factor(aa.combined$condition, levels = levels(aa$condition))
+  
+  p1 = DimPlot(aa.combined, label = TRUE, repel = TRUE, group.by = 'subtypes', raster=FALSE) 
+  p2 = DimPlot(aa.combined, label = TRUE, repel = TRUE, group.by = 'condition', raster=FALSE)
+  p1 + p2
+  
+  aa.combined <- FindNeighbors(aa.combined, reduction = "pca", dims = 1:30)
+  aa.combined <- FindClusters(aa.combined, resolution = 0.5)
+  
+  p3 = DimPlot(aa.combined, label = TRUE, repel = TRUE, group.by = 'seurat_clusters', raster=FALSE)
+  aa.combined$cluster = aa.combined$seurat_clusters
+  
+  aa.combined <- RunUMAP(aa.combined, reduction = "pca", dims = 1:30, n.neighbors = 100, min.dist = 0.3)
+  #DimPlot(aa.combined, label = TRUE, repel = TRUE, group.by = 'condition', raster=FALSE)
+  #p1 + p2+ p3
+  DimPlot(aa.combined, label = TRUE, repel = TRUE, group.by = 'subtypes', raster=FALSE)
+  
+  saveRDS(aa.combined, file = paste0(RdataDir, 'CMsubset_batch_corrected.rds'))
+  
+  aa = readRDS(file = paste0(RdataDir, 'CMsubset_batch_corrected.rds'))
+  
+}
+
+
 

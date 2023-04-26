@@ -14,7 +14,6 @@ version.analysis = '_R13591_intron.exon.20220729'
 resDir = paste0("../results/sc_multiome", version.analysis)
 RdataDir = paste0(resDir, '/Rdata/')
 
-
 if(!dir.exists(resDir)) dir.create(resDir)
 if(!dir.exists(RdataDir)) dir.create(RdataDir)
 
@@ -22,6 +21,7 @@ dataDir = '../R13591_axolotl_multiome'
 
 source('functions_scRNAseq.R')
 source('functions_Visium.R')
+species = 'axloltl_scRNAseq'
 
 require(Seurat)
 #require(sctransform)3
@@ -35,7 +35,7 @@ options(future.globals.maxSize = 80000 * 1024^2)
 
 mem_used()
 
-species = 'axloltl_scRNAseq'
+
 
 ########################################################
 ########################################################

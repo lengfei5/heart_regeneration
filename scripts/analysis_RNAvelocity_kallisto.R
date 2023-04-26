@@ -238,7 +238,7 @@ rm(g)
 ########################################################
 aa = readRDS(file = paste0(RdataDir, 'CM_subset_for_velocity.rds'))
 
-DimPlot(aa, label = TRUE, repel = TRUE, group.by = 'subtypes', raster=FALSE)
+p1 = DimPlot(aa, label = TRUE, repel = TRUE, group.by = 'subtypes', raster=FALSE)
 aa$celltypes = droplevels(aa$subtypes)
 
 aa <- FindVariableFeatures(aa, selection.method = "vst", nfeatures = 1000)
@@ -249,21 +249,97 @@ ElbowPlot(aa, ndims = 50)
 aa <- FindNeighbors(aa, dims = 1:20)
 aa <- FindClusters(aa, verbose = FALSE, algorithm = 3, resolution = 0.5)
 
-DimPlot(aa, label = TRUE, repel = TRUE, group.by = 'seurat_clusters', raster=FALSE)
+p2 = DimPlot(aa, label = TRUE, repel = TRUE, group.by = 'seurat_clusters', raster=FALSE)
 
 aa$time = gsub('d', '', aa$time)
+aa$clusters = aa$seurat_clusters
 
+p1 + p2
 
 
 subsetting_further = FALSE
 if(subsetting_further){
+  ##########################################
+  # drop the d0, because there is no dynamics in d0 and probably making trouble for the RNA velocity 
+  ##########################################
+  Drop_CM.prol1_CM.prol3_time.all = FALSE
+  if(Drop_CM.prol1_CM.prol3_time.all){
+    aa = subset(aa, cells = colnames(aa)[which(aa$subtypes != 'CM_Prol_1' & aa$subtypes != "CM_Prol_3")])
+    aa$celltypes = droplevels(aa$celltypes)
+    
+    p1 = DimPlot(aa, label = TRUE, repel = TRUE, group.by = 'subtypes', raster=FALSE)
+    
+    aa <- FindVariableFeatures(aa, selection.method = "vst", nfeatures = 2000)
+    aa <- ScaleData(aa)
+    aa <- RunPCA(aa, features = VariableFeatures(object = aa), weight.by.var = TRUE, verbose = FALSE)
+    ElbowPlot(aa, ndims = 50)
+    
+    aa <- FindNeighbors(aa, dims = 1:20)
+    aa <- FindClusters(aa, verbose = FALSE, algorithm = 3, resolution = 0.5)
+    
+    
+    p2 = DimPlot(aa, label = TRUE, repel = TRUE, group.by = 'seurat_clusters', raster=FALSE)
+    p1 + p2
+    
+    aa$clusters = aa$seurat_clusters
+    
+  }
+  
+  Drop.day0 = FALSE
+  if(Drop.day0){
+    aa = subset(aa, cells = colnames(aa)[which(aa$condition != 'Amex_scRNA_d0')])
+    aa$celltypes = droplevels(aa$celltypes)
+    aa$condition = droplevels(aa$condition)
+    
+    p1 = DimPlot(aa, label = TRUE, repel = TRUE, group.by = 'subtypes', raster=FALSE)
+    
+    aa <- FindVariableFeatures(aa, selection.method = "vst", nfeatures = 2000)
+    aa <- ScaleData(aa)
+    aa <- RunPCA(aa, features = VariableFeatures(object = aa), weight.by.var = TRUE, verbose = FALSE)
+    ElbowPlot(aa, ndims = 50)
+    
+    aa <- FindNeighbors(aa, dims = 1:20)
+    aa <- FindClusters(aa, verbose = FALSE, algorithm = 3, resolution = 0.5)
+    
+    
+    p2 = DimPlot(aa, label = TRUE, repel = TRUE, group.by = 'seurat_clusters', raster=FALSE)
+    p1 + p2
+    
+    aa$clusters = aa$seurat_clusters
+    
+  }
+  
+  Drop_CM.prol1_CM.prol3_time.noday0 = FALSE
+  if(Drop_CM.prol1_CM.prol3_time.all){
+    aa = subset(aa, cells = colnames(aa)[which(aa$subtypes != 'CM_Prol_1' & aa$subtypes != "CM_Prol_3"
+                                               & aa$condition != 'Amex_scRNA_d0')])
+    aa$celltypes = droplevels(aa$celltypes)
+    aa$condition = droplevels(aa$condition)
+    
+    
+    p1 = DimPlot(aa, label = TRUE, repel = TRUE, group.by = 'subtypes', raster=FALSE)
+    
+    # aa <- FindVariableFeatures(aa, selection.method = "vst", nfeatures = 2000)
+    # aa <- ScaleData(aa)
+    # aa <- RunPCA(aa, features = VariableFeatures(object = aa), weight.by.var = TRUE, verbose = FALSE)
+    # ElbowPlot(aa, ndims = 50)
+    # 
+    # aa <- FindNeighbors(aa, dims = 1:20)
+    # aa <- FindClusters(aa, verbose = FALSE, algorithm = 3, resolution = 0.5)
+    
+    
+    p2 = DimPlot(aa, label = TRUE, repel = TRUE, group.by = 'seurat_clusters', raster=FALSE)
+    p1 + p2
+    
+    aa$clusters = aa$seurat_clusters
+    
+  }
   
   #aa = subset(aa, cells = colnames(aa)[which(aa$subtypes == 'CM_IS'|aa$subtypes == "CM_Prol_IS")])
   
   ### select 4 major cell types
   #aa = subset(aa, cells = colnames(aa)[which(aa$subtypes != 'CM_Prol_1' & aa$subtypes != "CM_Prol_3" &
   #                                             aa$condition != "Amex_scRNA_d14")])
-  # aa = subset(aa, cells = colnames(aa)[which(aa$subtypes != 'CM_Prol_1' & aa$subtypes != "CM_Prol_3")])
   
   aa = subset(aa, cells = colnames(aa)[which(aa$condition == 'Amex_scRNA_d0' | 
                                                aa$condition == "Amex_scRNA_d1")])
@@ -541,7 +617,9 @@ mnt$celltypes[which(mnt$celltypes == "CM_ven_(Cav3_1)")] = "CM_ven_Cav3_1"
 #saveDir = paste0("/Volumes/groups/tanaka/People/current/jiwang/projects/RA_competence/",
 #                "results/scRNAseq_R13547_10x_mNT_20220813/RA_symetryBreaking/")
 #saveFile = "RNAmatrix_umap_kalisto.velocity_spliced_unspliced_CMsutypes_v1.5.h5Seurat"
-saveFile = 'RNAmatrix_umap_kalisto.velocity_spliced_unspliced_CMsutypesAll_d0.d1_2.2.h5Seurat'
+#saveFile = 'RNAmatrix_umap_kalisto.velocity_spliced_unspliced_CM_no.prol1.prol3_all.timepoints_v5.h5Seurat'
+#saveFile = 'RNAmatrix_umap_kalisto.velocity_spliced_unspliced_CM.all_timepoints.noday0_v5.h5Seurat'
+saveFile = 'RNAmatrix_umap_kalisto.velocity_spliced_unspliced_CM.no.prol1.prol3_timepoints.noday0_v5.h5Seurat'
 
 SaveH5Seurat(mnt, filename = paste0(outDir, saveFile), 
              overwrite = TRUE)
