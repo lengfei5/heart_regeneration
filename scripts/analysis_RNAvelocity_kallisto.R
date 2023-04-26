@@ -237,6 +237,7 @@ rm(g)
 ########################################################
 ########################################################
 aa = readRDS(file = paste0(RdataDir, 'CM_subset_for_velocity.rds'))
+
 DimPlot(aa, label = TRUE, repel = TRUE, group.by = 'subtypes', raster=FALSE)
 aa$celltypes = droplevels(aa$subtypes)
 aa <- FindNeighbors(aa, dims = 1:20)
