@@ -240,9 +240,20 @@ aa = readRDS(file = paste0(RdataDir, 'CM_subset_for_velocity.rds'))
 
 DimPlot(aa, label = TRUE, repel = TRUE, group.by = 'subtypes', raster=FALSE)
 aa$celltypes = droplevels(aa$subtypes)
+
+aa <- FindVariableFeatures(aa, selection.method = "vst", nfeatures = 1000)
+aa <- ScaleData(aa)
+aa <- RunPCA(aa, features = VariableFeatures(object = aa), weight.by.var = TRUE, verbose = FALSE)
+ElbowPlot(aa, ndims = 50)
+
 aa <- FindNeighbors(aa, dims = 1:20)
 aa <- FindClusters(aa, verbose = FALSE, algorithm = 3, resolution = 0.5)
+
+DimPlot(aa, label = TRUE, repel = TRUE, group.by = 'seurat_clusters', raster=FALSE)
+
 aa$time = gsub('d', '', aa$time)
+
+
 
 subsetting_further = FALSE
 if(subsetting_further){
@@ -536,41 +547,3 @@ SaveH5Seurat(mnt, filename = paste0(outDir, saveFile),
              overwrite = TRUE)
 Convert(paste0(outDir, saveFile), 
         dest = "h5ad", overwrite = TRUE)
-
-
-##########################################
-## test umap with spliced 
-##########################################
-Test_umap_use.only.splicedMatrix = FALSE
-if(Test_umap_use.only.splicedMatrix){
-  DefaultAssay(mnt) = 'spliced'
-  DimPlot(mnt, label = TRUE, repel = TRUE, reduction = 'UMAP',
-          group.by = 'condition', cols = cols_sel, raster=FALSE)
-  
-  
-  mnt <- FindVariableFeatures(mnt, selection.method = "vst", nfeatures = 3000) # find subset-specific HVGs
-  
-  ## because the data was regressed and scaled already, only the HVGs were used to calculate PCA
-  mnt = ScaleData(mnt)
-  
-  mnt <- RunPCA(mnt, features = VariableFeatures(object = mnt), verbose = FALSE, weight.by.var = TRUE)
-  ElbowPlot(mnt, ndims = 50)
-  
-  Idents(mnt) = mnt$condition
-  
-  mnt <- RunUMAP(mnt, dims = 1:20, n.neighbors = 100, min.dist = 0.2)
-  DimPlot(mnt, label = TRUE, repel = TRUE, group.by = 'condition',
-          reduction = 'umap', cols = cols_sel, raster=FALSE)
-  
-  ggsave(filename = paste0(outDir, 'UMAP_splicedMatrix_',
-                           'subsetting.RAsymmetryBreaking.onlyday3rep1.pdf'), width = 10, height = 8)
-  
-  DimPlot(mnt, label = TRUE, repel = TRUE, reduction = 'UMAP',
-          group.by = 'condition', cols = cols_sel, raster=FALSE)
-  
-}
-
-### double check the intron and exon ratios
-xx = readRDS(file = "../results/Rdata/seuratObject_axloltl_scRNAseq_R13591_20220720_lognormamlized_pca_umap_v2.rds")
-
-
