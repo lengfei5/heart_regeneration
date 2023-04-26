@@ -1540,6 +1540,7 @@ rowScale_matrix <- function(mat = NULL, min = NULL, max = NULL){
 
 binarySort_enrichedMotif = function(mat = NULL,
                                     cutOff = 5,
+                                    ntop = 10,
                                     pMax = Inf,
                                     clusterCols = TRUE,
                                     binaryClusterRows = TRUE,
@@ -1547,8 +1548,9 @@ binarySort_enrichedMotif = function(mat = NULL,
                                     rastr = TRUE,
                                     transpose = TRUE)
 {
+  # mat = motif.mat
   keep <- lapply(seq_len(ncol(mat)), function(x){
-    idx <- head(order(mat[, x], decreasing = TRUE), n)
+    idx <- head(order(mat[, x], decreasing = TRUE), ntop)
     rownames(mat)[idx[which(mat[idx, x] > cutOff)]]
   }) %>% unlist %>% unique
   mat <- mat[keep, ,drop = FALSE]

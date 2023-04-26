@@ -595,6 +595,10 @@ if(PLOT_chromVar_example){
   
 }
 
+motif_tf = readRDS(file = paste0(RdataDir, 'motif_to_tfs_pfm_JASPAR2020_CORE_vertebrate_v1.rds'))
+
+chromvar = readRDS(file = paste0(RdataDir, 'atac_seuratObject_motifClass_chromVAR_v3.rds'))
+
 ##########################################
 # the CM, machropage, FB
 ##########################################
@@ -643,9 +647,9 @@ for(celltype_sel in c('CM', 'EC', 'FB'))
     test.use = 'LR',
     latent.vars = 'atac_peak_region_fragments'
   )
+  saveRDS(da_peaks, file = paste0(RdataDir, 'DAR_subtypes_', celltype_sel, '.rds'))
   
-  saveRDS(da_peaks, file = paste0(RdataDir, 'DAR_celltype_v2.rds'))
-  da_peaks = readRDS(file = paste0(RdataDir, 'DAR_subtypes_CMsubet_v1.rds'))
+  da_peaks = readRDS(file = paste0(RdataDir, 'DAR_subtypes_', celltype_sel, '.rds'))
   
   cat(length(unique(da_peaks$gene)), 'unique peaks found \n')
   
@@ -658,53 +662,46 @@ for(celltype_sel in c('CM', 'EC', 'FB'))
   peak.mat = aggregate_peak_signals_by_groups(sub_obj, group_by = 'subtypes', assay = 'ATAC') 
   peak.mat = peak.mat[which(!is.na(match(rownames(peak.mat), da_peaks$gene))), ]
   
-  pheatmap(peak.mat, 
-           cluster_rows=TRUE,
+  mat = binarySort_peaks(mat = peak.mat, limits = c(-2, 2), cutOff = 1, clusterCols = TRUE)
+  
+  pheatmap(mat, 
+           cluster_rows=FALSE,
            #cutree_rows = 6,
-           show_rownames=FALSE, 
-           fontsize_row = 4,
+           show_rownames=TRUE, 
+           fontsize_row = 10,
            #color = colorRampPalette(rev(brewer.pal(n = 8, name ="RdBu")))(8), 
            color = ArchR::paletteContinuous(set = "solarExtra", n = 100),
-           show_colnames = TRUE,
-           scale = 'row',
-           cluster_cols=TRUE, 
+           show_colnames = FALSE,
+           scale = 'none',
+           cluster_cols=FALSE, 
            #annotation_col=df,
            #gaps_col = gaps_col,
            legend = TRUE,
-           treeheight_row = 15,
+           #treeheight_row = 15,
            annotation_legend = FALSE, 
            #annotation_colors = annot_colors,
            #clustering_callback = callback,
            #breaks = seq(-2, 2, length.out = 8),
-           clustering_method = 'complete', 
+           #clustering_method = 'complete', 
            #cutree_rows = ,
            #breaks = seq(-range, range, length.out = 20),
            #gaps_row =  c(22, 79),
            legend_labels = FALSE,
-           width = 4, height = 12, 
-           filename = paste0(resDir, '/heatmap_DAR_CMsubset.pdf'))
+           width = 10, height = 4, 
+           filename = paste0(resDir, '/heatmap_DAR_subtypes', celltype_sel, '_v4.pdf'))
   
   ##########################################
   # motif activities for major cell types
   ##########################################
   source('functions_scATAC.R')
-  #motif_tf = readRDS(paste0(RdataDir, 'motif_to_tfs_pfm_JASPAR2020_CORE_vertebrate.rds'))
-  #motif_tf$name = paste0(motif_tf$tf, '_', motif_tf$motif)
-  motif_tf = readRDS(file = paste0(RdataDir, 'motif_to_tfs_pfm_JASPAR2020_CORE_vertebrate_v1.rds'))
+  sub_chrom = subset(chromvar, cells = colnames(sub_obj))
+  sub_chrom$subtypes = sub_obj$subtypes[match(colnames(sub_chrom), colnames(sub_obj))]
   
-  chromvar = readRDS(file = paste0(RdataDir, 'atac_seuratObject_motifClass_chromVAR_v3.rds'))
-  chromvar = subset(chromvar, cells = colnames(sub_obj))
+  DefaultAssay(sub_chrom) = 'ATAC'
+  Idents(sub_chrom) = sub_chrom$subtypes
   
-  chromvar$subtypes = sub_obj$subtypes[match(colnames(chromvar), colnames(sub_obj))]
-  
-  sub_obj = chromvar
   ## motif enrichment analysis by groups
-  DefaultAssay(sub_obj) <- 'chromvar'
-  Idents(sub_obj) = sub_obj$subtypes
-  
-  FeaturePlot(sub_obj, features = 'MA0002.2')
-  
-  groups = unique(as.character(sub_obj$subtypes))
+  groups = unique(as.character(sub_chrom$subtypes))
   
   motif.mat = matrix(NA, ncol = length(groups), nrow = nrow(motif_tf))
   colnames(motif.mat) = groups
@@ -715,13 +712,13 @@ for(celltype_sel in c('CM', 'EC', 'FB'))
     # n = 1
     cat(n, '--', groups[n], '\n')
     da_peaks <- FindMarkers(
-      object = sub_obj,
+      object = sub_chrom,
       ident.1 = groups[n],
       ident.2 = NULL,
       only.pos = TRUE,
       test.use = 'LR',
       min.pct = 0.05,
-      latent.vars = 'nCount_ATAC'
+      latent.vars = 'atac_peak_region_fragments'
     )
     
     # get top differentially accessible peaks
@@ -729,7 +726,7 @@ for(celltype_sel in c('CM', 'EC', 'FB'))
     
     # test enrichment
     enriched.motifs <- FindMotifs(
-      object = sub_obj,
+      object = sub_chrom,
       features = top.da.peak
     )
     
@@ -737,41 +734,20 @@ for(celltype_sel in c('CM', 'EC', 'FB'))
     
   }
   
-  saveRDS(motif.mat, file = paste0(RdataDir, 'enriched_motif_pvalues_CMsubset_v1.rds'))
+  saveRDS(motif.mat, file = paste0(RdataDir, 'enriched_motif_pvalues_subtypes', celltype_sel,
+                                   '_v2.rds'))
   
-  motif.mat = readRDS(file = paste0(RdataDir, 'enriched_motif_pvalues_CMsubset_v1.rds'))
+  motif.mat = readRDS( file = paste0(RdataDir, 'enriched_motif_pvalues_subtypes', celltype_sel,
+                                     '_v2.rds'))
   
   motif.mat = -log10(motif.mat)
-  
   rownames(motif.mat) = motif_tf$name[match(rownames(motif.mat), motif_tf$motif)]
   
-  maxs = apply(motif.mat, 1, max)
-  o1 = order(-maxs)
+  source('functions_scATAC.R')
+  mat = binarySort_enrichedMotif(mat = motif.mat, cutOff = 10, ntop = 20)
   
-  motif.mat = motif.mat[o1, ]
-  
-  #cat(length(which(maxs>10)), ' enrichment motifs \n')
-  
-  ntop.per.group = 10
-  kk = c()
-  for(n in 1:ncol(motif.mat))
-  {
-    # n = 1
-    test = motif.mat[order(-motif.mat[,n]), ]
-    test = test[1:ntop.per.group, ]
-    kk = c(kk, match(rownames(test), rownames(motif.mat)))  
-    
-  }
-  
-  kk = unique(kk)
-  
-  res = motif.mat[kk, ]
-  
-  max.limit = 40
-  res[which(res>max.limit)] = max.limit
-  
-  pheatmap(res, 
-           cluster_rows=TRUE,
+  pheatmap(mat, 
+           cluster_rows=FALSE,
            #cutree_rows = 6,
            show_rownames=TRUE, 
            fontsize_row = 8,
@@ -780,11 +756,11 @@ for(celltype_sel in c('CM', 'EC', 'FB'))
            color = ArchR::paletteContinuous(set = "comet", n = 100),
            show_colnames = TRUE,
            #scale = 'row',
-           cluster_cols=TRUE, 
+           cluster_cols=FALSE, 
            #annotation_col=df,
            #gaps_col = gaps_col,
            legend = TRUE,
-           treeheight_row = 15,
+           #treeheight_row = 15,
            annotation_legend = FALSE, 
            #annotation_colors = annot_colors,
            #clustering_callback = callback,
@@ -794,9 +770,8 @@ for(celltype_sel in c('CM', 'EC', 'FB'))
            #breaks = seq(-range, range, length.out = 20),
            #gaps_row =  c(22, 79),
            legend_labels = FALSE,
-           width = 5, height = 12, 
-           filename = paste0(resDir, '/heatmap_enrichmentMotifs_CMsubset_v1.pdf'))
-  
+           width = 10, height = 4, 
+           filename = paste0(resDir, '/heatmap_enrichmentMotifs_subtypes', celltype_sel, '_v2.pdf'))
   
 }
 
