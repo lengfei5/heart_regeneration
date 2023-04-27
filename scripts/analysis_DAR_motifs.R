@@ -595,6 +595,12 @@ Idents(aa) = aa$celltypes
 
 motif_tf = readRDS(file = paste0(RdataDir, 'motif_to_tfs_pfm_JASPAR2020_CORE_vertebrate_v1.rds'))
 chromvar = readRDS(file = paste0(RdataDir, 'atac_seuratObject_motifClass_chromVAR_v3.rds'))
+DefaultAssay(chromvar) <- 'chromvar'
+ss = colSums(chromvar@assays$chromvar@data)
+length(which(is.na(ss)))
+data = chromvar@assays$chromvar@data
+data[which(is.na(data))] = 0
+chromvar@assays$chromvar@data = data
 
 ##########################################
 # the CM, machropage, FB
@@ -772,4 +778,8 @@ for(celltype_sel in c('EC', 'FB', 'Mo.Macs', 'Neu', 'RBC'))
   
 }
 
-
+mtf = 'RUNX'
+DefaultAssay(sub_chrom) <- 'chromvar'
+motif_tf[grep(mtf, motif_tf$tf), ]
+feature = motif_tf$motif[grep(mtf, motif_tf$tf)]
+FeaturePlot(sub_chrom, features = feature, min.cutoff = 'q5', max.cutoff = 'q95')

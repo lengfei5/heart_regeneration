@@ -957,12 +957,12 @@ FeaturePlot(MF_subset, c("G2M.Score", "S.Score"))
 
 s.genes.new <- c()
 for (i in s.genes) {
-  s.genes.new <-c(s.genes.new, rownames(Ery_subset)[grep(i, rownames(Ery_subset))])
+  s.genes.new <-c(s.genes.new, rownames(CM_subset)[grep(i, rownames(CM_subset))])
 }
 
 g2m.genes.new <- c()
 for (i in g2m.genes) {
-  g2m.genes.new <-c(g2m.genes.new, rownames(Ery_subset)[grep(i, rownames(Ery_subset))])
+  g2m.genes.new <-c(g2m.genes.new, rownames(CM_subset)[grep(i, rownames(CM_subset))])
 }
 
 RidgePlot(aa_sub, group.by = "Phase", features = c("TOP2A-AMEX60DD010148"), ncol = 2)
@@ -1233,7 +1233,7 @@ for (i in g2m.genes) {
   g2m.genes.new <-c(g2m.genes.new, rownames(aa)[grep(i, rownames(aa))])
 }
 
-Ery_subset <- CellCycleScoring(Ery_subset, s.features = s.genes.new, g2m.features = g2m.genes.new, set.ident = TRUE)
+aa <- CellCycleScoring(aa, s.features = s.genes.new, g2m.features = g2m.genes.new, set.ident = TRUE)
 
 
 Ery_subset <- ScaleData(Ery_subset, vars.to.regress = c("S.Score", "G2M.Score"), features = rownames(Ery_subset))
@@ -3380,9 +3380,20 @@ head(PseudobulkExpression(CM_subset, slot = "counts", assays = "RNA"))
 
 
 ######
-features = rownames(aa)[grep('FYB1', rownames(aa))]
+features = rownames(aa)[grep('CSPG4', rownames(aa))]
 FeaturePlot(aa, features = features, order = TRUE, cols = c("#dee2e6", "#661CB0"))
+
+features = rownames(CM_subset)[grep('AMEX60DD045581', rownames(CM_subset))]
+FeaturePlot(CM_subset, features = features, order = TRUE, cols = c("#dee2e6", "#661CB0"))
+
+features = rownames(EC)[grep('AMEX60DD003894', rownames(EC))]
+FeaturePlot(EC, features = features, order = TRUE, cols = c("#dee2e6", "#661CB0"))
+
 VlnPlot(CM_subset, features = features)
+
+
+features = rownames(CM_subset)[grep('MYH', rownames(aa))]
+DoHeatmap(subset(CM_subset, downsample = 100), features = features, size = 3)
 
 ## view specific cells dimplot
 DimPlot(aa, cells = names(aa$condition)[aa$condition == "Amex_scRNA_d0"])
@@ -3393,11 +3404,115 @@ for (i in levels(aa$condition)) {
   number_cluster <- rbind(number_cluster, summary(aa$subtypes[names(aa$condition)[aa$condition == i]]) )
 }
 
-rownames(number_cluster) <- levels(aa$condition)
+rownames(number_cluster) <- levels(CM_subset$condition)
 
+number_cluster <- c()
+
+for (i in levels(CM_subset$condition)) {
+  number_cluster <- cbind(number_cluster, summary(CM_subset$subtypes[names(CM_subset$condition)[CM_subset$condition == i]]) )
+}
+
+
+###########
+
+CM_subset <- subset(aa,  subtypes %in%  c(  "CM_ven_(Robo2)", "CM_ven_(Cav3_1)"))
+CM_subset$subtypes -> Idents(CM_subset)
+DimPlot(CM_subset)
+
+
+CM_subset <- FindVariableFeatures(CM_subset, selection.method = "vst", nfeatures = 2000)
+
+all.genes <- rownames(CM_subset)
+CM_subset <- ScaleData(CM_subset, features = all.genes)
+
+CM_subset <- RunPCA(CM_subset, features = VariableFeatures(object = CM_subset))
+
+CM_subset <- FindNeighbors(CM_subset, dims = 1:10)
+
+
+#CM_subset <- FindClusters(CM_subset, resolution = 0.3)
+CM_subset$subtypes -> Idents(CM_subset)
+
+CM_subset <- RunUMAP(CM_subset, dims = 1:10)
+
+CM_subset_marker <- FindAllMarkers(CM_subset, min.pct = 0.4, min.diff.pct = 0.2)
+
+CM_subset$subtypes -> Idents(CM_subset)
+
+CM_IS_VS_ROBO2 <- FindMarkers(aa, ident.1 = "CM_IS", ident.2 = c("CM_ven_(Robo2)"), min.pct = 0.4, min.diff.pct = 0.2)
+
+CMmyLevels <- c(  "CM_ven_(Robo2)", "CM_ven_(Cav3_1)", "CM_IS","CM_Prol_IS", "CM_Prol_1", "CM_Prol_3")
+
+#########
+CM_subset1 <- subset(aa,  subtypes %in%  c(  "CM_PM_(HCN4)", "CM_OFT","CM_Atria","CM_ven_(Robo2)", "CM_ven_(Cav3_1)"))
+DimPlot(CM_subset)
+CM_subset$subtypes -> Idents(CM_subset)
+
+CM_subset1 <- FindVariableFeatures(CM_subset1, selection.method = "vst", nfeatures = 2000)
+
+all.genes <- rownames(CM_subset1)
+CM_subset1 <- ScaleData(CM_subset1, features = all.genes)
+
+CM_subset1 <- RunPCA(CM_subset1, features = VariableFeatures(object = CM_subset1))
+
+CM_subset1 <- FindNeighbors(CM_subset1, dims = 1:10)
+
+
+
+CM_subset1 <- RunUMAP(CM_subset, dims = 1:10)
+
+DimPlot(CM_subset, split.by = "condition", group.by = "Phase", cols = c("#e5e5e5", "#ed7306", "#671bb2"))
+
+FeaturePlot(CM_subset, features = "S.Score", order = TRUE, cols = c("#dee2e6", "#661CB0"))
+
+
+######### CM_subset thresholding for cell cycle scoring
+
+CM_subset$True_G2M <- 1*(CM_subset$G2M.Score>0.2)
+CM_subset$True_G2M[CM_subset$True_G2M == 0] <- "Other"
+CM_subset$True_G2M[CM_subset$True_G2M == 1] <- "G2M"
+DimPlot(CM_subset, split.by = "condition", group.by = "True_G2M", cols = c("#661CB0", "#dee2e6"))
+table(data.frame(CM_subset$True_G2M, CM_subset$condition))
+
+CM_subset$True_S <- 1*(CM_subset$S.Score>0.13)
+CM_subset$True_S[CM_subset$True_S == 0] <- "Other"
+CM_subset$True_S[CM_subset$True_S == 1] <- "S_Phase"
+DimPlot(CM_subset, split.by = "condition", group.by = "True_S", cols = c("#dee2e6", "#661CB0"))
+table(data.frame(CM_subset$True_S, CM_subset$condition))
+
+hist(CM_subset$G2M.Score, breaks = 60)
+hist(CM_subset$S.Score, breaks = 60)
+
+hist(aa$G2M.Score, breaks = 60)
+hist(aa$S.Score, breaks = 60)
+
+
+G2MPhaser <- function (G2M_Scores,S_Scores,G2M_Thresh=0, S_Thresh=0) {
+  PhaseName <- rep('Other',length(G2M_Scores))
+  PhaseName[(S_Scores > S_Thresh ) & (S_Scores > G2M_Scores)] <- 'S'
+  PhaseName[(G2M_Scores > G2M_Thresh ) & (S_Scores < G2M_Scores)] <- 'G2M'
+  return(PhaseName)
+}
+
+
+CM_subset$Phase_threshold <- G2MPhaser(CM_subset$G2M.Score,CM_subset$S.Score,0.22,0.13)
+names(CM_subset$Phase_threshold) <- Cells(CM_subset)
+DimPlot(CM_subset, group.by = "Phase_threshold", cols = c("#ed7306", "#e5e5e5", "#671bb2"), split.by = "condition")
+
+aa$Phase_threshold <- G2MPhaser(aa$G2M.Score,aa$S.Score,0.22,0.13)
+names(aa$Phase_threshold) <- Cells(aa)
+DimPlot(aa, group.by = "Phase_threshold", cols = c("#ed7306", "#e5e5e5", "#671bb2"))
+
+table(CM_subset$Phase_threshold)
+#######
+
+
+
+### to get values in a table such as counting the number of cells per class
+table(data.frame(CM_subset$Phase, CM_subset$condition))
 
 ## saverds
 saveRDS(aa1, "/groups/tanaka/Collaborations/Jingkui-Elad/scMultiome/aa_subtypes_final_20221117.rds")
 
-write.csv(number_cluster, "/groups/tanaka/People/current/Elad/number_of_clusters_for_deconv.csv", quote = F)
+write.csv(Markers, "/groups/tanaka/People/current/Elad/Prol_CM_markers.csv", quote = F)
 
