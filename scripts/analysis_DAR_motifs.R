@@ -449,6 +449,15 @@ aa = readRDS(file = paste0(RdataDir, 'atac_seuratObject_motifClass_chromVAR_v3.r
 aa = subset(aa, cells = colnames(srat_cr))
 #aa = srat_cr
 
+PLOT_chromVar_example = FALSE
+if(PLOT_chromVar_example){
+  DefaultAssay(aa) <- 'chromvar'
+  motif_tf[grep('SMAD', motif_tf$tf), ]
+  feature = motif_tf$motif[grep('SMAD', motif_tf$tf)]
+  FeaturePlot(aa, features = feature, min.cutoff = 'q5', max.cutoff = 'q95')
+  
+}
+
 aa$celltypes = srat_cr$celltypes[match(colnames(aa), colnames(srat_cr))]
 
 ## motif enrichment analysis by groups
@@ -584,15 +593,6 @@ DefaultAssay(aa) <- 'ATAC'
 aa = subset(aa, cells = colnames(aa)[which(aa$celltypes != 'Neuronal')])
 Idents(aa) = aa$celltypes
 
-PLOT_chromVar_example = FALSE
-if(PLOT_chromVar_example){
-  DefaultAssay(aa) <- 'chromvar'
-  motif_tf[grep('SMAD', motif_tf$tf), ]
-  feature = motif_tf$motif[grep('SMAD', motif_tf$tf)]
-  FeaturePlot(aa, features = feature, min.cutoff = 'q5', max.cutoff = 'q95')
-  
-}
-
 motif_tf = readRDS(file = paste0(RdataDir, 'motif_to_tfs_pfm_JASPAR2020_CORE_vertebrate_v1.rds'))
 chromvar = readRDS(file = paste0(RdataDir, 'atac_seuratObject_motifClass_chromVAR_v3.rds'))
 
@@ -601,7 +601,7 @@ chromvar = readRDS(file = paste0(RdataDir, 'atac_seuratObject_motifClass_chromVA
 ##########################################
 for(celltype_sel in c('EC', 'FB', 'Mo.Macs', 'Neu', 'RBC'))
 {
-  # celltype_sel = 'CM'
+  # celltype_sel = 'FB'
   
   sub_obj =subset(aa, cells = colnames(aa)[which(aa$celltypes == celltype_sel)])
   sub_obj$subtypes = droplevels(sub_obj$subtypes)
@@ -734,7 +734,7 @@ for(celltype_sel in c('EC', 'FB', 'Mo.Macs', 'Neu', 'RBC'))
   saveRDS(motif.mat, file = paste0(RdataDir, 'enriched_motif_pvalues_subtypes', celltype_sel,
                                    '_v2.rds'))
   
-  motif.mat = readRDS( file = paste0(RdataDir, 'enriched_motif_pvalues_subtypes', celltype_sel,
+  motif.mat = readRDS(file = paste0(RdataDir, 'enriched_motif_pvalues_subtypes', celltype_sel,
                                      '_v2.rds'))
   
   motif.mat = -log10(motif.mat)
