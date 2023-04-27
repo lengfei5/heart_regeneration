@@ -32,7 +32,6 @@ library(data.table)
 source('functions_scATAC.R')
 library(ArchR)
 
-
 library(JASPAR2020)
 library(TFBSTools)
 library(chromVAR)
@@ -343,7 +342,6 @@ DefaultAssay(srat_cr) <- 'ATAC'
 srat_cr = subset(srat_cr, cells = colnames(srat_cr)[which(srat_cr$celltypes != 'Neuronal')])
 Idents(srat_cr) = srat_cr$celltypes
 
-
 ##########################################
 # DA analysis either using FindAllMarkers or FindMarkers 
 ##########################################
@@ -498,7 +496,7 @@ motif.mat = -log10(motif.mat)
 
 rownames(motif.mat) = motif_tf$name[match(rownames(motif.mat), motif_tf$motif)]
 
-mat = binarySort_enrichedMotif(mat = motif.mat, cutOff = 10)
+mat = binarySort_enrichedMotif(mat = motif.mat, cutOff = 10, ntop = 20)
 pheatmap(mat, 
          cluster_rows=FALSE,
          #cutree_rows = 6,
@@ -524,7 +522,7 @@ pheatmap(mat,
          #gaps_row =  c(22, 79),
          legend_labels = FALSE,
          width = 10, height = 4, 
-         filename = paste0(resDir, '/heatmap_enrichmentMotifs_v3.pdf'))
+         filename = paste0(resDir, '/heatmap_enrichmentMotifs_v4.pdf'))
 
 
 ##########################################
@@ -596,15 +594,14 @@ if(PLOT_chromVar_example){
 }
 
 motif_tf = readRDS(file = paste0(RdataDir, 'motif_to_tfs_pfm_JASPAR2020_CORE_vertebrate_v1.rds'))
-
 chromvar = readRDS(file = paste0(RdataDir, 'atac_seuratObject_motifClass_chromVAR_v3.rds'))
 
 ##########################################
 # the CM, machropage, FB
 ##########################################
-for(celltype_sel in c('CM', 'EC', 'FB'))
+for(celltype_sel in c('EC', 'FB', 'Mo.Macs', 'Neu', 'RBC'))
 {
-  celltype_sel = 'CM'
+  # celltype_sel = 'CM'
   
   sub_obj =subset(aa, cells = colnames(aa)[which(aa$celltypes == celltype_sel)])
   sub_obj$subtypes = droplevels(sub_obj$subtypes)
