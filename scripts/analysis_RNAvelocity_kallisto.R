@@ -59,7 +59,6 @@ aa$time = gsub('Amex_scRNA_', '', aa$condition)
 aa$cell.ids = sapply(colnames(aa), function(x) unlist(strsplit(as.character(x), '-'))[1]) 
 aa$cell.ids = paste0(aa$cell.ids, '_', aa$time)
 
-
 levels = c("Amex_scRNA_d0", "Amex_scRNA_d1",
            "Amex_scRNA_d4", "Amex_scRNA_d7", 
            "Amex_scRNA_d14")
