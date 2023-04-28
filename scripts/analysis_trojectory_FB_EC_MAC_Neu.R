@@ -108,38 +108,48 @@ sub_obj = subset(aa, cells = colnames(aa)[which(aa$celltypes == celltype_sel)])
 sub_obj$subtypes = droplevels(sub_obj$subtypes)
 
 ## Endothecial cells are many and look pretty clear for the trajectory
-if(celltype_sel == 'EC'){
-  ref =  readRDS(file = paste0("/groups/tanaka/Collaborations/Jingkui-Elad/scMultiome/", 
-                               "EC_subset_final_20221117.rds"))
+ref =  readRDS(file = paste0("/groups/tanaka/Collaborations/Jingkui-Elad/scMultiome/", 
+                             "EC_subset_final_20221117.rds"))
+
+mm = match(colnames(sub_obj), colnames(ref))
+cat(length(which(is.na(mm))), ' cells without updated subtypes \n')
+cat(length(which(is.na(match(colnames(ref), colnames(sub_obj))))), 
+    ' cells filtered in the scATAC analysis\n')
+
+cells_keep = colnames(sub_obj)[which(!is.na(mm))]
+mm = mm[which(!is.na(mm))]
+
+sub_obj = subset(sub_obj, cells = cells_keep)
+sub_obj$subtypes = ref$subtypes[mm]
+
+sub_obj$subtypes = droplevels(sub_obj$subtypes)
+
+ECmyLevels <- c("EC", "EC_(NOS3)","EC_(WNT4)","EC_(LHX6)",  
+                "EC_(CEMIP)","EC_Prol", "EC_IS_(LOX)","EC_IS_(IARS1)","EC_IS_Prol")
+
+#factor(Idents(sub_obj, levels= ECmyLevels))
+Idents(sub_obj) <- factor(sub_obj$subtypes, levels= ECmyLevels)
+
+DimPlot(ref, group.by = 'subtypes')
+
+umap.embedding = ref@reductions$umap@cell.embeddings
+umap.embedding = umap.embedding[match(colnames(sub_obj), rownames(umap.embedding)), ]
+
+sub_obj[['umap']] = Seurat::CreateDimReducObject(embeddings=umap.embedding,
+                                                 key='UMAP_',
+                                                 assay='RNA')
+rm(umap.embedding)
+DefaultAssay(sub_obj) <- 'RNA'
+
+subtype_version = '_4subtypes'
+
+refine_subpopulation_for_trajectory = TRUE
+if(refine_subpopulation_for_trajectory){
   
-  mm = match(colnames(sub_obj), colnames(ref))
-  cat(length(which(is.na(mm))), ' cells without updated subtypes \n')
-  cat(length(which(is.na(match(colnames(ref), colnames(sub_obj))))), 
-      ' cells filtered in the scATAC analysis\n')
-  
-  cells_keep = colnames(sub_obj)[which(!is.na(mm))]
-  mm = mm[which(!is.na(mm))]
-  
-  sub_obj = subset(sub_obj, cells = cells_keep)
-  sub_obj$subtypes = ref$subtypes[mm]
+  subtypes_sel = c("EC", "EC_IS_(IARS1)", "EC_IS_(LOX)", "EC_IS_Prol")
+  sub_obj = subset(sub_obj,  cells = colnames(sub_obj)[which(!is.na(match(sub_obj$subtypes, subtypes_sel)))])
   
   sub_obj$subtypes = droplevels(sub_obj$subtypes)
-  
-  ECmyLevels <- c("EC", "EC_(NOS3)","EC_(WNT4)","EC_(LHX6)",  
-                  "EC_(CEMIP)","EC_Prol", "EC_IS_(LOX)","EC_IS_(IARS1)","EC_IS_Prol")
-  
-  #factor(Idents(sub_obj, levels= ECmyLevels))
-  Idents(sub_obj) <- factor(sub_obj$subtypes, levels= ECmyLevels)
-  
-  DimPlot(ref, group.by = 'subtypes')
-  
-  umap.embedding = ref@reductions$umap@cell.embeddings
-  umap.embedding = umap.embedding[match(colnames(sub_obj), rownames(umap.embedding)), ]
-  
-  sub_obj[['umap']] = Seurat::CreateDimReducObject(embeddings=umap.embedding,
-                                                   key='UMAP_',
-                                                   assay='RNA')
-  rm(umap.embedding)
   
   ## redo the clustering in case needed in the downstream analysis
   sub_obj <- FindVariableFeatures(sub_obj, selection.method = "vst", nfeatures = 2000)
@@ -148,21 +158,34 @@ if(celltype_sel == 'EC'){
                     verbose = FALSE)
   ElbowPlot(sub_obj, ndims = 50)
   
-  sub_obj <- FindNeighbors(sub_obj, dims = 1:30)
-  sub_obj <- FindClusters(sub_obj, verbose = FALSE, algorithm = 3, resolution = 0.5)
+  sub_obj <- RunUMAP(sub_obj, dims = 1:20, n.neighbors = 30, min.dist = 0.1)
   
-  p1 = DimPlot(sub_obj, label = TRUE, group.by = 'subtypes',  repel = TRUE) + NoLegend()
-  p2 = DimPlot(sub_obj, label = TRUE, repel = TRUE, group.by = 'seurat_clusters', raster=FALSE)
+  DimPlot(sub_obj, group.by = 'subtypes', label = TRUE, repel = TRUE)
   
-  p1 + p2
-  
-  sub_obj$time = gsub('d', '', sub_obj$time)
-  sub_obj$clusters = sub_obj$seurat_clusters
-  
-  ggsave(filename = paste0(outDir, '/multiome_snRNA_scATAC_subset_', celltype_sel, '_reclustered.pdf'), 
-         height = 5, width = 14)
+}else{
+  ## redo the clustering in case needed in the downstream analysis
+  sub_obj <- FindVariableFeatures(sub_obj, selection.method = "vst", nfeatures = 2000)
+  sub_obj <- ScaleData(sub_obj)
+  sub_obj <- RunPCA(sub_obj, features = VariableFeatures(object = sub_obj), weight.by.var = TRUE, 
+                    verbose = FALSE)
+  ElbowPlot(sub_obj, ndims = 50)
   
 }
+
+sub_obj <- FindNeighbors(sub_obj, dims = 1:20)
+sub_obj <- FindClusters(sub_obj, verbose = FALSE, algorithm = 3, resolution = 0.3)
+
+p1 = DimPlot(sub_obj, label = TRUE, group.by = 'subtypes',  repel = TRUE) + NoLegend()
+p2 = DimPlot(sub_obj, label = TRUE, repel = TRUE, group.by = 'seurat_clusters', raster=FALSE)
+
+p1 + p2
+
+sub_obj$time = gsub('d', '', sub_obj$time)
+sub_obj$clusters = sub_obj$seurat_clusters
+
+ggsave(filename = paste0(outDir, '/multiome_snRNA_scATAC_subset_', celltype_sel, subtype_version,
+                         '_reclustered.pdf'), 
+       height = 5, width = 14)
 
 DefaultAssay(sub_obj) <- 'RNA'
 p1 = DimPlot(sub_obj, label = TRUE, group.by = 'subtypes',  repel = TRUE) + NoLegend()
@@ -172,14 +195,14 @@ p2 = DimPlot(sub_obj, label = TRUE, reduction = 'umap_topics',
              group.by = 'subtypes',  repel = TRUE) + NoLegend()
 p1 + p2
 
-ggsave(filename = paste0(outDir, '/multiome_snRNA_scATAC_subset_', celltype_sel, '.pdf'), 
+ggsave(filename = paste0(outDir, '/multiome_snRNA_scATAC_subset_', celltype_sel,  subtype_version, '.pdf'), 
        height = 6, width = 14)
-
 
 DefaultAssay(sub_obj) <- 'RNA'
 DimPlot(sub_obj, label = TRUE, group.by = 'subtypes', split.by = 'condition', repel = TRUE) + NoLegend()
 
-ggsave(filename = paste0(outDir, '/multiome_snRNA_scATAC_subset_', celltype_sel, '_bytimePoint.pdf'), 
+ggsave(filename = paste0(outDir, '/multiome_snRNA_scATAC_subset_', celltype_sel, subtype_version, 
+                         '_bytimePoint.pdf'), 
        height = 5, width = 20)
 
 
@@ -187,6 +210,9 @@ ggsave(filename = paste0(outDir, '/multiome_snRNA_scATAC_subset_', celltype_sel,
 # preapre the spliced and unspliced matrix   
 ##########################################
 DefaultAssay(sub_obj) = 'RNA'
+
+saveRDS(sub_obj, file = paste0(outDir, 'seuratObj_multiome_snRNA_scATAC_',  celltype_sel, subtype_version, 
+                               '.rds'))
 
 source('utility_velocity.R')
 # process_spliced_unspliced_kallisto(aa)
@@ -196,12 +222,118 @@ Idents(mnt) = mnt$condition
 mnt = subset(mnt, downsample = 2000)
 
 saveFile = paste0('RNAmatrix_umap_kalisto.velocity_spliced_unspliced_',
-                  'EC_subtypes.all_timepoints.all_downsample.10k.h5Seurat')
+                  'EC_subtypes_4subtypes_timepoints.all_downsample.10k.h5Seurat')
 
 SaveH5Seurat(mnt, filename = paste0(outDir, saveFile), 
              overwrite = TRUE)
 Convert(paste0(outDir, saveFile), 
         dest = "h5ad", overwrite = TRUE)
+
+
+##########################################
+# 3D DM to visualize the trajectory
+##########################################
+library(slingshot, quietly = FALSE)
+library(destiny, quietly = TRUE)
+library(mclust, quietly = TRUE)
+library(scater)
+library(SingleCellExperiment)
+library(scran)
+library(RColorBrewer)
+
+DefaultAssay(sub_obj) = 'RNA'
+sub_obj_diet = DietSeurat(sub_obj, 
+                          counts = TRUE, 
+                          data = TRUE,
+                          scale.data = TRUE,
+                          features = rownames(sub_obj), 
+                          assays = c('RNA'), 
+                          dimreducs = c('umap'), 
+                          graphs = NULL, 
+                          misc = TRUE)
+sce = as.SingleCellExperiment(sub_obj_diet)
+
+rm(sub_obj_diet)
+
+dec <- modelGeneVar(sce)
+
+#plot(dec$mean, dec$total, xlab="Mean log-expression", ylab="Variance")
+#curve(metadata(dec)$trend(x), col="blue", add=TRUE)
+
+nb_features = 3000; 
+top.hvgs <- getTopHVGs(dec, n=nb_features)
+
+sce <- runPCA(sce, subset_row=top.hvgs, ncomponents = 100)
+# reducedDimNames(sce)
+ll.pca = reducedDim(sce, 'PCA')[, c(1:50)]
+
+n_neighbors = 100; n_eigs = 50; sigma = 'global';
+
+tic()
+dm <- DiffusionMap(ll.pca, sigma = sigma, k = n_neighbors, n_eigs = n_eigs, distance = 'euclidean')
+toc()
+
+cells = names(dm$DC1)
+metadata = sub_obj@meta.data
+dcs = data.frame(dm@eigenvectors, stringsAsFactors = FALSE)
+
+dcs = dcs[match(rownames(metadata), cells), ]
+
+dcs = as.matrix(dcs)
+
+sub_obj[["DC"]] <- CreateDimReducObject(embeddings = as.matrix(dcs), key = "DC_", assay = DefaultAssay(sub_obj))
+
+rm(metadata)
+
+#sub_obj = RunUMAP(sub_obj, reduction = "DC", dims = 1:30, n.neighbors = 100, min.dist = 0.3, metric = 'euclidean',
+#             reduction.name = "dc_umap")
+#DimPlot(sub_obj, reduction = 'dc_umap', label = TRUE, repel = TRUE, group.by = 'subtypes', raster=FALSE)
+
+## try to make 3d for DC1, DC2 and DC3
+## example from https://plotly-r.com/d-charts.html
+library(plotly)
+dcs = as.data.frame(dcs)
+dcs$subtypes = sub_obj$subtypes[match(rownames(dcs), colnames(sub_obj))]
+dcs$condition = sub_obj$condition[match(rownames(dcs), colnames(sub_obj))]
+
+
+plot_ly(data.frame(dcs), x = ~DC1, y = ~DC2, z = ~DC4, size = 3) %>%
+  add_markers(color = ~ subtypes)
+
+plot_ly(data.frame(dcs), x = ~DC2, y = ~DC3, z = ~DC4, size = 3) %>%
+  add_markers(color = ~ subtypes)
+
+plot_ly(data.frame(dcs), x = ~DC1, y = ~DC2, z = ~DC3, size = 3) %>%
+  add_markers(color = ~ subtypes)
+
+p1 = DimPlot(sub_obj, reduction = 'DC', dims = c(1, 2), cols = cols)
+p2 = DimPlot(sub_obj, reduction = 'DC', dims = c(1, 3), cols = cols)
+p3 = DimPlot(sub_obj, reduction = 'DC', dims = c(1, 4), cols = cols)
+p1 / p2 / p3
+
+DimPlot(sub_obj, reduction = 'DC', dims = c(2, 3), label = TRUE, repel = TRUE,
+        group.by = 'subtypes')
+
+DimPlot(sub_obj, reduction = 'DC', dims = c(1, 2), label = TRUE, repel = TRUE,
+        group.by = 'subtypes')
+
+
+p1 = DimPlot(sub_obj, reduction = 'DC', dims = c(1, 2), label = TRUE, repel = TRUE,
+             group.by = 'subtypes')
+p2 = DimPlot(sub_obj, reduction = 'DC', dims = c(1, 3), label = TRUE, repel = TRUE,
+             group.by = 'subtypes')
+
+p1 / p2
+
+ggsave(filename = paste0(outDir, 'trajectory_test_DM_CM_subtypes.no.prol1.prol3_timepoints.all.pdf'), 
+       width = 8, height = 16)
+
+DimPlot(sub_obj, reduction = 'DC', dims = c(2, 3), label = TRUE, repel = TRUE,
+        group.by = 'subtypes')
+
+save(sub_obj, dcs, file = paste0(RdataDir, 
+                            'trajectory_test_DM_CM_subtypes.no.prol1.prol3_timepoints.all.Rdata'))
+
 
 
 
