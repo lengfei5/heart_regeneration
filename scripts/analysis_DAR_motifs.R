@@ -345,55 +345,59 @@ Idents(srat_cr) = srat_cr$celltypes
 ##########################################
 # DA analysis either using FindAllMarkers or FindMarkers 
 ##########################################
-for(pct_cutoff in  c(0.04, 0.03))
-{
-  pct_cutoff = 0.04
-  cat('pct cutoff --- ', pct_cutoff, '---\n')
-  da_peaks <- FindAllMarkers(
-    object = srat_cr,
-    #ident.1 = cc,
-    #ident.2 = ,
-    min.pct = pct_cutoff,
-    test.use = 'LR',
-    latent.vars = 'atac_peak_region_fragments'
+Identify_DAR_withFindMarker = FALSE
+if(Identify_DAR_withFindMarker){
+  for(pct_cutoff in  c(0.04, 0.03))
+  {
+    pct_cutoff = 0.04
+    cat('pct cutoff --- ', pct_cutoff, '---\n')
+    da_peaks <- FindAllMarkers(
+      object = srat_cr,
+      #ident.1 = cc,
+      #ident.2 = ,
+      min.pct = pct_cutoff,
+      test.use = 'LR',
+      latent.vars = 'atac_peak_region_fragments'
+      
+    )
+    saveRDS(da_peaks, file = paste0(RdataDir, 'DAR_major.celltype_FindAllMarkers_v4_pct.',
+                                    pct_cutoff, '.rds'))
     
-  )
-  saveRDS(da_peaks, file = paste0(RdataDir, 'DAR_major.celltype_FindAllMarkers_v4_pct.',
-                                  pct_cutoff, '.rds'))
-  
-  ## too much time consuming 
-  # clusters = unique(srat_cr$celltypes)
-  # da_peaks = c()
-  # for(n in 1:length(clusters))
-  # {
-  #   # n = 6; m = 7
-  #   for(m in setdiff(1:length(clusters), n))
-  #   {
-  #     cat(clusters[n], ' vs. ', clusters[m], '\n')
-  #     
-  #     da_test <- FindMarkers(
-  #       object = srat_cr,
-  #       ident.1 = clusters[n],
-  #       ident.2 = clusters[m],
-  #       min.pct = pct_cutoff,
-  #       test.use = 'LR', 
-  #       latent.vars = 'atac_peak_region_fragments'
-  #     )
-  #     
-  #     da_test$cluster = clusters[n]
-  #     da_test$gene = rownames(da_test)
-  #     da_peaks = rbind(da_peaks, da_test)
-  #     
-  #   }
+    ## too much time consuming 
+    # clusters = unique(srat_cr$celltypes)
+    # da_peaks = c()
+    # for(n in 1:length(clusters))
+    # {
+    #   # n = 6; m = 7
+    #   for(m in setdiff(1:length(clusters), n))
+    #   {
+    #     cat(clusters[n], ' vs. ', clusters[m], '\n')
+    #     
+    #     da_test <- FindMarkers(
+    #       object = srat_cr,
+    #       ident.1 = clusters[n],
+    #       ident.2 = clusters[m],
+    #       min.pct = pct_cutoff,
+    #       test.use = 'LR', 
+    #       latent.vars = 'atac_peak_region_fragments'
+    #     )
+    #     
+    #     da_test$cluster = clusters[n]
+    #     da_test$gene = rownames(da_test)
+    #     da_peaks = rbind(da_peaks, da_test)
+    #     
+    #   }
     
-  #}
-  #saveRDS(da_peaks, file = paste0(RdataDir, 'DAR_major.celltype_FindMarkers_subtypes.one.vs.one_v4_pct.',
-  #                                pct_cutoff, '.rds'))
+    #}
+    #saveRDS(da_peaks, file = paste0(RdataDir, 'DAR_major.celltype_FindMarkers_subtypes.one.vs.one_v4_pct.',
+    #                                pct_cutoff, '.rds'))
+    
+  }
   
+  #da_xx = readRDS(file = paste0(RdataDir, 'DAR_major.elltype_v3.rds'))
+  #da_peaks = readRDS(file = paste0(RdataDir, 'DAR_major.celltype_v2.rds'))
 }
 
-#da_xx = readRDS(file = paste0(RdataDir, 'DAR_major.elltype_v3.rds'))
-#da_peaks = readRDS(file = paste0(RdataDir, 'DAR_major.celltype_v2.rds'))
 
 da_peaks = readRDS(file = paste0(RdataDir, 'DAR_major.celltype_FindAllMarkers_v4_pct.0.04.rds'))
 cat(length(unique(da_peaks$gene)), 'unique peaks found \n')
@@ -435,7 +439,12 @@ pheatmap(mat,
          #gaps_row =  c(22, 79),
          legend_labels = FALSE,
          width = 10, height = 4, 
-         filename = paste0(resDir, '/heatmap_DAR_majoy.celltypes_v4.pdf'))
+         filename = paste0(resDir, '/heatmap_DAR_majoy.celltypes_v5.pdf'))
+
+
+FeaturePlot(srat_cr, features = 'atac_peak_region_fragments', reduction = 'umap')
+
+VlnPlot(srat_cr, features = 'nFeature_ATAC', group.by = 'celltypes')
 
 ##########################################
 # motif activities for major cell types
@@ -532,7 +541,6 @@ pheatmap(mat,
          legend_labels = FALSE,
          width = 10, height = 4, 
          filename = paste0(resDir, '/heatmap_enrichmentMotifs_v4.pdf'))
-
 
 ##########################################
 # ChromVar analysis
