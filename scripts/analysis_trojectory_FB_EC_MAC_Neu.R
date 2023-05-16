@@ -15,6 +15,7 @@ RdataDir = paste0(resDir, '/Rdata/')
 
 outDir = paste0('../results/sc_multiome_R13591_intron.exon.20220729', 
                 '/FB_EC_Mac_Neu_trajectory_test/')
+
 system(paste0('mkdir -p ', outDir))
 
 if(!dir.exists(resDir)) dir.create(resDir)
@@ -143,12 +144,18 @@ sub_obj[['umap']] = Seurat::CreateDimReducObject(embeddings=umap.embedding,
 rm(umap.embedding)
 DefaultAssay(sub_obj) <- 'RNA'
 
-subtype_version = '_4subtypes'
+sub_obj = subset(sub_obj, cells = colnames(sub_obj)[which(sub_obj$subtypes != 'EC_(LHX6)')])
+sub_obj$subtypes = droplevels(sub_obj$subtypes)
+
+subtype_version = '_5staticSubtypes'
+
 
 refine_subpopulation_for_trajectory = TRUE
 if(refine_subpopulation_for_trajectory){
   
-  subtypes_sel = c("EC", "EC_IS_(IARS1)", "EC_IS_(LOX)", "EC_IS_Prol")
+  #subtypes_sel = c("EC", "EC_IS_(IARS1)", "EC_IS_(LOX)", "EC_IS_Prol")
+  subtypes_sel = setdiff(unique(sub_obj$subtypes), c("EC_IS_(IARS1)", "EC_IS_(LOX)", "EC_IS_Prol"))
+  
   sub_obj = subset(sub_obj,  cells = colnames(sub_obj)[which(!is.na(match(sub_obj$subtypes, subtypes_sel)))])
   
   sub_obj$subtypes = droplevels(sub_obj$subtypes)
@@ -160,7 +167,7 @@ if(refine_subpopulation_for_trajectory){
                     verbose = FALSE)
   ElbowPlot(sub_obj, ndims = 50)
   
-  sub_obj <- RunUMAP(sub_obj, dims = 1:20, n.neighbors = 30, min.dist = 0.1)
+  sub_obj <- RunUMAP(sub_obj, dims = 1:10, n.neighbors = 30, min.dist = 0.1)
   
   DimPlot(sub_obj, group.by = 'subtypes', label = TRUE, repel = TRUE)
   
@@ -172,9 +179,12 @@ if(refine_subpopulation_for_trajectory){
                     verbose = FALSE)
   ElbowPlot(sub_obj, ndims = 50)
   
+  sub_obj <- RunUMAP(sub_obj, dims = 1:10, n.neighbors = 30, min.dist = 0.1)
+  DimPlot(sub_obj, group.by = 'subtypes', label = TRUE, repel = TRUE)
+  
 }
 
-sub_obj <- FindNeighbors(sub_obj, dims = 1:20)
+sub_obj <- FindNeighbors(sub_obj, dims = 1:10)
 sub_obj <- FindClusters(sub_obj, verbose = FALSE, algorithm = 3, resolution = 0.3)
 
 p1 = DimPlot(sub_obj, label = TRUE, group.by = 'subtypes',  repel = TRUE) + NoLegend()
@@ -213,18 +223,17 @@ ggsave(filename = paste0(outDir, '/multiome_snRNA_scATAC_subset_', celltype_sel,
 ##########################################
 DefaultAssay(sub_obj) = 'RNA'
 
-saveRDS(sub_obj, file = paste0(outDir, 'seuratObj_multiome_snRNA_scATAC_',  celltype_sel, subtype_version, 
-                               '.rds'))
+#saveRDS(sub_obj, file = paste0(outDir, 'seuratObj_multiome_snRNA_scATAC_',  celltype_sel, 
+#                               subtype_version, '.rds'))
 
 source('utility_velocity.R')
-# process_spliced_unspliced_kallisto(aa)
 mnt = preapre_dataFile_for_RNAvelocity_PAGA(seuratObj = sub_obj)
 
 Idents(mnt) = mnt$condition
 mnt = subset(mnt, downsample = 2000)
 
 saveFile = paste0('RNAmatrix_umap_kalisto.velocity_spliced_unspliced_',
-                  'EC_subtypes_4subtypes_timepoints.all_downsample.10k.h5Seurat')
+                  'EC_subtypes', subtype_version, '_timepoints.all_downsample.10k.h5Seurat')
 
 SaveH5Seurat(mnt, filename = paste0(outDir, saveFile), 
              overwrite = TRUE)
@@ -356,34 +365,34 @@ celltype_sel = 'FB'
 sub_obj = subset(aa, cells = colnames(aa)[which(aa$celltypes == celltype_sel)])
 sub_obj$subtypes = droplevels(sub_obj$subtypes)
 
-DimPlot(sub_obj, group.by = 'subtypes', label = TRUE, repel = FALSE)
+DimPlot(sub_obj, reduction = 'umap', group.by = 'subtypes', label = TRUE, repel = FALSE)
 
 DefaultAssay(sub_obj) <- 'RNA'
 
-subtype_version = '_subtypes.3subtypes_timepoints.all'
+subtype_version = '_all.rm.TNC_timepoints.all'
 
 refine_subpopulation_for_trajectory = FALSE
 if(refine_subpopulation_for_trajectory){
   
-  subtypes_sel = c("FB_(PKD1)", "FB_IS_(TFPI2)", "FB_IS_(TNC)")
-  sub_obj = subset(sub_obj,  cells = colnames(sub_obj)[which(!is.na(match(sub_obj$subtypes, subtypes_sel)))])
+  subtypes_sel = c("FB_IS_(TNC)")
+  sub_obj = subset(sub_obj,  cells = colnames(sub_obj)[which(is.na(match(sub_obj$subtypes, subtypes_sel)))])
   
   sub_obj$subtypes = droplevels(sub_obj$subtypes)
   
 }
 
 ## redo the clustering in case needed in the downstream analysis
-sub_obj <- FindVariableFeatures(sub_obj, selection.method = "vst", nfeatures = 2000)
+sub_obj <- FindVariableFeatures(sub_obj, selection.method = "vst", nfeatures = 1000)
 sub_obj <- ScaleData(sub_obj)
 sub_obj <- RunPCA(sub_obj, features = VariableFeatures(object = sub_obj), weight.by.var = TRUE, 
                   verbose = FALSE)
 ElbowPlot(sub_obj, ndims = 50)
 
-sub_obj <- RunUMAP(sub_obj, dims = 1:20, n.neighbors = 30, min.dist = 0.3)
+sub_obj <- RunUMAP(sub_obj, dims = 1:10, n.neighbors = 30, min.dist = 0.3)
 
 DimPlot(sub_obj, group.by = 'subtypes', label = TRUE, repel = TRUE)
 
-sub_obj <- FindNeighbors(sub_obj, dims = 1:20)
+sub_obj <- FindNeighbors(sub_obj, dims = 1:10)
 sub_obj <- FindClusters(sub_obj, verbose = FALSE, algorithm = 3, resolution = 0.3)
 
 p1 = DimPlot(sub_obj, label = TRUE, group.by = 'subtypes',  repel = TRUE) + NoLegend()
@@ -421,9 +430,8 @@ ggsave(filename = paste0(outDir, '/multiome_snRNA_scATAC_subset_', celltype_sel,
 # preapre the spliced and unspliced matrix   
 ##########################################
 DefaultAssay(sub_obj) = 'RNA'
-
-saveRDS(sub_obj, file = paste0(outDir, 'seuratObj_multiome_snRNA_scATAC_',  celltype_sel, subtype_version, 
-                               '.rds'))
+#saveRDS(sub_obj, file = paste0(outDir, 'seuratObj_multiome_snRNA_scATAC_',  celltype_sel, 
+#                               subtype_version, '.rds'))
 
 source('utility_velocity.R')
 # process_spliced_unspliced_kallisto(aa)
@@ -562,15 +570,14 @@ save(sub_obj, dcs, file = paste0(outDir, 'trajectory_test_DM_',
 ########################################################
 celltype_sel = 'myeloid'
 
-sub_obj = subset(aa, cells = colnames(aa)[which(aa$celltypes == 'Mo.Macs'|
-                                                  aa$celltypes == 'Neu')])
+sub_obj = subset(aa, cells = colnames(aa)[which(aa$celltypes == 'Mo.Macs')])
 sub_obj$subtypes = droplevels(sub_obj$subtypes)
 
 DimPlot(sub_obj, group.by = 'subtypes', label = TRUE, repel = FALSE)
 
 DefaultAssay(sub_obj) <- 'RNA'
 
-subtype_version = '_subtypes.all_timepoints.all'
+subtype_version = '_subtypes.Mo.Macs_timepoints.all'
 
 refine_subpopulation_for_trajectory = FALSE
 if(refine_subpopulation_for_trajectory){
@@ -583,14 +590,13 @@ if(refine_subpopulation_for_trajectory){
 }
 
 ## redo the clustering in case needed in the downstream analysis
-sub_obj <- FindVariableFeatures(sub_obj, selection.method = "vst", nfeatures = 2000)
+sub_obj <- FindVariableFeatures(sub_obj, selection.method = "vst", nfeatures = 1000)
 sub_obj <- ScaleData(sub_obj)
 sub_obj <- RunPCA(sub_obj, features = VariableFeatures(object = sub_obj), weight.by.var = TRUE, 
                   verbose = FALSE)
 ElbowPlot(sub_obj, ndims = 50)
 
 sub_obj <- RunUMAP(sub_obj, dims = 1:20, n.neighbors = 30, min.dist = 0.1)
-
 DimPlot(sub_obj, group.by = 'subtypes', label = TRUE, repel = TRUE)
 
 sub_obj <- FindNeighbors(sub_obj, dims = 1:20)
@@ -633,15 +639,15 @@ ggsave(filename = paste0(outDir, '/multiome_snRNA_scATAC_subset_', celltype_sel,
 ##########################################
 DefaultAssay(sub_obj) = 'RNA'
 
-saveRDS(sub_obj, file = paste0(outDir, 'seuratObj_multiome_snRNA_scATAC_',  celltype_sel, subtype_version, 
-                               '.rds'))
+#saveRDS(sub_obj, file = paste0(outDir, 'seuratObj_multiome_snRNA_scATAC_',  celltype_sel, subtype_version, 
+#                               '.rds'))
 
 source('utility_velocity.R')
 # process_spliced_unspliced_kallisto(aa)
 mnt = preapre_dataFile_for_RNAvelocity_PAGA(seuratObj = sub_obj)
 
 Idents(mnt) = mnt$condition
-#mnt = subset(mnt, downsample = 2000)
+mnt = subset(mnt, downsample = 2000)
 
 saveFile = paste0('RNAmatrix_umap_kalisto.velocity_spliced_unspliced_',
                   celltype_sel, subtype_version, '.h5Seurat')

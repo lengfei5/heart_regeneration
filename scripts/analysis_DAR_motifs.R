@@ -579,13 +579,11 @@ FeaturePlot(
   pt.size = 0.1
 ) + ggtitle(paste0(tf_sel, ' -- ', feature))
 
-
 DimPlot(aa, group.by = 'subtypes')
 
-
 ########################################################
 ########################################################
-# Section II: subsets of CM 
+# Section II: subsets of CM, EC, FB and myeloid
 #  
 ########################################################
 ########################################################
@@ -610,14 +608,17 @@ data = chromvar@assays$chromvar@data
 data[which(is.na(data))] = 0
 chromvar@assays$chromvar@data = data
 
+chromvar = subset(chromvar, cells = colnames(aa))
+
+
 ##########################################
 # the CM, machropage, FB
 ##########################################
 for(celltype_sel in c('EC', 'FB', 'Mo.Macs', 'Neu', 'RBC'))
 {
-  # celltype_sel = 'FB'
+  # celltype_sel = 'EC'
   
-  sub_obj =subset(aa, cells = colnames(aa)[which(aa$celltypes == celltype_sel)])
+  sub_obj = subset(aa, cells = colnames(aa)[which(aa$celltypes == celltype_sel)])
   sub_obj$subtypes = droplevels(sub_obj$subtypes)
   
   if(celltype_sel == 'CM'){
@@ -634,7 +635,6 @@ for(celltype_sel in c('EC', 'FB', 'Mo.Macs', 'Neu', 'RBC'))
     sub_obj$subtypes = factor(sub_obj$subtypes, levels = CMmyLevels)
     
   }
-  
   
   DefaultAssay(sub_obj) <- 'RNA'
   p1 = DimPlot(sub_obj, label = TRUE, group.by = 'subtypes',  repel = TRUE) + NoLegend()
@@ -658,6 +658,7 @@ for(celltype_sel in c('EC', 'FB', 'Mo.Macs', 'Neu', 'RBC'))
     test.use = 'LR',
     latent.vars = 'atac_peak_region_fragments'
   )
+  
   saveRDS(da_peaks, file = paste0(RdataDir, 'DAR_subtypes_', celltype_sel, '.rds'))
   
   da_peaks = readRDS(file = paste0(RdataDir, 'DAR_subtypes_', celltype_sel, '.rds'))
@@ -699,7 +700,7 @@ for(celltype_sel in c('EC', 'FB', 'Mo.Macs', 'Neu', 'RBC'))
            #gaps_row =  c(22, 79),
            legend_labels = FALSE,
            width = 10, height = 4, 
-           filename = paste0(resDir, '/heatmap_DAR_subtypes', celltype_sel, '_v4.pdf'))
+           filename = paste0(resDir, '/heatmap_DAR_subtypes_', celltype_sel, '_v4.pdf'))
   
   ##########################################
   # motif activities for major cell types
@@ -707,9 +708,16 @@ for(celltype_sel in c('EC', 'FB', 'Mo.Macs', 'Neu', 'RBC'))
   source('functions_scATAC.R')
   sub_chrom = subset(chromvar, cells = colnames(sub_obj))
   sub_chrom$subtypes = sub_obj$subtypes[match(colnames(sub_chrom), colnames(sub_obj))]
+  mm = match(colnames(sub_chrom), colnames(chromvar))
+  chromvar$subtypes = as.character(chromvar$subtypes)
+  chromvar$subtypes[mm] = as.character(sub_chrom$subtypes)
+  chromvar$subtypes = factor(chromvar$subtypes)
   
   DefaultAssay(sub_chrom) = 'ATAC'
   Idents(sub_chrom) = sub_chrom$subtypes
+  
+  DefaultAssay(chromvar) = 'ATAC'
+  Idents(chromvar) = chromvar$subtypes
   
   ## motif enrichment analysis by groups
   groups = unique(as.character(sub_chrom$subtypes))
@@ -718,9 +726,11 @@ for(celltype_sel in c('EC', 'FB', 'Mo.Macs', 'Neu', 'RBC'))
   colnames(motif.mat) = groups
   rownames(motif.mat) = motif_tf$motif
   
+  motif.mat2 = motif.mat
+  
   for(n in 1:length(groups))
   {
-    # n = 1
+    # n = 6
     cat(n, '--', groups[n], '\n')
     da_peaks <- FindMarkers(
       object = sub_chrom,
@@ -729,27 +739,50 @@ for(celltype_sel in c('EC', 'FB', 'Mo.Macs', 'Neu', 'RBC'))
       only.pos = TRUE,
       test.use = 'LR',
       min.pct = 0.05,
-      latent.vars = 'atac_peak_region_fragments'
+      latent.vars = 'nCount_ATAC'
+      
     )
     
     # get top differentially accessible peaks
     top.da.peak <- rownames(da_peaks[da_peaks$p_val < 0.05, ])
     
-    # test enrichment
     enriched.motifs <- FindMotifs(
       object = sub_chrom,
       features = top.da.peak
+      #features.match = "count"
     )
-    
     motif.mat[,n] = enriched.motifs$pvalue[match(rownames(motif.mat), enriched.motifs$motif)]
+    
+    # ## change the background
+    # da_peaks <- FindMarkers(
+    #   object = chromvar,
+    #   ident.1 = groups[n],
+    #   ident.2 = NULL,
+    #   only.pos = TRUE,
+    #   test.use = 'LR',
+    #   min.pct = 0.05,
+    #   latent.vars = 'nCount_ATAC'
+    #   
+    # )
+    # 
+    # # get top differentially accessible peaks
+    # top.da.peak <- rownames(da_peaks[da_peaks$p_val < 0.05, ])
+    # 
+    # enriched.motifs2 <- FindMotifs(
+    #   object = chromvar,
+    #   features = top.da.peak,
+    #   features.match = "percentile"
+    # )
+    # 
+    # motif.mat2[,n] = enriched.motifs$pvalue[match(rownames(motif.mat2), enriched.motifs2$motif)]
     
   }
   
-  saveRDS(motif.mat, file = paste0(RdataDir, 'enriched_motif_pvalues_subtypes', celltype_sel,
-                                   '_v2.rds'))
+  saveRDS(motif.mat, file = paste0(RdataDir, 'enriched_motif_pvalues_subtypes_', celltype_sel,
+                                   '_v4.rds'))
   
-  motif.mat = readRDS(file = paste0(RdataDir, 'enriched_motif_pvalues_subtypes', celltype_sel,
-                                     '_v2.rds'))
+  motif.mat = readRDS(file = paste0(RdataDir, 'enriched_motif_pvalues_subtypes_', celltype_sel,
+                                     '_v4.rds'))
   
   motif.mat = -log10(motif.mat)
   rownames(motif.mat) = motif_tf$name[match(rownames(motif.mat), motif_tf$motif)]
@@ -757,7 +790,7 @@ for(celltype_sel in c('EC', 'FB', 'Mo.Macs', 'Neu', 'RBC'))
   source('functions_scATAC.R')
   mat = binarySort_enrichedMotif(mat = motif.mat, cutOff = 10, ntop = 20)
   
-  pheatmap(mat, 
+  pheatmap(mat,
            cluster_rows=FALSE,
            #cutree_rows = 6,
            show_rownames=TRUE, 
@@ -782,12 +815,16 @@ for(celltype_sel in c('EC', 'FB', 'Mo.Macs', 'Neu', 'RBC'))
            #gaps_row =  c(22, 79),
            legend_labels = FALSE,
            width = 10, height = 4, 
-           filename = paste0(resDir, '/heatmap_enrichmentMotifs_subtypes', celltype_sel, '_v2.pdf'))
+           filename = paste0(resDir, '/heatmap_enrichmentMotifs_subtypes_', celltype_sel, '_v4.pdf'))
   
 }
 
-mtf = 'RUNX'
-DefaultAssay(sub_chrom) <- 'chromvar'
+mtf = 'FOS_JUN'
+DefaultAssay(chromvar) <- 'chromvar'
 motif_tf[grep(mtf, motif_tf$tf), ]
 feature = motif_tf$motif[grep(mtf, motif_tf$tf)]
-FeaturePlot(sub_chrom, features = feature, min.cutoff = 'q5', max.cutoff = 'q95')
+FeaturePlot(chromvar, features = feature, min.cutoff = 'q1', max.cutoff = 'q99', reduction = 'umap')
+
+FeaturePlot(aa, features = '')
+DimPlot(chromvar, reduction = 'umap', group.by = 'subtypes', label = TRUE, repel = TRUE) + NoLegend()
+
