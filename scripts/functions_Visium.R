@@ -1716,7 +1716,7 @@ run_misty_colocalization_analysis = function(st,
     {
       for(segment in c('all', 'BZ', 'Remote'))
       {
-        # assay_label = 'RCTD_density'
+        # assay_label = 'RCTD_density'; segment = 'all'
         cat(' --- selected assay ', assay_label, '; selected region ', segment, '---\n')
         
         slide_id = slice
@@ -1763,6 +1763,8 @@ run_misty_colocalization_analysis = function(st,
         mistyR::plot_interaction_communities(misty_res_slide, "para_15", cutoff = 0.5)
         
         dev.off()
+        
+        
         
       }
      
