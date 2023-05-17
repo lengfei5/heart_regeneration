@@ -38,6 +38,7 @@ library(chromVAR)
 
 library(pryr) # monitor the memory usage
 require(ggplot2)
+library(viridis)
 require(dplyr)
 require(stringr)
 require(tidyr)
@@ -62,7 +63,6 @@ granges_axolotl = ballgown::gffReadGR(gtf_axolotl)
 granges_axolotl$gene_biotype = "protein_coding"
 
 species = 'axloltl_scATAC'
-
 
 ########################################################
 ########################################################
@@ -610,15 +610,33 @@ chromvar@assays$chromvar@data = data
 
 chromvar = subset(chromvar, cells = colnames(aa))
 
+tfs = readRDS(file = paste0('/groups/tanaka/People/current/jiwang/projects/RA_competence/',
+                            'data/annotations/curated_human_TFs_Lambert.rds'))
+tfs = unique(tfs$`HGNC symbol`)
+#tfs = as.character(unlist(sapply(tfs, firstup)))
+
+dataPath_nichenet = '../data/NicheNet/'
+lr_network = readRDS(paste0(dataPath_nichenet, "lr_network.rds"))
+lr_network = lr_network %>% mutate(bonafide = ! database %in% c("ppi_prediction","ppi_prediction_go"))
+lr_network = lr_network %>% dplyr::rename(ligand = from, receptor = to) %>% 
+  distinct(ligand, receptor, bonafide)
+
 
 ##########################################
-# the CM, machropage, FB
+# CM subtypes
 ##########################################
-for(celltype_sel in c('EC', 'FB', 'Mo.Macs', 'Neu', 'RBC'))
+for(celltype_sel in c('CM', 'EC', 'FB', 'Myeloid'))
 {
-  # celltype_sel = 'EC'
+  # celltype_sel = 'Myeloid'
   
-  sub_obj = subset(aa, cells = colnames(aa)[which(aa$celltypes == celltype_sel)])
+  outDir = paste0(resDir, '/', celltype_sel, '/')
+  if(!dir.exists(outDir)) dir.create(outDir)
+  
+  if(celltype_sel == 'Myeloid'){
+    sub_obj = subset(aa, cells = colnames(aa)[which(aa$celltypes == "Mo.Macs"| aa$celltypes == 'Neu')])
+  }else{
+    sub_obj = subset(aa, cells = colnames(aa)[which(aa$celltypes == celltype_sel)])
+  }
   sub_obj$subtypes = droplevels(sub_obj$subtypes)
   
   if(celltype_sel == 'CM'){
@@ -644,8 +662,26 @@ for(celltype_sel in c('EC', 'FB', 'Mo.Macs', 'Neu', 'RBC'))
           group.by = 'subtypes',  repel = TRUE) + NoLegend()
   p1 + p2
   
+  ggsave(filename = paste0(outDir, 'RNA_ATAC_umap_umap.topics.pdf'), height = 6, width = 12)
+  
   # identify the DARs using the celltypes 
   DefaultAssay(sub_obj) <- 'ATAC'
+  sub_obj <- RunTFIDF(sub_obj)
+  sub_obj = FindTopFeatures(sub_obj, min.cutoff = 'q5')
+  sub_obj <- RunSVD(sub_obj)
+  
+  DepthCor(sub_obj, n = 30)
+  dims_use = c(2:30)
+  #print(dims_use)
+  
+  sub_obj <- RunUMAP(object = sub_obj, reduction = 'lsi', dims = dims_use, n.neighbors = 30, min.dist = 0.1, 
+                     reduction.name = "umap_lsi")
+  
+  p3 = DimPlot(object = sub_obj, label = TRUE, repel = TRUE, 
+               reduction = 'umap_lsi', group.by = 'subtypes') + NoLegend()
+  
+  p2 + p3
+  ggsave(filename = paste0(outDir, 'ATAC_umapTopics_umapLsi.pdf'), height = 6, width = 12)
   
   #sub_obj = subset(sub_obj, cells = colnames(sub_obj)[which(sub_obj$celltypes != 'Neuronal')])
   Idents(sub_obj) = sub_obj$subtypes
@@ -668,10 +704,11 @@ for(celltype_sel in c('EC', 'FB', 'Mo.Macs', 'Neu', 'RBC'))
   #da_peaks = da_peaks[which(da_peaks$cluster != 'Neuronal'), ]
   #subs = subset(sub_obj, cells = colnames(sub_obj)[which(sub_obj$celltypes != 'Neuronal')])
   
-  source('functions_scATAC.R')
   library(ArchR)
+  source('functions_scATAC.R')
   
-  peak.mat = aggregate_peak_signals_by_groups(sub_obj, group_by = 'subtypes', assay = 'ATAC') 
+  peak.mat = aggregate_peak_signals_by_groups(sub_obj, group_by = 'subtypes', assay = 'ATAC', 
+                                              counts_cutoff = 10) 
   peak.mat = peak.mat[which(!is.na(match(rownames(peak.mat), da_peaks$gene))), ]
   
   mat = binarySort_peaks(mat = peak.mat, limits = c(-2, 2), cutOff = 1, clusterCols = TRUE)
@@ -700,7 +737,7 @@ for(celltype_sel in c('EC', 'FB', 'Mo.Macs', 'Neu', 'RBC'))
            #gaps_row =  c(22, 79),
            legend_labels = FALSE,
            width = 10, height = 4, 
-           filename = paste0(resDir, '/heatmap_DAR_subtypes_', celltype_sel, '_v4.pdf'))
+           filename = paste0(outDir, 'heatmap_DAR_subtypes_', celltype_sel, '_v4.pdf'))
   
   ##########################################
   # motif activities for major cell types
@@ -725,8 +762,6 @@ for(celltype_sel in c('EC', 'FB', 'Mo.Macs', 'Neu', 'RBC'))
   motif.mat = matrix(NA, ncol = length(groups), nrow = nrow(motif_tf))
   colnames(motif.mat) = groups
   rownames(motif.mat) = motif_tf$motif
-  
-  motif.mat2 = motif.mat
   
   for(n in 1:length(groups))
   {
@@ -753,44 +788,22 @@ for(celltype_sel in c('EC', 'FB', 'Mo.Macs', 'Neu', 'RBC'))
     )
     motif.mat[,n] = enriched.motifs$pvalue[match(rownames(motif.mat), enriched.motifs$motif)]
     
-    # ## change the background
-    # da_peaks <- FindMarkers(
-    #   object = chromvar,
-    #   ident.1 = groups[n],
-    #   ident.2 = NULL,
-    #   only.pos = TRUE,
-    #   test.use = 'LR',
-    #   min.pct = 0.05,
-    #   latent.vars = 'nCount_ATAC'
-    #   
-    # )
-    # 
-    # # get top differentially accessible peaks
-    # top.da.peak <- rownames(da_peaks[da_peaks$p_val < 0.05, ])
-    # 
-    # enriched.motifs2 <- FindMotifs(
-    #   object = chromvar,
-    #   features = top.da.peak,
-    #   features.match = "percentile"
-    # )
-    # 
-    # motif.mat2[,n] = enriched.motifs$pvalue[match(rownames(motif.mat2), enriched.motifs2$motif)]
     
   }
   
-  saveRDS(motif.mat, file = paste0(RdataDir, 'enriched_motif_pvalues_subtypes_', celltype_sel,
-                                   '_v4.rds'))
+  saveRDS(motif.mat, file = paste0(RdataDir, 'enriched_motif_pvalues_subtypes', celltype_sel,
+                                   '_v2.rds'))
   
-  motif.mat = readRDS(file = paste0(RdataDir, 'enriched_motif_pvalues_subtypes_', celltype_sel,
-                                     '_v4.rds'))
+  motif.mat = readRDS(file = paste0(RdataDir, 'enriched_motif_pvalues_subtypes', celltype_sel,
+                                     '_v2.rds'))
   
   motif.mat = -log10(motif.mat)
   rownames(motif.mat) = motif_tf$name[match(rownames(motif.mat), motif_tf$motif)]
   
   source('functions_scATAC.R')
-  mat = binarySort_enrichedMotif(mat = motif.mat, cutOff = 10, ntop = 20)
+  mat = binarySort_enrichedMotif(mat = motif.mat, cutOff = 5, ntop = 20, pMax = 20)
   
-  pheatmap(mat,
+  pheatmap(t(mat),
            cluster_rows=FALSE,
            #cutree_rows = 6,
            show_rownames=TRUE, 
@@ -814,17 +827,71 @@ for(celltype_sel in c('EC', 'FB', 'Mo.Macs', 'Neu', 'RBC'))
            #breaks = seq(-range, range, length.out = 20),
            #gaps_row =  c(22, 79),
            legend_labels = FALSE,
-           width = 10, height = 4, 
-           filename = paste0(resDir, '/heatmap_enrichmentMotifs_subtypes_', celltype_sel, '_v4.pdf'))
+           width = 5, height = 10,
+           filename = paste0(outDir, 'heatmap_enrichmentMotifs_subtypes_', celltype_sel, '_v4.pdf'))
   
+  
+  ## RNA marker genes intersect with TFs and signaling molecules
+  DefaultAssay(sub_obj) = 'RNA'
+  Idents(sub_obj) = sub_obj$subtypes
+  
+  subs.markers <- FindAllMarkers(sub_obj, only.pos = TRUE, min.pct = 0.2, logfc.threshold = 0.25)
+  
+  subs.markers$symbol = get_geneName(subs.markers$gene)
+  subs.markers = subs.markers[which(!is.na(match(subs.markers$symbol, tfs))), ]
+  
+  subs.markers %>%
+    group_by(cluster) %>%
+    slice_max(n = 10, order_by = avg_log2FC) -> top10
+  
+  features = top10$gene
+  cat(length(features), ' tfs \n')
+  
+  DotPlot(sub_obj, features = unique(features), group.by = 'subtypes') + 
+    RotatedAxis() + 
+    coord_flip() +
+    scale_colour_viridis(option="magma") +
+    labs(x = "", y = "") + 
+    theme(
+      #axis.text.x = element_text(angle = 0, size = 14), 
+        axis.text.y = element_text(angle = 0, size = 8) 
+        #axis.title =  element_text(size = 14),
+        #legend.text = element_text(size=14),
+        #legend.title = element_text(size = 14)
+    ) 
+    #scale_colour_gradient2(low="steelblue", mid="lightgrey", high="darkgoldenrod1")
+  ggsave(filename = paste0(outDir, '/subtype_markers_TFs.pdf'), height= 10, width = 6)
+  
+  ## check individual motif in chromvar
+  Test_ChromVar = FALSE
+  if(Test_ChromVar){
+    DefaultAssay(sub_chrom) = 'chromvar'
+    Idents(sub_chrom) = sub_chrom$subtypes
+    differential.activity <- FindAllMarkers(
+      object = sub_chrom,
+      only.pos = TRUE,
+      mean.fxn = rowMeans,
+      fc.name = "avg_diff",
+      logfc.threshold = 0.1
+    )
+    
+    differential.activity %>%
+      group_by(cluster) %>%
+      top_n(n = 10, wt = avg_diff) -> top10
+    DoHeatmap(sub_chrom, features = top10$gene, slot = 'data') + NoLegend()
+    
+    mtf = 'FOS_JUN'
+    DefaultAssay(sub_chrom) <- 'chromvar'
+    motif_tf[grep(mtf, motif_tf$tf), ]
+    feature = motif_tf$motif[grep(mtf, motif_tf$tf)]
+    FeaturePlot(sub_chrom, features = feature, min.cutoff = 'q1', max.cutoff = 'q99', reduction = 'umap')
+    
+    mtf = 'RUNX'
+    DefaultAssay(sub_chrom) <- 'chromvar'
+    motif_tf[grep(mtf, motif_tf$tf), ]
+    feature = motif_tf$motif[grep(mtf, motif_tf$tf)]
+    FeaturePlot(sub_chrom, features = feature, min.cutoff = 'q1', max.cutoff = 'q99', reduction = 'umap')
+    
+  }
+ 
 }
-
-mtf = 'FOS_JUN'
-DefaultAssay(chromvar) <- 'chromvar'
-motif_tf[grep(mtf, motif_tf$tf), ]
-feature = motif_tf$motif[grep(mtf, motif_tf$tf)]
-FeaturePlot(chromvar, features = feature, min.cutoff = 'q1', max.cutoff = 'q99', reduction = 'umap')
-
-FeaturePlot(aa, features = '')
-DimPlot(chromvar, reduction = 'umap', group.by = 'subtypes', label = TRUE, repel = TRUE) + NoLegend()
-

@@ -1393,7 +1393,8 @@ compute.motif.enrichment = function(seurat.cistopic)
 # 
 ########################################################
 ########################################################
-aggregate_peak_signals_by_groups = function(seurat_obj, group_by = 'celltypes', assay = 'ATAC')
+aggregate_peak_signals_by_groups = function(seurat_obj, group_by = 'celltypes', assay = 'ATAC', 
+                                            counts_cutoff = 50)
 {
   # seurat_obj = srat_cr; group_by = 'celltypes'; assay = 'ATAC'
   require(scuttle)
@@ -1410,11 +1411,12 @@ aggregate_peak_signals_by_groups = function(seurat_obj, group_by = 'celltypes', 
   ss = rowMax(counts(dds))
   hist(log10(ss), breaks = 60)
   abline(v = log10(c(20, 50, 100)))
+  abline(v = log10(counts_cutoff), lwd = 1.5, col = 'red')
   #length(which(ss>20))
-  cat(length(which(ss>50)), ' peaks selected to normalized the pseudo-bulk \n')
+  cat(length(which(ss>counts_cutoff)), ' peaks selected to normalized the pseudo-bulk \n')
   #length(which(ss>100))
   
-  dd0 = dds[which(ss > 50), ]
+  dd0 = dds[which(ss > counts_cutoff), ]
   dd0 = estimateSizeFactors(dd0)
   
   sizeFactors(dds) = sizeFactors(dd0)
