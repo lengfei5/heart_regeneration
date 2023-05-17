@@ -69,7 +69,7 @@ refs$celltypes = gsub('CM_ven_Cav3_1', 'CM_Cav3.1', refs$celltypes)
 Run_Neighborhood_Enrichment_Analysis = FALSE
 if(Run_Neighborhood_Enrichment_Analysis){
   
-  outDir = paste0(resDir, '/neighborhood_test/Run_misty_v1.7_long/')
+  outDir = paste0(resDir, '/neighborhood_test/Run_misty_v1.8_test/')
   
   RCTD_out = paste0('../results/visium_axolotl_R12830_resequenced_20220308/',
                     'RCTD_subtype_out_42subtypes_ref.time.specific_v4.3')
@@ -83,7 +83,8 @@ if(Run_Neighborhood_Enrichment_Analysis){
   #                                    'Mo.Macs_SNX22', "Neu_DYSF", 
   #                                     "CM_Cav3.1", "CM_Robo2", 'CM_IS',
   #                                    "Megakeryocytes","RBC"),
-  #                           d4 = c('EC', "EC_CEMIP", "EC_LHX6", 'EC_NOS3', "EC_WNT4", 'EC_IS_IARS1', "EC_IS_LOX",
+  #                           d4 = c('EC', "EC_CEMIP", "EC_LHX6", 'EC_NOS3', "EC_WNT4", 'EC_IS_IARS1', 
+  # "EC_IS_LOX",
   #                                    "FB_PKD1", "FB_TNXB", 
   #                                    "Mo.Macs_resident",  "Mo.Macs_FAXDC2", 'Mo.Macs_SNX22', 'Neu_DYSF', 
   #                                    "CM_Cav3.1", "CM_Robo2", 'CM_IS',  'CM_Prol_IS', 
@@ -106,19 +107,23 @@ if(Run_Neighborhood_Enrichment_Analysis){
                                    "CM_Robo2", "CM_Cav3.1",  'CM_IS', "CM_Prol_1", "CM_Prol_3",
                                    "Megakeryocytes", "Proliferating_Megakeryocytes", "RBC", "Proliferating_RBC"),
                             
-                            d4 = c('EC', "EC_CEMIP", "EC_LHX6", 'EC_NOS3', "EC_WNT4", 'EC_IS_IARS1', "EC_IS_LOX", "EC_IS_Prol", "EC_Prol",
+                            d4 = c('EC', "EC_CEMIP", "EC_LHX6", 'EC_NOS3', "EC_WNT4", 'EC_IS_IARS1', "EC_IS_LOX", 
+                                   "EC_IS_Prol", "EC_Prol",
                                    "FB_PKD1", "FB_TNXB",
-                                   "Mo.Macs_Prol", "Mo.Macs_resident", "Mo.Macs_FAXDC2", 'Mo.Macs_SNX22', "Neu_DYSF", "Neu_IL1R1",
+                                   "Mo.Macs_Prol", "Mo.Macs_resident", "Mo.Macs_FAXDC2", 'Mo.Macs_SNX22', "Neu_DYSF", 
+                                   "Neu_IL1R1",
                                    "CM_Robo2", "CM_Cav3.1",  'CM_IS', "CM_Prol_IS", "CM_Prol_1", "CM_Prol_3",
                                    "Megakeryocytes", "Proliferating_Megakeryocytes", "RBC", "Proliferating_RBC"),
                             
-                            d7 = c('EC', "EC_CEMIP", "EC_LHX6", 'EC_NOS3', "EC_WNT4", "EC_IS_LOX", "EC_IS_Prol", "EC_Prol",
+                            d7 = c('EC', "EC_CEMIP", "EC_LHX6", 'EC_NOS3', "EC_WNT4", "EC_IS_LOX", "EC_IS_Prol", 
+                                   "EC_Prol",
                                    "FB_PKD1", "FB_TNXB",
                                    "Mo.Macs_Prol", "Mo.Macs_resident", "Mo.Macs_FAXDC2", "Neu_DYSF", "Neu_IL1R1",
                                    "CM_Robo2", "CM_Cav3.1",  'CM_IS', "CM_Prol_IS", "CM_Prol_1", "CM_Prol_3",
                                    "Megakeryocytes", "Proliferating_Megakeryocytes", "RBC", "Proliferating_RBC"),
                             
-                            d14 = c('EC', "EC_CEMIP", "EC_LHX6", 'EC_NOS3', "EC_WNT4", "EC_IS_LOX", "EC_IS_Prol", "EC_Prol",
+                            d14 = c('EC', "EC_CEMIP", "EC_LHX6", 'EC_NOS3', "EC_WNT4", "EC_IS_LOX", "EC_IS_Prol",
+                                    "EC_Prol",
                                     "FB_PKD1", "FB_TNXB",
                                     "Mo.Macs_Prol", "Mo.Macs_resident", "Neu_DYSF", 
                                     "CM_Robo2", "CM_Cav3.1",  'CM_IS', "CM_Prol_1", "CM_Prol_3",
@@ -163,11 +168,13 @@ timepoint_specific = TRUE
 
 
 
-# celltypes_BZ_timeSpecific = list(day1 = c('EC', 'EC_NOS3', 'EC_IS_IARS1', 'FB_IS_TFPI2', 'Mo.Macs_SNX22', 'Neu_IL1R1', 
+# celltypes_BZ_timeSpecific = list(day1 = c('EC', 'EC_NOS3', 'EC_IS_IARS1', 'FB_IS_TFPI2', 'Mo.Macs_SNX22', 
+# 'Neu_IL1R1', 
 #                                        'CM_IS', "RBC"),
 #                               day4 = c('EC_IS_LOX', 'EC_IS_Prol', 'Mo.Macs_SNX22', 'Neu_DYSF', 'CM_IS', 
 #                                        'CM_Prol_IS', 'RBC'),
-#                               day7 = c('EC_IS_LOX', 'EC_IS_Prol', 'Mo.Macs_FAXDC2', 'Neu_DYSF', 'Neu_IL1R1', 'CM_IS', 
+#                               day7 = c('EC_IS_LOX', 'EC_IS_Prol', 'Mo.Macs_FAXDC2', 'Neu_DYSF', 'Neu_IL1R1', 
+# 'CM_IS', 
 #                                        'CM_Prol_IS', 'RBC'),
 #                               day14 = c('EC_IS_LOX', 'EC_IS_Prol', 'FB_PKD1', 'Neu_DYSF', 'CM_IS', 'Megakeryocytes', 
 #                                         'RBC')
@@ -274,7 +281,8 @@ active_signaling_network = get_ligand_signaling_path(ligand_tf_matrix = ligand_t
                                                      targets_all = targets_all, 
                                                      weighted_networks = weighted_networks)
 
-# For better visualization of edge weigths: normalize edge weights to make them comparable between signaling and gene regulatory interactions
+# For better visualization of edge weigths: normalize edge weights to make them comparable between signaling and 
+# gene regulatory interactions
 active_signaling_network_min_max = active_signaling_network
 active_signaling_network_min_max$sig = active_signaling_network_min_max$sig %>% 
   mutate(weight = ((weight-min(weight))/(max(weight)-min(weight))) + 0.75)

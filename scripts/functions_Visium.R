@@ -1614,7 +1614,7 @@ run_misty_colocalization_analysis = function(st,
   # setup parallel execution
   options(future.globals.maxSize = 80000 * 1024^2)
   # plan(multisession)
-  source("misty_utilities.R")
+  source("utility_misty.R")
   #future::plan(future::multisession)
   
   # outDir = paste0(resDir, '/colocalization_misty')
@@ -1769,6 +1769,7 @@ run_misty_colocalization_analysis = function(st,
     }
   
   }
+  
   
 }
 
