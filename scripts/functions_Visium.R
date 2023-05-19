@@ -1764,6 +1764,51 @@ run_misty_colocalization_analysis = function(st,
         
         dev.off()
         
+        transform_tibble_matrix = function(imp)
+        {
+          # imp = intra_imp 
+          predictors = unique(imp$Predictor)
+          targets = unique(imp$Target)
+          
+          res = matrix(NA, ncol = length(predictors), nrow = length(targets))
+          colnames(res) = predictors[order(predictors, decreasing = TRUE)]
+          rownames(res) = targets[order(targets, decreasing = TRUE)]
+          
+          for(nn in 1:nrow(imp)){
+            # nn = 1
+            index_col = which(colnames(res) == imp$Predictor[nn])
+            index_row = which(rownames(res) == imp$Target[nn])
+            res[index_row, index_col] = imp$Importance[nn]
+            
+          }
+          return(res)
+          
+        }
+        importances = as.data.frame(misty_res_slide$importances)
+        importances = importances[, -1]
+        importances$Importance[which(importances$Importance<0)] = 0
+        
+        
+        intra_imp = importances[which(importances$view == 'intra'), ]
+        intra_imp = transform_tibble_matrix(intra_imp)
+        
+        write.csv2(intra_imp, file = paste0(plot_folder, "/", slide_id, "_", segment,  
+                                            "_summary_table_intra.csv"), quote = FALSE, 
+                   row.names = TRUE)
+        
+        juxta_imp = importances[which(importances$view == 'juxta_5'), ]
+        juxta_imp = transform_tibble_matrix(juxta_imp)
+        
+        write.csv2(juxta_imp, file = paste0(plot_folder, "/", slide_id, "_", segment,  
+                                            "_summary_table_juxta5.csv"), quote = FALSE, 
+                   row.names = TRUE)
+        
+        para_imp = importances[which(importances$view == 'para_15'), ]
+        para_imp = transform_tibble_matrix(para_imp)
+        
+        write.csv2(para_imp, file = paste0(plot_folder, "/", slide_id, "_", segment,  
+                                            "_summary_table_para15.csv"), quote = FALSE, 
+                   row.names = TRUE)
         
         
       }
