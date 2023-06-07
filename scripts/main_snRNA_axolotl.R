@@ -36,7 +36,6 @@ options(future.globals.maxSize = 80000 * 1024^2)
 mem_used()
 
 
-
 ########################################################
 ########################################################
 # Section I: import the scRNAseq data by kalisto

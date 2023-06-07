@@ -1687,20 +1687,26 @@ run_misty_colocalization_analysis = function(st,
     results <- myRCTD@results
     
     weights = results$weights
-    norm_weights = normalize_weights(results$weights) 
+    
+    colnames(weights) = gsub('CM_ven_Robo2', 'CM_Robo2', colnames(weights))
+    colnames(weights) = gsub('CM_ven_Cav3_1', 'CM_Cav3.1', colnames(weights))
+    
+    norm_weights = normalize_weights(weights)
     weights = as.matrix(t(weights))
     norm_weights = as.matrix(t(norm_weights))
     
     if(!is.null(condSpec_celltypes)){
       celltypes_sels = condSpec_celltypes[[which(names(condSpec_celltypes) == gsub('Amex_', '', cc[n]))]]
       mm = match(celltypes_sels, rownames(weights))
+      #celltypes_sels[which(is.na(mm))]
+      
       if(length(which(is.na(mm))) == 0){
         weights = weights[mm, ]
         norm_weights = norm_weights[mm, ]
         cat('--', nrow(weights), ' celltypes to use -- \n')
+      }else{
+        stop(paste0(celltypes_sels[which(is.na(mm))], collapse = ' '), ' not found \n')
       }
-    }else{
-      stop('some selected not found')
     }
     
     # filter the subtypes without matching
@@ -1771,7 +1777,7 @@ run_misty_colocalization_analysis = function(st,
           targets = unique(imp$Target)
           
           res = matrix(NA, ncol = length(predictors), nrow = length(targets))
-          colnames(res) = predictors[order(predictors, decreasing = TRUE)]
+          colnames(res) = predictors[order(predictors, decreasing = FALSE)]
           rownames(res) = targets[order(targets, decreasing = TRUE)]
           
           for(nn in 1:nrow(imp)){
@@ -1784,6 +1790,7 @@ run_misty_colocalization_analysis = function(st,
           return(res)
           
         }
+        
         importances = as.data.frame(misty_res_slide$importances)
         importances = importances[, -1]
         importances$Importance[which(importances$Importance<0)] = 0
