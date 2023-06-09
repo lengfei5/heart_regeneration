@@ -430,12 +430,9 @@ if(Trajectory_pseudotime_principlecurve){
   
 }
 
-########################################################
-########################################################
-# Section : NOT Used anymore 
-# 
-########################################################
-########################################################
+##########################################
+# test batch correction across time points
+##########################################
 Test_Batch_correction_timepoint = FALSE
 if(Test_Batch_correction_timepoint){
   aa.list <- SplitObject(aa, split.by = "condition")
@@ -495,28 +492,99 @@ if(Test_Batch_correction_timepoint){
 
 ########################################################
 ########################################################
-# Section : pseudotime with cellRank
+# Section II: pseudotime with scanpy for injury-specific and injury-nospecific
 # 
 ########################################################
 ########################################################
-########################################################
-########################################################
-# Section I : EC 
-# double check the subtype annotations 
-# Prepare trajectory analysis with PAGA and RNA velocity
-# run Diffusion map and 3D visualization
-########################################################
-########################################################
-celltype_sel = 'EC'
+source('functions_scATAC.R')
+source('functions_scRNAseq.R')
+source('functions_Visium.R')
+#source('functions_scRNAseq.R')
+
+library(Signac)
+library(Seurat)
+library(GenomeInfoDb)
+library(patchwork)
+require(SeuratObject)
+library(data.table)
+source('functions_scATAC.R')
+library(ArchR)
+
+library(JASPAR2020)
+library(TFBSTools)
+library(chromVAR)
+
+library(pryr) # monitor the memory usage
+require(ggplot2)
+require(dplyr)
+require(stringr)
+require(tidyr)
+require(tictoc)
+library(future)
+require(pheatmap)
+require(RColorBrewer)
+options(future.globals.maxSize = 80 * 1024^3)
+
+mem_used()
+
+###  import annotation and metadata
+set.seed(1234)
+library(BSgenome.Amexicanum.axolotlomics.AmexGv6cut500M)
+library(ballgown)
+gtf_axolotl = paste0("/groups/tanaka/People/current/jiwang/scripts/axolotl_multiome/r_package/", 
+                     "AmexT_v47.FULL_corr_chr_cut.gtf")
+
+granges_axolotl = ballgown::gffReadGR(gtf_axolotl)
+
+# adding a gene biotype, as that's necessary for TSS metaprofile
+granges_axolotl$gene_biotype = "protein_coding"
+
+species = 'axloltl_scATAC'
+
+##########################################
+# import the multiome data
+##########################################
+aa = readRDS(file = paste0('../results/sc_multiome_R13591_atac_reseq_20221115/Rdata/',
+                           'seuratObj_multiome_snRNA.annotated.normalized.umap_',
+                           'scATAC.merged.peaks.cr_filtered_umap.lsi',
+                           '584K.features_37680cells_umap.topics_updated.umap.subtypes_celltypes.rds'))
+
+aa$time = gsub('Amex_', '', aa$condition)
+aa$cell.ids = sapply(colnames(aa), function(x) unlist(strsplit(as.character(x), '-'))[1]) 
+aa$cell.ids = paste0(aa$cell.ids, '_', aa$time)
+
+
+# identify the DARs using the celltypes 
+DefaultAssay(aa) <- 'ATAC'
+
+aa = subset(aa, cells = colnames(aa)[which(aa$celltypes != 'Neuronal')])
+Idents(aa) = aa$celltypes
+
+motif_tf = readRDS(file = paste0('../results/sc_multiome_R13591_atac_reseq_20221115/Rdata/', 
+                                 'motif_to_tfs_pfm_JASPAR2020_CORE_vertebrate_v1.rds'))
+chromvar = readRDS(file = paste0('../results/sc_multiome_R13591_atac_reseq_20221115/Rdata/', 
+                                 'atac_seuratObject_motifClass_chromVAR_v3.rds'))
+DefaultAssay(chromvar) <- 'chromvar'
+ss = colSums(chromvar@assays$chromvar@data)
+length(which(is.na(ss)))
+data = chromvar@assays$chromvar@data
+data[which(is.na(data))] = 0
+chromvar@assays$chromvar@data = data
+
+##########################################
+# subset CM sels 
+##########################################
+celltype_sel = 'CM'
 
 sub_obj = subset(aa, cells = colnames(aa)[which(aa$celltypes == celltype_sel)])
 sub_obj$subtypes = droplevels(sub_obj$subtypes)
 
-## Endothecial cells are many and look pretty clear for the trajectory
+## make sure the CM subtypes are the latest version
 ref =  readRDS(file = paste0("/groups/tanaka/Collaborations/Jingkui-Elad/scMultiome/", 
-                             "EC_subset_final_20221117.rds"))
+                             "CM_subset_for_velocity.rds"))
 
 mm = match(colnames(sub_obj), colnames(ref))
+
 cat(length(which(is.na(mm))), ' cells without updated subtypes \n')
 cat(length(which(is.na(match(colnames(ref), colnames(sub_obj))))), 
     ' cells filtered in the scATAC analysis\n')
@@ -529,11 +597,7 @@ sub_obj$subtypes = ref$subtypes[mm]
 
 sub_obj$subtypes = droplevels(sub_obj$subtypes)
 
-ECmyLevels <- c("EC", "EC_(NOS3)","EC_(WNT4)","EC_(LHX6)",  
-                "EC_(CEMIP)","EC_Prol", "EC_IS_(LOX)","EC_IS_(IARS1)","EC_IS_Prol")
-
-#factor(Idents(sub_obj, levels= ECmyLevels))
-Idents(sub_obj) <- factor(sub_obj$subtypes, levels= ECmyLevels)
+Idents(sub_obj) <- factor(sub_obj$subtypes)
 
 DimPlot(ref, group.by = 'subtypes')
 
@@ -546,13 +610,17 @@ sub_obj[['umap']] = Seurat::CreateDimReducObject(embeddings=umap.embedding,
 rm(umap.embedding)
 DefaultAssay(sub_obj) <- 'RNA'
 
-sub_obj = subset(sub_obj, cells = colnames(sub_obj)[which(sub_obj$subtypes != 'EC_(LHX6)')])
+subtype_version = '_injurySubtypes'
+
+sel_subtypes = c('CM_IS', 'CM_ven_(Cav3_1)', 'CM_Prol_IS')
+# sub_obj = subset(sub_obj, cells = colnames(sub_obj)[which(!is.na(match(sub_obj$subtypes, sel_subtypes)))])
+
+sub_obj = subset(sub_obj, cells = colnames(sub_obj)[which(!is.na(match(sub_obj$subtypes, sel_subtypes)))])
 sub_obj$subtypes = droplevels(sub_obj$subtypes)
 
-subtype_version = '_5staticSubtypes'
+table(sub_obj$subtypes)
 
-
-refine_subpopulation_for_trajectory = TRUE
+refine_subpopulation_for_trajectory = FALSE
 if(refine_subpopulation_for_trajectory){
   
   #subtypes_sel = c("EC", "EC_IS_(IARS1)", "EC_IS_(LOX)", "EC_IS_Prol")
@@ -575,13 +643,13 @@ if(refine_subpopulation_for_trajectory){
   
 }else{
   ## redo the clustering in case needed in the downstream analysis
-  sub_obj <- FindVariableFeatures(sub_obj, selection.method = "vst", nfeatures = 2000)
+  sub_obj <- FindVariableFeatures(sub_obj, selection.method = "vst", nfeatures = 1000)
   sub_obj <- ScaleData(sub_obj)
   sub_obj <- RunPCA(sub_obj, features = VariableFeatures(object = sub_obj), weight.by.var = TRUE, 
                     verbose = FALSE)
   ElbowPlot(sub_obj, ndims = 50)
   
-  sub_obj <- RunUMAP(sub_obj, dims = 1:10, n.neighbors = 30, min.dist = 0.1)
+  sub_obj <- RunUMAP(sub_obj, dims = 1:10, n.neighbors = 30, min.dist = 0.3)
   DimPlot(sub_obj, group.by = 'subtypes', label = TRUE, repel = TRUE)
   
 }
@@ -601,23 +669,23 @@ ggsave(filename = paste0(outDir, '/multiome_snRNA_scATAC_subset_', celltype_sel,
                          '_reclustered.pdf'), 
        height = 5, width = 14)
 
-DefaultAssay(sub_obj) <- 'RNA'
-p1 = DimPlot(sub_obj, label = TRUE, group.by = 'subtypes',  repel = TRUE) + NoLegend()
-
-DefaultAssay(sub_obj) <- 'ATAC'
-p2 = DimPlot(sub_obj, label = TRUE, reduction = 'umap_topics',
-             group.by = 'subtypes',  repel = TRUE) + NoLegend()
-p1 + p2
-
-ggsave(filename = paste0(outDir, '/multiome_snRNA_scATAC_subset_', celltype_sel,  subtype_version, '.pdf'), 
-       height = 6, width = 14)
-
-DefaultAssay(sub_obj) <- 'RNA'
-DimPlot(sub_obj, label = TRUE, group.by = 'subtypes', split.by = 'condition', repel = TRUE) + NoLegend()
-
-ggsave(filename = paste0(outDir, '/multiome_snRNA_scATAC_subset_', celltype_sel, subtype_version, 
-                         '_bytimePoint.pdf'), 
-       height = 5, width = 20)
+# DefaultAssay(sub_obj) <- 'RNA'
+# p1 = DimPlot(sub_obj, label = TRUE, group.by = 'subtypes',  repel = TRUE) + NoLegend()
+# 
+# DefaultAssay(sub_obj) <- 'ATAC'
+# p2 = DimPlot(sub_obj, label = TRUE, reduction = 'umap_topics',
+#              group.by = 'subtypes',  repel = TRUE) + NoLegend()
+# p1 + p2
+# 
+# ggsave(filename = paste0(outDir, '/multiome_snRNA_scATAC_subset_', celltype_sel,  subtype_version, '.pdf'), 
+#        height = 6, width = 14)
+# 
+# DefaultAssay(sub_obj) <- 'RNA'
+# DimPlot(sub_obj, label = TRUE, group.by = 'subtypes', split.by = 'condition', repel = TRUE) + NoLegend()
+# 
+# ggsave(filename = paste0(outDir, '/multiome_snRNA_scATAC_subset_', celltype_sel, subtype_version, 
+#                          '_bytimePoint.pdf'), 
+#        height = 5, width = 20)
 
 
 ##########################################
@@ -632,10 +700,12 @@ source('utility_velocity.R')
 mnt = preapre_dataFile_for_RNAvelocity_PAGA(seuratObj = sub_obj)
 
 Idents(mnt) = mnt$condition
-mnt = subset(mnt, downsample = 2000)
+table(mnt$condition)
+
+#mnt = subset(mnt, downsample = 2000)
 
 saveFile = paste0('RNAmatrix_umap_kalisto.velocity_spliced_unspliced_',
-                  'EC_subtypes', subtype_version, '_timepoints.all_downsample.10k.h5Seurat')
+                  'CM_subtypes', subtype_version, '_timepoints.all_downsample.h5Seurat')
 
 SaveH5Seurat(mnt, filename = paste0(outDir, saveFile), 
              overwrite = TRUE)
