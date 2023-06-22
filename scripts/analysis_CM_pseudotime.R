@@ -403,254 +403,26 @@ saveRDS(sub_obj, file = paste0(outDir, 'CM_subset_RNA_ATAC_pseudotime.scanpy.rds
 # 1) tradeseq (not sure it will work)
 ##########################################
 aa = readRDS(file = paste0(outDir, 'CM_subset_RNA_ATAC_pseudotime.scanpy.rds'))
+aa = ScaleData(aa, features = rownames(aa), assay = 'RNA')
 
-Test_TradeSeq = FALSE
-if(Test_TradeSeq){
-  library(tradeSeq)
-  library(RColorBrewer)
-  library(SingleCellExperiment)
-  library(Seurat)
-  library(SeuratDisk)
-  library(SeuratObject)
-  library(slingshot)
-  palette(brewer.pal(8, "Dark2"))
+Test_features_along_trajectory_TSCAN = FALSE
+if(Test_features_along_trajectory_TSCAN)
+{
+  library(TSCAN)
+  # injury branch
+  sub_obj = subset(aa, cells = colnames(aa)[which(aa$branch == 'injury')])
+  #sub_obj = ScaleData(sub_obj, features = rownames(sub_obj), assay = 'RNA')
+  sce = as.SingleCellExperiment(sub_obj, assay = 'RNA')
   
-  # data(countMatrix, package = "tradeSeq")
-  # counts <- as.matrix(countMatrix)
-  # rm(countMatrix)
-  # data(crv, package = "tradeSeq")
-  # data(celltype, package = "tradeSeq")
-  # 
-  # set.seed(7)
-  # pseudotime <- slingPseudotime(crv, na = FALSE)
-  # cellWeights <- slingCurveWeights(crv)
-  # 
+  pseudo <- testPseudotime(sce, pseudotime=sce$pst)
+  #pseudo$gene <- rowData(sce)$SYMBOL
+  pseudo = data.frame(pseudo[order(pseudo$p.value),])
   
-  # assign cell weights to two trajectories
-  index_cells = which(!is.na(aa$branch))
+  gene_sels = rownames(pseudo)[which(abs(pseudo$logFC) >1 & pseudo$FDR<0.05)]
   
-  cellWeights = matrix(NA, ncol = 2, nrow = length(index_cells))
-  rownames(cellWeights) = colnames(aa)[index_cells]
-  colnames(cellWeights) = c('injury', 'uninjury')
+  source('utility_plot.R')
   
-  pseudotime = matrix(NA, ncol = 2, nrow = nrow(cellWeights))
-  rownames(pseudotime) = rownames(cellWeights)
-  colnames(pseudotime) = colnames(cellWeights)
+  plot_genes_branched_heatmap(aa, gene_subset = gene_sels)
   
-  cell_injury = colnames(aa)[which(aa$branch == 'injury')]
-  cell_uninjury = colnames(aa)[which(aa$branch == 'uninjury')]
-  
-  kk1 = match(cell_injury, rownames(cellWeights))
-  cellWeights[kk1, 1] = 1; cellWeights[kk1, 2] = 0
-  pseudotime[kk1, 1] = aa$pst[match(cell_injury, colnames(aa))] # keep the pseudo computed before
-  #pseudotime[kk1, 2] = pseudotime[kk1, 1]
-  pseudotime[kk1, 2] = 0
-  
-  kk2 = match(cell_uninjury, rownames(cellWeights))
-  cellWeights[kk2, 1] = 0; cellWeights[kk2, 2] = 1
-  pseudotime[kk2, 2] = aa$pst[match(cell_uninjury, colnames(aa))] # keep the pseudo computed before
-  #pseudotime[kk2, 1] = pseudotime[kk2, 2]
-  pseudotime[kk2, 1] = 0
-  
-  rm(list =c('kk1', 'kk2'))
-  
-  counts = GetAssayData(aa, slot = 'counts', assay = 'RNA')
-  counts = counts[, match(rownames(pseudotime), colnames(counts))]
-  
-  #save(counts, pseudotime, cellWeights, 
-  #     file = paste0(outDir, '/counts_pseudotime_cellWeights_for_tradeSeq.Rdata'))
-  #load(file = paste0(outDir, '/counts_pseudotime_cellWeights_for_tradeSeq.Rdata'))
-  
-  #RNGversion("3.5.0")
-  counts <- as.matrix(counts)
-    
-  ### Downstream of any trajectory inference method using pseudotime and cell weights
-  # slow, but still ok. with 60K cells, it takes 10-15 mins for each knot.
-  require(tictoc)
-  library(BiocParallel)
-  parallel::detectCores()
-  
-  BPPARAM <- BiocParallel::bpparam()
-  BPPARAM # lists current options
-  BPPARAM$workers <- 1 # use 2 cores
-  
-  tic()
-  set.seed(7)
-  #index_sub = sample(c(1:ncol(counts)), 10000)
-  #set.seed(7)
-  icMat <- evaluateK(counts = counts,
-                      pseudotime = pseudotime,
-                      cellWeights = cellWeights,
-                      k=seq(5, 100, by = 5),
-                      nGenes = 300,
-                      verbose = TRUE,
-                      plot = TRUE,
-                      parallel=FALSE,
-                     BPPARAM = BPPARAM)
-  
-  saveRDS(icMat, file = paste0(outDir, 'tradeSeqDE_evaluateK_res_v2.rds'))
-
-  toc()
-  
-  
-  pdfname = paste0(outDir, "Knot_number_estimation_genes300.pdf")
-  pdf(pdfname, width=12, height = 10)
-  par(cex =0.7, mar = c(3,0.8,2,5)+0.1, mgp = c(1.6,0.5,0),las = 0, tcl = -0.3)
-  
-  #icMat = readRDS(file = paste0(outDir, 'tradeSeqDE_evaluateK_res.rds'))
-  #icMat = readRDS(file = paste0(outDir, 'tradeSeqDE_evaluateK_res_k3.12_100genes_v7.rds'))
-  #icMat = readRDS(file = paste0(outDir, 'tradeSeqDE_evaluateK_res_k3.12_200genes_v6.rds'))
-  icMat = readRDS(file = paste0(outDir, 'tradeSeqDE_evaluateK_res_k3.12_300genes_v5.rds'))
-  icMat = readRDS(file = paste0(outDir, 'tradeSeqDE_evaluateK_res_v1.rds'))
-  icMat = data.frame(icMat)
-  colnames(icMat) = gsub('k..', '', colnames(icMat))
-  
-  icDev = icMat - apply(icMat, 1, mean)
-  boxplot(icDev, ylim = c(-50, 50))
-  
-  plot(as.numeric(as.character(colnames(icMat))), apply(icMat, 2, mean, na.rm = TRUE), type = 'b')
-  
-  icRel =  icMat/apply(icMat, 1, max, na.rm = TRUE)
-  plot(as.numeric(as.character(colnames(icMat))), apply(icRel, 2, mean, na.rm = TRUE), type = 'b')
-  
-  dev.off()
-  
-  # downsample the cells and also the genes of interest to test fitGAM
-  # library(BiocParallel)
-  # BPPARAM <- BiocParallel::bpparam()
-  # BPPARAM # lists current options
-  # BPPARAM$workers <- 16 # use 2 cores
-  # 
-  # 
-  # set.seed(7)
-  # nb_cells = 10000
-  # set.seed(7)
-  # index_sub = sample(c(1:ncol(counts)), nb_cells)
-  # 
-  # candidates = readRDS(file = paste0(outDir, 'DElist_3512genes_pairwiseComaprison.rds'))
-  # genes.sel = match(candidates, rownames(counts))
-  # genes.sel = genes.sel[which(!is.na(genes.sel))]
-  # length(genes.sel)
-  # 
-  # nb.knots = 6;
-  # 
-  # 
-  # tic()
-  # set.seed(7)
-  # sce <- fitGAM(counts = counts[, index_sub], 
-  #               pseudotime = pseudotime[index_sub, ], 
-  #               cellWeights = cellWeights[index_sub, ],
-  #               genes = genes.sel,
-  #               nknots = nb.knots, 
-  #               verbose = TRUE, 
-  #               parallel=TRUE, 
-  #               BPPARAM = BPPARAM
-  #               )
-  # toc()
-  #save(sce, file = paste0(RdataDir, 'fitGAM_output_tradeSeq_v3.Rdata'))
-  
-  ## reload the fitGam results
-  load(paste0(outDir, 'tradeSeqDE_fitGAM_output_cellnb.10000.Rdata'))
-  table(rowData(sce)$tradeSeq$converged)
-  candidates = readRDS(file = paste0(outDir, 'DElist_3512genes_pairwiseComaprison.rds'))
-  load(file = paste0(outDir, '/counts_pseudotime_cellWeights_for_tradeSeq.Rdata'))
-  
-  counts = counts[match(candidates, rownames(counts)), match(colnames(sce), colnames(counts))] 
-  pseudotime = pseudotime[match(colnames(sce), colnames(counts)), ] 
-  cellWeights = cellWeights[match(colnames(sce), colnames(counts)), ] 
-  
-  plotGeneCount(curve = pseudotime, 
-                counts = counts,
-                #clusters = apply(slingClusterLabels(crv), 1, which.max),
-                models = sce)
-  earlyDERes <- earlyDETest(sce, knots = c(1, 2))
-  
-  oEarly <- order(earlyDERes$waldStat, decreasing = TRUE)
-  earlyDERes = earlyDERes[oEarly, ]
-  head(rownames(earlyDERes))
-  
-  plotSmoothers(sce, counts, gene = rownames(earlyDERes)[oEarly][1])
-  
-  plotSmoothers(sce, counts, gene = 'Zfp703', nPoints = 1000)
-  plotSmoothers(sce, counts, gene = 'Cyp26a1', nPoints = 1000)
-  
-  assoRes <- associationTest(sce)
-  head(assoRes)
-  
-  startRes <- startVsEndTest(sce)
-  
-  oStart <- order(startRes$waldStat, decreasing = TRUE)
-  sigGeneStart <- names(sce)[oStart[3]]
-  plotSmoothers(sce, counts[, index_sub], gene = sigGeneStart)
-  
-  endRes <- diffEndTest(sce)
-  o <- order(endRes$waldStat, decreasing = TRUE)
-  sigGene <- names(sce)[o[1]]
-  plotSmoothers(sce, counts[, index_sub], sigGene)
-  
-  plotGeneCount(crv, counts[, index_sub], gene = sigGene)
-  
-  patternRes <- patternTest(sce)
-  oPat <- order(patternRes$waldStat, decreasing = TRUE)
-  head(rownames(patternRes)[oPat])
-  
-  plotSmoothers(sce, counts[, index_sub], gene = rownames(patternRes)[oPat][4])
-  
-  ##########################################
-  # test how to define the pseudotime for tradeseq 
-  ##########################################
-  # For reproducibility
-  # palette(brewer.pal(8, "Dark2"))
-  # data(countMatrix, package = "tradeSeq")
-  # counts <- as.matrix(countMatrix)
-  # rm(countMatrix)
-  # data(celltype, package = "tradeSeq")
-  # 
-  # set.seed(22)
-  # library(monocle3) # unable to install monocle3
-  # 
-  # # Create a cell_data_set object
-  # cds <- new_cell_data_set(counts, cell_metadata = pd,
-  #                          gene_metadata = data.frame(gene_short_name = rownames(counts),
-  #                                                     row.names = rownames(counts)))
-  # # Run PCA then UMAP on the data
-  # cds <- preprocess_cds(cds, method = "PCA")
-  # cds <- reduce_dimension(cds, preprocess_method = "PCA",
-  #                         reduction_method = "UMAP")
-  # 
-  # # First display, coloring by the cell types from Paul et al
-  # plot_cells(cds, label_groups_by_cluster = FALSE, cell_size = 1,
-  #            color_cells_by = "cellType")
-  # 
-  # # Running the clustering method. This is necessary to the construct the graph
-  # cds <- cluster_cells(cds, reduction_method = "UMAP")
-  # # Visualize the clusters
-  # plot_cells(cds, color_cells_by = "cluster", cell_size = 1)
-  # 
-  # # Construct the graph
-  # # Note that, for the rest of the code to run, the graph should be fully connected
-  # cds <- learn_graph(cds, use_partition = FALSE)
-  # 
-  # # We find all the cells that are close to the starting point
-  # cell_ids <- colnames(cds)[pd$cellType ==  "Multipotent progenitors"]
-  # closest_vertex <- cds@principal_graph_aux[["UMAP"]]$pr_graph_cell_proj_closest_vertex
-  # closest_vertex <- as.matrix(closest_vertex[colnames(cds), ])
-  # closest_vertex <- closest_vertex[cell_ids, ]
-  # closest_vertex <- as.numeric(names(which.max(table(closest_vertex))))
-  # mst <- principal_graph(cds)$UMAP
-  # root_pr_nodes <- igraph::V(mst)$name[closest_vertex]
-  # 
-  # # We compute the trajectory
-  # cds <- order_cells(cds, root_pr_nodes = root_pr_nodes)
-  # plot_cells(cds, color_cells_by = "pseudotime")
   
 }
-
-
-##########################################
-# 
-##########################################
-
-
-
-
