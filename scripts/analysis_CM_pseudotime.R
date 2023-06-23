@@ -75,6 +75,7 @@ DefaultAssay(aa) <- 'ATAC'
 aa = subset(aa, cells = colnames(aa)[which(aa$celltypes != 'Neuronal')])
 Idents(aa) = aa$celltypes
 
+
 motif_tf = readRDS(file = paste0('../results/sc_multiome_R13591_atac_reseq_20221115/Rdata/', 
                                  'motif_to_tfs_pfm_JASPAR2020_CORE_vertebrate_v1.rds'))
 chromvar = readRDS(file = paste0('../results/sc_multiome_R13591_atac_reseq_20221115/Rdata/', 
@@ -399,14 +400,14 @@ saveRDS(sub_obj, file = paste0(outDir, 'CM_subset_RNA_ATAC_pseudotime.scanpy.rds
 
 
 ##########################################
-# test trajectory genes along pseudotime  
-# 1) tradeseq (not sure it will work)
+# test features along pseudotime in trajectory
+# 
 ##########################################
 aa = readRDS(file = paste0(outDir, 'CM_subset_RNA_ATAC_pseudotime.scanpy.rds'))
 aa = ScaleData(aa, features = rownames(aa), assay = 'RNA')
 
-Test_features_along_trajectory_TSCAN = FALSE
-if(Test_features_along_trajectory_TSCAN)
+Test_genes_along_trajectory_TSCAN = FALSE
+if(Test_genes_along_trajectory_TSCAN)
 {
   library(TSCAN)
   # injury branch
@@ -422,7 +423,75 @@ if(Test_features_along_trajectory_TSCAN)
   
   source('utility_plot.R')
   
-  plot_genes_branched_heatmap(aa, gene_subset = gene_sels)
+  plot_features_branched_heatmap(aa, gene_subset = gene_sels)
+  
+}
+
+Test_motifActivity_along_trajectory_TSCAN = FALSE
+if(Test_motifActivity_along_trajectory_TSCAN){
+  library(TSCAN)
+  motif_tf = readRDS(file = paste0('../results/sc_multiome_R13591_atac_reseq_20221115/Rdata/', 
+                                   'motif_to_tfs_pfm_JASPAR2020_CORE_vertebrate_v1.rds'))
+  chromvar = readRDS(file = paste0('../results/sc_multiome_R13591_atac_reseq_20221115/Rdata/', 
+                                   'atac_seuratObject_motifClass_chromVAR_v3.rds'))
+  
+  DefaultAssay(chromvar) <- 'chromvar'
+  ss = colSums(chromvar@assays$chromvar@data)
+  length(which(is.na(ss)))
+  data = chromvar@assays$chromvar@data
+  data[which(is.na(data))] = 0
+  chromvar@assays$chromvar@data = data
+  
+  # subset for CM
+  chromvar_CM = subset(chromvar, cells = intersect(colnames(chromvar), colnames(aa)))
+  chromvar_CM$subtypes = aa$subtypes[match(colnames(chromvar_CM), colnames(aa))]
+  chromvar_CM$branch = aa$branch[match(colnames(chromvar_CM), colnames(aa))]
+  chromvar_CM$pst = aa$pst[match(colnames(chromvar_CM), colnames(aa))]
+  
+  # injury branch
+  cells =  colnames(chromvar_CM)[which(chromvar_CM$branch == 'injury')]
+  sub_obj = subset(chromvar_CM, cells = cells)
+  
+  #sub_obj = ScaleData(sub_obj, features = rownames(sub_obj), assay = 'RNA')
+  sce = as.SingleCellExperiment(sub_obj, assay = 'chromvar')
+  
+  pseudo <- testPseudotime(sce, pseudotime=sce$pst)
+  pseudo = data.frame(pseudo[order(pseudo$p.value),])
+  
+  pseudo$names  <- motif_tf$name[match(rownames(pseudo), rownames(motif_tf))]
+  feature_sels = rownames(pseudo)[which(abs(pseudo$logFC) > 0.7 & pseudo$FDR<0.05)]
+  
+  source('utility_plot.R')
+  plot_features_branched_heatmap(chromvar_CM, feature_subset = feature_subset, feature = 'motif_activity')
   
   
 }
+
+Test_peaks_along_trajectory = FALSE
+if(Test_peaks_along_trajectory)
+{
+  #library(TSCAN)
+  # injury branch
+  DefaultAssay(aa) = 'ATAC'
+  sub_obj = subset(aa, cells = colnames(aa)[which(aa$branch == 'injury')])
+  
+  
+  sce = as.SingleCellExperiment(sub_obj, assay = 'RNA')
+  
+  pseudo <- testPseudotime(sce, pseudotime=sce$pst)
+  #pseudo$gene <- rowData(sce)$SYMBOL
+  pseudo = data.frame(pseudo[order(pseudo$p.value),])
+  
+  gene_sels = rownames(pseudo)[which(abs(pseudo$logFC) >1 & pseudo$FDR<0.05)]
+  
+  source('utility_plot.R')
+  
+  plot_features_branched_heatmap(chromvar_CM, feature_subset = feature_subset, feature = 'peak')
+  
+  
+  
+}
+
+
+
+

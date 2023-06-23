@@ -112,10 +112,31 @@ if(Test_LDA){
 ##########################################
 # plot heatmap of features along trajectories
 ##########################################
+get_smooth_curve_spline = function(x, t, newt, downsample = TRUE)
+{
+  # x = as.numeric(cds[1, jj]); t = Pseudotime; newt = pseudot_comomon;
+  if(downsample){
+    nb_t = min(5000, length(t))
+    nn = sample(1:length(t), size = nb_t, replace = FALSE)
+    t = t[nn]
+    x = x[nn]
+  }
+  
+  fit_sel = smooth.spline(t, x, df = 3)
+  
+  #plot(Pseudotime, cds_sel, cex = 0.5)
+  #lines(fit_sel, col = 'red', lwd =2.0)
+  newx = predict(fit_sel, newt)
+  return(newx$y)
+  #VGAM::vglm(~sm.ns(Pseudotime, df=3), family = 'gaussian', data = cds_sel)
+  
+}
+
 ## original functions from Monocle
 ## https://github.com/cole-trapnell-lab/monocle-release/blob/master/R/plotting.R
-plot_genes_branched_heatmap <- function(seuratObj = aa,
-                                        gene_subset = candidates,
+plot_features_branched_heatmap <- function(seuratObj = aa,
+                                           feature = 'gene',
+                                        feature_subset = candidates,
                                         nbCell_condition = 50,
                                         Get.Smooth.Curve = TRUE, 
                                         scale_max=3, 
@@ -127,58 +148,40 @@ plot_genes_branched_heatmap <- function(seuratObj = aa,
                                         add_annotation_row = NULL,
                                         show_rownames = TRUE) 
 {
-  # seuratObj = aa;nbCell_condition = 50;scale_max=3; scale_min=-3;hmcols = NULL; Get.Smooth.Curve = TRUE;
-  # gene_subset = gene_sels;hclust_method = "ward.D2";num_clusters = 6
+  # seuratObj = chromvar_CM;nbCell_condition = 50;scale_max=3; scale_min=-3; Get.Smooth.Curve = TRUE;
+  # feature_subset = feature_sels;hclust_method = "ward.D2";num_clusters = 6;hmcols = NULL;
   library(VGAM) # an example code from https://online.stat.psu.edu/stat504/lesson/8/8.2/8.2.2
   library(MASS)
   library(tidyr)
   require(colorRamps)
   require(pheatmap)
   
+  ## subsampling cells to make the heatmap symmetric and also avoid too many cells in some cell types
   subsampling.cells_perCondition = FALSE
   if(subsampling.cells_perCondition){
-    cell_beforeRA = colnames(seuratObj)[which(!is.na(seuratObj$pseudot) & seuratObj$condition == 'day2_beforeRA')]
-    cell_noRA = colnames(seuratObj)[which(!is.na(seuratObj$pseudot) & grepl('_noRA', seuratObj$condition))]
-    cell_RA = colnames(seuratObj)[which(!is.na(seuratObj$pseudot) & grepl('_RA', seuratObj$condition))]
     
-    cat('subsampling ', nbCell_condition, ' cells\n')
-    cell.sels = c()
-    cc = unique(seuratObj$condition)
-    for(n in 1:length(cc))
-    {
-      cell.sels = c(cell.sels, sample(colnames(seuratObj)[which(seuratObj$condition == cc[n] & 
-                                                                  !is.na(seuratObj$pseudot))], 
-                                      size = nbCell_condition, 
-                                      replace = FALSE))
-    }
+    subs = seuratObj
+    Idents(subs) = as.factor(subs$subtypes)
+    subs = subset(x = subs, downsample = 1000)
     
-    subs = subset(seuratObj, cells = cell.sels)
-  }
-  
-  get_smooth_curve_spline = function(x, t, newt, downsample = TRUE)
-  {
-    # x = as.numeric(cds[1, jj]); t = Pseudotime; newt = pseudot_comomon;
-    if(downsample){
-      nb_t = min(5000, length(t))
-      nn = sample(1:length(t), size = nb_t, replace = FALSE)
-      t = t[nn]
-      x = x[nn]
-    }
+    Idents(subs) = as.factor(subs$branch)
+    subs = subset(x = subs, downsample = min(table(subs$branch)))
     
-    fit_sel = smooth.spline(t, x, df = 3)
+    cell_ds = colnames(subs)
     
-    #plot(Pseudotime, cds_sel, cex = 0.5)
-    #lines(fit_sel, col = 'red', lwd =2.0)
-    newx = predict(fit_sel, newt)
-    return(newx$y)
-    #VGAM::vglm(~sm.ns(Pseudotime, df=3), family = 'gaussian', data = cds_sel)
+    saveRDS(cell_ds, file = paste0(outDir, 'saved_cells_downsampled.rds'))
+    rm(subs)
     
   }
   
+  ## select the corresponding matrix of selected features
+  if(feature == 'gene') cds <- seuratObj@assays$RNA@scale.data
+  if(feature == 'motif_activity') cds = seuratObj@assays$chromvar@data
+  rownames(cds) = rownames(seuratObj)
+  cds = cds[which(!is.na(match(rownames(cds), feature_subset))), ]
+  
+  ## smooth the gene expression along the trajectory
   if(Get.Smooth.Curve){
-    cds <- seuratObj@assays$RNA@scale.data
-    rownames(cds) = rownames(seuratObj)
-    cds = cds[which(!is.na(match(rownames(cds), gene_subset))), ]
     cat(' -- smoothing the single cell data for subsampled cells -- \n')
     
     jj = which(seuratObj$branch == 'injury')
@@ -202,16 +205,30 @@ plot_genes_branched_heatmap <- function(seuratObj = aa,
                              newt = newt))
     colnames(BranchB_exprs) = names
     
+    save(BranchA_exprs, BranchB_exprs, file = paste0(outDir, 'smoothed_geneExpr_forHeatmap.Rdata'))
+    
   }
   
-  kk_subsample = sample(1:ncol(BranchB_exprs), ncol(BranchA_exprs))
-  BranchB_exprs = BranchB_exprs[, kk_subsample[order(kk_subsample)]]
+  # reload the downsampled cells
+  cell_ds = readRDS(file = paste0(outDir, 'saved_cells_downsampled.rds'))
+  cat(length(cell_ds), ' pre-selected \n')
+  cell_ds = intersect(cell_ds, colnames(seuratObj))
+  cat(length(cell_ds), ' selected to use \n')
+  
+  ## use only cells saved in the previously downsampled
+  load(file = paste0(outDir, 'smoothed_geneExpr_forHeatmap.Rdata'))
+  BranchA_exprs = BranchA_exprs[, !is.na(match(colnames(BranchA_exprs), cell_ds))]
+  BranchB_exprs = BranchB_exprs[, !is.na(match(colnames(BranchB_exprs), cell_ds))]
   col_gap_ind <- c(ncol(BranchB_exprs))
   
   heatmap_matrix <- cbind(BranchB_exprs[, ncol(BranchB_exprs):1], 
                         BranchA_exprs)
   
+  if(feature == 'motif_activity'){
+    scale_max=2; scale_min=-2;
+  }
   heatmap_matrix=heatmap_matrix[!apply(heatmap_matrix, 1, sd)==0,]
+  #if(feature == 'gene') 
   heatmap_matrix=Matrix::t(scale(Matrix::t(heatmap_matrix),center=TRUE))
   heatmap_matrix=heatmap_matrix[is.na(row.names(heatmap_matrix)) == FALSE, ]
   heatmap_matrix[is.nan(heatmap_matrix)] = 0
@@ -220,8 +237,10 @@ plot_genes_branched_heatmap <- function(seuratObj = aa,
   
   saveRDS(heatmap_matrix, file = paste0(outDir, "/heatmap_matrix_forPlot.rds"))
   #heatmap_matrix_ori <- heatmap_matrix
-  #heatmap_matrix <- heatmap_matrix[is.finite(heatmap_matrix[, 1]) & is.finite(heatmap_matrix[, col_gap_ind]), ] #remove the NA fitting failure genes for each branch 
+  #heatmap_matrix <- heatmap_matrix[is.finite(heatmap_matrix[, 1]) & 
+  # is.finite(heatmap_matrix[, col_gap_ind]), ] #remove the NA fitting failure genes for each branch 
   
+  heatmap_matrix = readRDS(file = paste0(outDir, "/heatmap_matrix_forPlot.rds"))
   row_dist <- as.dist((1 - cor(Matrix::t(heatmap_matrix)))/2)
   row_dist[is.na(row_dist)] <- 1
   
@@ -231,6 +250,8 @@ plot_genes_branched_heatmap <- function(seuratObj = aa,
   if(is.null(hmcols)) {
     hmcols <- blue2green2red(length(bks) - 1)
   }
+  
+  num_clusters = 4
   
   # prin  t(hmcols)
   ph <- pheatmap(heatmap_matrix, 
@@ -255,9 +276,10 @@ plot_genes_branched_heatmap <- function(seuratObj = aa,
   colnames(heatmap_matrix) <- c(1:ncol(heatmap_matrix))
   annotation_col <- data.frame(row.names = c(1:ncol(heatmap_matrix)),
                                pseudot = seuratObj$pst[match(cells, colnames(seuratObj))],
-                               condition = seuratObj$subtypes[match(cells, colnames(seuratObj))])
+                               subtype = seuratObj$subtypes[match(cells, colnames(seuratObj))],
+                               branch = seuratObj$branch[match(cells, colnames(seuratObj))])
   
-  write.csv2(annotation_row, file = paste0(outDir, 'gene_clusters.csv'), row.names = TRUE, quote = FALSE)
+  #write.csv2(annotation_row, file = paste0(outDir, 'gene_clusters.csv'), row.names = TRUE, quote = FALSE)
   
   #colnames(annotation_col) <- "Cell Type"  
   #if(!is.null(add_annotation_col)) {
@@ -267,195 +289,151 @@ plot_genes_branched_heatmap <- function(seuratObj = aa,
   #annotation_colors=list("condition"=branch_colors)
   #names(annotation_colors$`condition`) = c('Pre-branch', branch_labels)
   
-  
   #names(branch_colors) <- c("Pre-branch", branch_labels[1], branch_labels[2])
   #annotation_colors=list("Cell Type"=branch_colors)
   #names(annotation_colors$`Cell Type`) = c('Pre-branch', branch_labels)
-  feature_label <- row.names(heatmap_matrix)
-  row_ann_labels <- row.names(annotation_row)
+  
+  if(feature == 'motif_activity'){
+    motif_tf = readRDS(file = paste0('../results/sc_multiome_R13591_atac_reseq_20221115/Rdata/', 
+                                     'motif_to_tfs_pfm_JASPAR2020_CORE_vertebrate_v1.rds'))
+    feature_label = motif_tf$name[match(rownames(heatmap_matrix), motif_tf$motif)]
+    row_ann_labels = motif_tf$name[match(rownames(annotation_row), motif_tf$motif)]
+  }else{
+    feature_label <- row.names(heatmap_matrix)
+    row_ann_labels <- row.names(annotation_row)
+  }
   
   row.names(heatmap_matrix) <- feature_label
   row.names(annotation_row) <- row_ann_labels
   
-  ##########################################
-  # all DE genes
-  ##########################################
-  pheatmap(heatmap_matrix[, ], #ph$tree_row$order
-           useRaster = T,
-           cluster_cols=FALSE, 
-           cluster_rows=TRUE, 
-           show_rownames=FALSE,
-           show_colnames=FALSE, 
-           scale='none',
-           clustering_distance_rows=row_dist, #row_dist
-           clustering_method = hclust_method, #ward.D2
-           cutree_rows=num_clusters,
-           # cutree_cols = 2,
-           annotation_row=annotation_row,
-           annotation_col=annotation_col,
-           #annotation_colors=annotation_colors,
-           gaps_col = col_gap_ind,
-           treeheight_row = 30, 
-           breaks=bks,
-           fontsize = 6,
-           color=hmcols, 
-           border_color = NA,
-           silent=TRUE, 
-           filename=paste0(outDir, "/expression_pseudotime_pheatmap_allDEgenes.pdf"),
-           width = 6, height = 12
-  )
-  
-  pheatmap(heatmap_matrix[, ], #ph$tree_row$order
-           useRaster = T,
-           cluster_cols=FALSE, 
-           cluster_rows=TRUE, 
-           show_rownames=TRUE,
-           show_colnames=FALSE, 
-           scale='none',
-           clustering_distance_rows=row_dist, #row_dist
-           clustering_method = hclust_method, #ward.D2
-           cutree_rows=num_clusters,
-           # cutree_cols = 2,
-           annotation_row=annotation_row,
-           annotation_col=annotation_col,
-           #annotation_colors=annotation_colors,
-           gaps_col = col_gap_ind,
-           treeheight_row = 50, 
-           breaks=bks,
-           fontsize = 4,
-           color=hmcols, 
-           border_color = NA,
-           silent=TRUE, 
-           filename=paste0(outDir, "/expression_pseudotime_pheatmap_allDEgenes_with.geneNames.pdf"),
-           width = 12, height = 25
-  )
   
   ##########################################
-  # DE TFs and signaling pathways 
+  # heatmap plotting
   ##########################################
-  tfs = readRDS(file = paste0('../data/annotations/curated_human_TFs_Lambert.rds'))
-  tfs = unique(tfs$`HGNC symbol`)
-  tfs = as.character(unlist(sapply(tfs, firstup)))
-  sps = readRDS(file = paste0('../data/annotations/curated_signaling.pathways_gene.list_v2.rds'))
-  targets = unique(c(tfs, sps$gene))
-  xx = read.table('../data/annotations/GO_term_summary_RAR_signalingPathway.txt', header = TRUE, sep = '\t', 
-                  row.names = NULL)
-  targets = unique(c(targets, xx[,2]))
-  xx = read.table('../data/annotations/GO_term_summary_TGFb.txt', header = TRUE, sep = '\t', 
-                  row.names = NULL)
-  targets = unique(c(targets, xx[,2]))
-  #sps = toupper(unique(sps$gene))
-  #sps = setdiff(sps, tfs)
+  Plot_use_heatmap = TRUE
+  if(Plot_use_heatmap){
+    if(feature == 'gene') myColor = hmcols
+    if(feature == 'motif_activity') myColor = inlmisc::GetColors(length(bks) +1, scheme = "BuRd")
+    
+    # all DE genes
+    pheatmap(heatmap_matrix[, ], #ph$tree_row$order
+             useRaster = T,
+             cluster_cols=FALSE, 
+             cluster_rows=TRUE, 
+             show_rownames=FALSE,
+             show_colnames=FALSE, 
+             scale='none',
+             clustering_distance_rows=row_dist, #row_dist
+             clustering_method = hclust_method, #ward.D2
+             cutree_rows=num_clusters,
+             # cutree_cols = 2,
+             annotation_row=annotation_row,
+             annotation_col=annotation_col,
+             #annotation_colors=annotation_colors,
+             gaps_col = col_gap_ind,
+             treeheight_row = 30, 
+             breaks=bks,
+             fontsize = 6,
+             color=myColor, 
+             border_color = NA,
+             silent=TRUE, 
+             filename=paste0(outDir, "/expression_pseudotime_pheatmap_DEtrajectory_", feature, ".pdf"),
+             width = 5, height = 8
+    )
+    
+    pheatmap(heatmap_matrix[, ], #ph$tree_row$order
+             useRaster = T,
+             cluster_cols=FALSE, 
+             cluster_rows=TRUE, 
+             show_rownames=TRUE,
+             show_colnames=FALSE, 
+             scale='none',
+             clustering_distance_rows=row_dist, #row_dist
+             clustering_method = hclust_method, #ward.D2
+             cutree_rows=num_clusters,
+             # cutree_cols = 2,
+             annotation_row=annotation_row,
+             annotation_col=annotation_col,
+             #annotation_colors=annotation_colors,
+             gaps_col = col_gap_ind,
+             treeheight_row = 50, 
+             breaks=bks,
+             fontsize = 6,
+             color=myColor, 
+             border_color = NA,
+             silent=TRUE, 
+             filename=paste0(outDir, "/expression_pseudotime_pheatmap_DEtrajectory_", feature, "withNames.pdf"),
+             width = 8, height = 12
+    )
+    
+    ##########################################
+    # DE TFs and signaling pathways 
+    ##########################################
+    tfs = readRDS(file = paste0('../../RA_competence/data/annotations/curated_human_TFs_Lambert.rds'))
+    tfs = unique(tfs$`HGNC symbol`)
+    
+    ggs = get_geneName(rownames(heatmap_matrix))
+    sels = which(!is.na(match(ggs, tfs)))
+    
+    #sels = which(!is.na(match(rownames(heatmap_matrix), targets)))
+    row_dist <- as.dist((1 - cor(Matrix::t(heatmap_matrix[sels,])))/2)
+    row_dist[is.na(row_dist)] <- 1
+    annotation_rowSel = data.frame(Cluster = annotation_row[sels, ])
+    rownames(annotation_rowSel) = rownames(annotation_row)[sels]
+    
+    pheatmap(heatmap_matrix[sels, ], #ph$tree_row$order
+             useRaster = T,
+             cluster_cols=FALSE, 
+             cluster_rows=TRUE, 
+             show_rownames=FALSE,
+             show_colnames=FALSE, 
+             scale='none',
+             clustering_distance_rows=row_dist, #row_dist
+             clustering_method = hclust_method, #ward.D2
+             #cutree_rows=num_clusters,
+             # cutree_cols = 2,
+             annotation_row=annotation_rowSel,
+             annotation_col=annotation_col,
+             #annotation_colors=annotation_colors,
+             gaps_col = col_gap_ind,
+             treeheight_row = 30, 
+             breaks=bks,
+             fontsize = 6,
+             color=hmcols, 
+             border_color = NA,
+             silent=TRUE, 
+             filename=paste0(outDir, "/expression_pseudotime_pheatmap_allDEgenes_TF.pdf"),
+             width = 5, height = 12
+    )
+    
+    pheatmap(heatmap_matrix[sels, ], #ph$tree_row$order
+             useRaster = T,
+             cluster_cols=FALSE, 
+             cluster_rows=TRUE, 
+             show_rownames=TRUE,
+             show_colnames=FALSE, 
+             scale='none',
+             clustering_distance_rows=row_dist, #row_dist
+             clustering_method = hclust_method, #ward.D2
+             cutree_rows=num_clusters,
+             # cutree_cols = 2,
+             annotation_row=annotation_rowSel,
+             annotation_col=annotation_col,
+             annotation_colors=annotation_colors,
+             gaps_col = col_gap_ind,
+             treeheight_row = 30, 
+             breaks=bks,
+             fontsize = 4,
+             color=hmcols, 
+             border_color = NA,
+             silent=TRUE, 
+             filename=paste0(outDir, "/expression_pseudotime_pheatmap_allDEgenes_TF.SP",
+                             "_withgeneNames.pdf"),
+             width = 8, height = 20
+    )
+    
+  }
   
-  sels = which(!is.na(match(rownames(heatmap_matrix), targets)))
-  row_dist <- as.dist((1 - cor(Matrix::t(heatmap_matrix[sels,])))/2)
-  row_dist[is.na(row_dist)] <- 1
-  annotation_rowSel = data.frame(Cluster = annotation_row[sels, ])
-  rownames(annotation_rowSel) = rownames(annotation_row)[sels]
-  
-  pheatmap(heatmap_matrix[sels, ], #ph$tree_row$order
-           useRaster = T,
-           cluster_cols=FALSE, 
-           cluster_rows=TRUE, 
-           show_rownames=FALSE,
-           show_colnames=FALSE, 
-           scale='none',
-           clustering_distance_rows=row_dist, #row_dist
-           clustering_method = hclust_method, #ward.D2
-           cutree_rows=num_clusters,
-           # cutree_cols = 2,
-           annotation_row=annotation_rowSel,
-           annotation_col=annotation_col,
-           annotation_colors=annotation_colors,
-           gaps_col = col_gap_ind,
-           treeheight_row = 30, 
-           breaks=bks,
-           fontsize = 6,
-           color=hmcols, 
-           border_color = NA,
-           silent=TRUE, 
-           filename=paste0(outDir, "/expression_pseudotime_pheatmap_allDEgenes_TF.SP.pdf"),
-           width = 6, height = 12
-  )
-  
-  pheatmap(heatmap_matrix[sels, ], #ph$tree_row$order
-           useRaster = T,
-           cluster_cols=FALSE, 
-           cluster_rows=TRUE, 
-           show_rownames=TRUE,
-           show_colnames=FALSE, 
-           scale='none',
-           clustering_distance_rows=row_dist, #row_dist
-           clustering_method = hclust_method, #ward.D2
-           cutree_rows=num_clusters,
-           # cutree_cols = 2,
-           annotation_row=annotation_rowSel,
-           annotation_col=annotation_col,
-           annotation_colors=annotation_colors,
-           gaps_col = col_gap_ind,
-           treeheight_row = 30, 
-           breaks=bks,
-           fontsize = 4,
-           color=hmcols, 
-           border_color = NA,
-           silent=TRUE, 
-           filename=paste0(outDir, "/expression_pseudotime_pheatmap_allDEgenes_TF.SP",
-                           "_withgeneNames.pdf"),
-           width = 8, height = 20
-  )
-  
-  
-  
-  ##########################################
-  # DE TFs and signaling pathways intersected with RAR target
-  ##########################################
-  targets = readRDS('../results/RA_targets_L118404_smartseq3_20221117/Rdata/RAR_targets_chip_chiapet.rds')
-  
-  tfs = readRDS(file = paste0('../data/annotations/curated_human_TFs_Lambert.rds'))
-  tfs = unique(tfs$`HGNC symbol`)
-  tfs = as.character(unlist(sapply(tfs, firstup)))
-  sps = readRDS(file = paste0('../data/annotations/curated_signaling.pathways_gene.list_v2.rds'))
-  tf.sp = unique(c(tfs, sps$gene))
-  xx = read.table('../data/annotations/GO_term_summary_RAR_signalingPathway.txt', header = TRUE, sep = '\t', 
-                  row.names = NULL)
-  tf.sp = unique(c(tf.sp, xx[,2]))
-  xx = read.table('../data/annotations/GO_term_summary_TGFb.txt', header = TRUE, sep = '\t', 
-                  row.names = NULL)
-  tf.sp = unique(c(tf.sp, xx[,2]))
-  
-  targets = intersect(targets, tf.sp)
-  
-  sels = which(!is.na(match(rownames(heatmap_matrix), targets)))
-  row_dist <- as.dist((1 - cor(Matrix::t(heatmap_matrix[sels,])))/2)
-  row_dist[is.na(row_dist)] <- 1
-  annotation_rowSel = data.frame(Cluster = annotation_row[sels, ])
-  rownames(annotation_rowSel) = rownames(annotation_row)[sels]
-  
-  pheatmap(heatmap_matrix[sels, ], #ph$tree_row$order
-           useRaster = T,
-           cluster_cols=FALSE, 
-           cluster_rows=TRUE, 
-           show_rownames=TRUE,
-           show_colnames=FALSE, 
-           scale='none',
-           clustering_distance_rows=row_dist, #row_dist
-           clustering_method = hclust_method, #ward.D2
-           cutree_rows=num_clusters,
-           # cutree_cols = 2,
-           annotation_row=annotation_rowSel,
-           annotation_col=annotation_col,
-           annotation_colors=annotation_colors,
-           gaps_col = col_gap_ind,
-           treeheight_row = 30, 
-           breaks=bks,
-           fontsize = 6,
-           color=hmcols, 
-           border_color = NA,
-           silent=TRUE, 
-           filename=paste0(outDir, "/expression_pseudotime_pheatmap_all.TF.SP_intersectedRARtargets",
-                           "_withgeneNames.pdf"),
-           width = 6, height = 12
-  )
   
 }
 

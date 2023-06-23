@@ -1594,3 +1594,11 @@ binarySort_enrichedMotif = function(mat = NULL,
   
 }
 
+##########################################
+# test the trajectory-dependent peaks 
+##########################################
+testPseudotime_scATACseq = function()
+{
+  
+  
+}
