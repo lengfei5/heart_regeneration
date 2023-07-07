@@ -1597,8 +1597,62 @@ binarySort_enrichedMotif = function(mat = NULL,
 ##########################################
 # test the trajectory-dependent peaks 
 ##########################################
-testPseudotime_scATACseq = function()
+fit_solo_gam = function(y, tt, lvar)
 {
+  # inspired by https://github.com/quadbio/organoid_regulomes/blob/main/utils/de.R
+  # likelihood ratio test https://api.rpubs.com/tomanderson_34/lrt
+  fit <-gam(y ~ s(tt, df=4) + lvar, family=binomial)
+  fit0 <-gam(y ~ lvar, family=binomial)
   
+  test <- lmtest::lrtest(fit0, fit)
+  #cat(pval, '\n')
+  #coef <- fit$coefficients[[term+1]]
+  
+  return(test$Pr[2])
+        
+}
+
+testPseudotime_scATACseq = function(x, 
+                                    pseudotime,
+                                    latent.var)
+{
+  library('gam')
+  library(tictoc)
+  options(future.globals.maxSize = 150 * 1024^3)
+  
+  # pseudotime=sub_obj$pst; latent.var = sub_obj$nCount_ATAC
+  
+  # binarize and process count matrix
+  x = x > 0
+  ss = rowSums(x)
+  feature_sels = which(ss>5 & ss<0.8*ncol(x))
+  x = x[feature_sels, ]
+  
+  ss1 = colSums(x)
+  cell_sels = which(ss1>10)
+  x = x[, cell_sels]
+  tt = as.numeric(pseudotime[cell_sels])
+  lvar = as.numeric(latent.var[cell_sels])
+  
+  # index = 82
+  # plot(tt, x[index,])
+  #plot(lvar, x[2,])
+  tic()
+  pvals = apply(x, 1, fit_solo_gam, tt, lvar)
+  toc()
+  
+  # tic()
+  # res2 <- parallel::mclapply(c(1:200), function(j){
+  #   y = as.numeric(x[j, ])
+  #   fit <-gam(y ~ s(tt, df=4) + lvar, family=binomial)
+  #   fit0 <-gam(y ~ lvar, family=binomial)
+  #   test <- lmtest::lrtest(fit0, fit)
+  #   return(test$Pr[2])
+  # }, mc.cores = 16)
+  # toc()
+  # 
+  #res = unlist(res)
+  #saveRDS(res, file = paste(outDir, '/fit_gam_res_peaks.rds'))
+  return(pvals)
   
 }

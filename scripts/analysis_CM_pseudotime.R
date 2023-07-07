@@ -7,6 +7,18 @@
 # Date of creation: Tue Apr 18 13:07:41 2023
 ##########################################################################
 ##########################################################################
+rm(list = ls())
+
+version.analysis = '_R13591_intron.exon.20220729'
+
+resDir = paste0("../results/sc_multiome", version.analysis)
+RdataDir = paste0(resDir, '/Rdata/')
+
+if(!dir.exists(resDir)) dir.create(resDir)
+if(!dir.exists(RdataDir)) dir.create(RdataDir)
+
+dataDir = '../R13591_axolotl_multiome'
+
 source('functions_scATAC.R')
 source('functions_scRNAseq.R')
 source('functions_Visium.R')
@@ -404,12 +416,13 @@ saveRDS(sub_obj, file = paste0(outDir, 'CM_subset_RNA_ATAC_pseudotime.scanpy.rds
 # 
 ##########################################
 aa = readRDS(file = paste0(outDir, 'CM_subset_RNA_ATAC_pseudotime.scanpy.rds'))
-aa = ScaleData(aa, features = rownames(aa), assay = 'RNA')
 
 Test_genes_along_trajectory_TSCAN = FALSE
 if(Test_genes_along_trajectory_TSCAN)
 {
   library(TSCAN)
+  DefaultAssay(aa) = 'RNA'
+  aa = ScaleData(aa, features = rownames(aa), assay = 'RNA')
   # injury branch
   sub_obj = subset(aa, cells = colnames(aa)[which(aa$branch == 'injury')])
   #sub_obj = ScaleData(sub_obj, features = rownames(sub_obj), assay = 'RNA')
@@ -419,11 +432,11 @@ if(Test_genes_along_trajectory_TSCAN)
   #pseudo$gene <- rowData(sce)$SYMBOL
   pseudo = data.frame(pseudo[order(pseudo$p.value),])
   
-  gene_sels = rownames(pseudo)[which(abs(pseudo$logFC) >1 & pseudo$FDR<0.05)]
+  feature_sels = rownames(pseudo)[which(abs(pseudo$logFC) >1 & pseudo$FDR<0.05)]
   
   source('utility_plot.R')
   
-  plot_features_branched_heatmap(aa, gene_subset = gene_sels)
+  plot_features_branched_heatmap(aa, feature_subset = feature_sels, feature = 'gene')
   
 }
 
@@ -470,23 +483,49 @@ if(Test_motifActivity_along_trajectory_TSCAN){
 Test_peaks_along_trajectory = FALSE
 if(Test_peaks_along_trajectory)
 {
-  #library(TSCAN)
   # injury branch
   DefaultAssay(aa) = 'ATAC'
   sub_obj = subset(aa, cells = colnames(aa)[which(aa$branch == 'injury')])
   
+  ## pre-select the DE peaks
+  Idents(sub_obj) = droplevels(sub_obj$subtypes)
   
-  sce = as.SingleCellExperiment(sub_obj, assay = 'RNA')
+  da_peaks <- FindMarkers(
+    object = sub_obj,
+    ident.1 = 'CM_IS',
+    ident.2 = 'CM_ven_(Cav3_1)',
+    only.pos = TRUE,
+    test.use = 'LR',
+    min.pct = 0.05,
+    latent.vars = 'nCount_ATAC'
+  )
+  da_peaks2 <- FindMarkers(
+    object = sub_obj,
+    ident.1 = 'CM_Prol_IS',
+    ident.2 = 'CM_ven_(Cav3_1)',
+    only.pos = TRUE,
+    test.use = 'LR',
+    min.pct = 0.05,
+    latent.vars = 'nCount_ATAC'
+  )
   
-  pseudo <- testPseudotime(sce, pseudotime=sce$pst)
-  #pseudo$gene <- rowData(sce)$SYMBOL
-  pseudo = data.frame(pseudo[order(pseudo$p.value),])
+  # get top differentially accessible peaks
+  top.da.peak <- unique(c(rownames(da_peaks[da_peaks$p_val < 0.05, ]),  
+                          rownames(da_peaks[da_peaks2$p_val < 0.05, ]))
+  )
   
-  gene_sels = rownames(pseudo)[which(abs(pseudo$logFC) >1 & pseudo$FDR<0.05)]
+  source('functions_scATAC.R')
+  x = sub_obj@assays$ATAC@counts
+  x = x[!is.na(match(rownames(x), top.da.peak)), ]
+  
+  pseudo <- testPseudotime_scATACseq(x, pseudotime=sub_obj$pst, latent.var = sub_obj$nCount_ATAC)
+  
+  #pseudo = data.frame(pseudo[order(pseudo$p.value),])
+  feature_sels = names(pseudo)[which(pseudo<0.05)]
   
   source('utility_plot.R')
   
-  plot_features_branched_heatmap(chromvar_CM, feature_subset = feature_subset, feature = 'peak')
+  plot_features_branched_heatmap(aa, feature_subset = feature_subset, feature = 'peak')
   
   
   

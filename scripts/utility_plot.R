@@ -148,7 +148,7 @@ plot_features_branched_heatmap <- function(seuratObj = aa,
                                         add_annotation_row = NULL,
                                         show_rownames = TRUE) 
 {
-  # seuratObj = chromvar_CM;nbCell_condition = 50;scale_max=3; scale_min=-3; Get.Smooth.Curve = TRUE;
+  # seuratObj = aa; feature = 'gene';nbCell_condition = 50;scale_max=3; scale_min=-3; Get.Smooth.Curve = TRUE;
   # feature_subset = feature_sels;hclust_method = "ward.D2";num_clusters = 6;hmcols = NULL;
   library(VGAM) # an example code from https://online.stat.psu.edu/stat504/lesson/8/8.2/8.2.2
   library(MASS)
@@ -177,8 +177,15 @@ plot_features_branched_heatmap <- function(seuratObj = aa,
   ## select the corresponding matrix of selected features
   if(feature == 'gene') cds <- seuratObj@assays$RNA@scale.data
   if(feature == 'motif_activity') cds = seuratObj@assays$chromvar@data
+  if(feature == 'peak') {
+    #seuratObj = ScaleData(seuratObj, features = )
+    cds = seuratObj@assays$ATAC@data
+  }
   rownames(cds) = rownames(seuratObj)
   cds = cds[which(!is.na(match(rownames(cds), feature_subset))), ]
+  if(feature == 'peaks'){
+    cds = t(apply(cds, 1, scale))
+  }
   
   ## smooth the gene expression along the trajectory
   if(Get.Smooth.Curve){
@@ -205,7 +212,7 @@ plot_features_branched_heatmap <- function(seuratObj = aa,
                              newt = newt))
     colnames(BranchB_exprs) = names
     
-    save(BranchA_exprs, BranchB_exprs, file = paste0(outDir, 'smoothed_geneExpr_forHeatmap.Rdata'))
+    save(BranchA_exprs, BranchB_exprs, file = paste0(outDir, 'smoothed_', feature, '_forHeatmap.Rdata'))
     
   }
   
@@ -216,7 +223,7 @@ plot_features_branched_heatmap <- function(seuratObj = aa,
   cat(length(cell_ds), ' selected to use \n')
   
   ## use only cells saved in the previously downsampled
-  load(file = paste0(outDir, 'smoothed_geneExpr_forHeatmap.Rdata'))
+  load(file = paste0(outDir, 'smoothed_', feature, '_forHeatmap.Rdata'))
   BranchA_exprs = BranchA_exprs[, !is.na(match(colnames(BranchA_exprs), cell_ds))]
   BranchB_exprs = BranchB_exprs[, !is.na(match(colnames(BranchB_exprs), cell_ds))]
   col_gap_ind <- c(ncol(BranchB_exprs))
@@ -224,8 +231,8 @@ plot_features_branched_heatmap <- function(seuratObj = aa,
   heatmap_matrix <- cbind(BranchB_exprs[, ncol(BranchB_exprs):1], 
                         BranchA_exprs)
   
-  if(feature == 'motif_activity'){
-    scale_max=2; scale_min=-2;
+  if(feature != 'gene'){
+    scale_max=2; scale_min=-2; num_clusters = 4;
   }
   heatmap_matrix=heatmap_matrix[!apply(heatmap_matrix, 1, sd)==0,]
   #if(feature == 'gene') 
@@ -235,12 +242,12 @@ plot_features_branched_heatmap <- function(seuratObj = aa,
   heatmap_matrix[heatmap_matrix>scale_max] = scale_max
   heatmap_matrix[heatmap_matrix<scale_min] = scale_min
   
-  saveRDS(heatmap_matrix, file = paste0(outDir, "/heatmap_matrix_forPlot.rds"))
+  saveRDS(heatmap_matrix, file = paste0(outDir, "/heatmap_matrix_forPlot_", feature, ".rds"))
   #heatmap_matrix_ori <- heatmap_matrix
   #heatmap_matrix <- heatmap_matrix[is.finite(heatmap_matrix[, 1]) & 
   # is.finite(heatmap_matrix[, col_gap_ind]), ] #remove the NA fitting failure genes for each branch 
   
-  heatmap_matrix = readRDS(file = paste0(outDir, "/heatmap_matrix_forPlot.rds"))
+  heatmap_matrix = readRDS(file = paste0(outDir, "/heatmap_matrix_forPlot_", feature, ".rds"))
   row_dist <- as.dist((1 - cor(Matrix::t(heatmap_matrix)))/2)
   row_dist[is.na(row_dist)] <- 1
   
@@ -251,7 +258,6 @@ plot_features_branched_heatmap <- function(seuratObj = aa,
     hmcols <- blue2green2red(length(bks) - 1)
   }
   
-  num_clusters = 4
   
   # prin  t(hmcols)
   ph <- pheatmap(heatmap_matrix, 
@@ -314,7 +320,7 @@ plot_features_branched_heatmap <- function(seuratObj = aa,
   if(Plot_use_heatmap){
     if(feature == 'gene') myColor = hmcols
     if(feature == 'motif_activity') myColor = inlmisc::GetColors(length(bks) +1, scheme = "BuRd")
-    
+    if(feature == 'peak') myColor = paletteContinuous(set = "solarExtra", n = length(bks) +1)
     # all DE genes
     pheatmap(heatmap_matrix[, ], #ph$tree_row$order
              useRaster = T,
@@ -363,7 +369,7 @@ plot_features_branched_heatmap <- function(seuratObj = aa,
              border_color = NA,
              silent=TRUE, 
              filename=paste0(outDir, "/expression_pseudotime_pheatmap_DEtrajectory_", feature, "withNames.pdf"),
-             width = 8, height = 12
+             width = 8, height = 20
     )
     
     ##########################################

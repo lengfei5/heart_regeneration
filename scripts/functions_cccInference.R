@@ -270,6 +270,30 @@ run_LIANA_defined_celltype = function(subref,
 }
 
 
+aggregate_output_LIANA = function(outDir)
+{
+  xlist = list.files(path = outDir, pattern = '*.txt', full.names = TRUE)
+  
+  for(n in 1:length(xlist))
+  {
+    # n = 2
+    cat(n, ' -- ', basename(xlist[n]), '\n')
+    test = read.table(xlist[n], header = TRUE)
+    
+    ## aggregate_rank interpretation: https://saezlab.github.io/liana/articles/liana_tutorial.html
+    ## RRA scores can be interpreted as p-values and 
+    ## interactions which are ranked consistently higher than random are assigned low scores/p-values.
+    test = data.frame(test[, c(1:6, 
+                               which(colnames(test) == 'natmi.edge_specificity'), 
+                               which(colnames(test) == 'sca.LRscore'))], stringsAsFactors = FALSE)
+    
+    write.table(test, file = paste0(outDir, '/',  gsub('.txt', '_simplied.txt', basename(xlist[n]))),
+                quote = FALSE, col.names = TRUE, row.names = FALSE)
+    
+  }
+  
+  
+}
 
 assembly.liana.plot = function()
 {
