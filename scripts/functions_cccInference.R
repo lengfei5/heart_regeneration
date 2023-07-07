@@ -19,12 +19,13 @@
 ##########################################
 # original code from https://saezlab.github.io/liana/articles/liana_tutorial.html
 run_LIANA = function(refs,
+                     timepoint_specific = TRUE,
+                     include_autocrine = FALSE,
                      celltypes = NULL,
                      celltypes_timeSpecific = NULL,
-                     timepoint_specific = FALSE,
-                     receiver_cells = list(c('CM_IS')),
+                     #receiver_cells = list(c('CM_IS')),
                      outDir = '../results/Ligand_Receptor_analysis',
-                     ntop = 50,
+                     ntop = 100,
                      RUN.CPDB.alone = FALSE)
 {
   require(tidyverse)
@@ -37,6 +38,8 @@ run_LIANA = function(refs,
   require(matrixStats)
   require(MatrixGenerics)
   require(sparseMatrixStats)
+  
+  # celltypes_timeSpecific = celltypes_BZ_timeSpecific[[1]]
   
   ## double check timepoint_specific and celltype 
   if(!timepoint_specific){
@@ -64,19 +67,21 @@ run_LIANA = function(refs,
       if(!is.list(celltypes_timeSpecific) | length(celltypes_timeSpecific) == 0){
         stop('a list of time-specific cell types expected \n')
       }else{
-        cat(length(celltypes_timeSpecific), 'time points specified \n')
-        cat(names(celltypes_timeSpecific), '\n')
+        #cat(length(celltypes_timeSpecific), 'subtype pairs specified \n')
+        cat(names(celltypes_timeSpecific), ' as receivers \n')
         
         for(n in 1:length(celltypes_timeSpecific))
         {
-          celltypes = celltypes_timeSpecific[[n]]
+          celltypes = unique(c(celltypes_timeSpecific[[n]], names(celltypes_timeSpecific)[n]))
           mm = match(celltypes, refs$celltypes)
           if(length(which(is.na(mm)))>0){
             stop(names(celltypes_timeSpecific)[n], 
                  ': some selected cell types not found in refs -- ', celltypes[which(is.na(mm))])
           }else{
-            cat(names(celltypes_timeSpecific)[n], celltypes,'\n')
-            cat('--all selected cell types were found in the refs \n')
+            cat('-----------------\n')
+            cat("receiver : ", names(celltypes_timeSpecific)[n],'\n')
+            cat("senders : ", celltypes, '\n')
+            cat('--all selected cell types were found in the refs --\n')
           }
         }
       }
@@ -107,14 +112,18 @@ run_LIANA = function(refs,
   }else{
     for(n in 1:length(celltypes_timeSpecific))
     {
-      # n = 2
+      # n = 1
       celltypes = celltypes_timeSpecific[[n]]
-      timepoint = names(celltypes_timeSpecific)[n]
-      receivers = receiver_cells[[n]]
+      #timepoint = names(celltypes_timeSpecific)[n]
+      receivers = names(celltypes_timeSpecific)[n]
       
-      cat(n, '-- time point : ', timepoint, '\n')
+      if(include_autocrine) {
+        cat('-- autocrine is considerede -- \n')
+        celltypes = unique(c(celltypes, receivers))
+      }
+      
       cat('---- celltype : ', celltypes, '\n')
-      cat('---- receiver : ', receivers, "\n")
+      cat('---- receivers : ', receivers, "\n")
       
       celltypes_sel = unique(c(celltypes, receivers))
       
@@ -131,7 +140,7 @@ run_LIANA = function(refs,
       run_LIANA_defined_celltype(subref,
                                  celltypes = celltypes,
                                  receivers = receivers,
-                                 additionalLabel = paste0('_', timepoint))
+                                 additionalLabel = paste0('_', receivers))
 
     }
   
@@ -252,7 +261,6 @@ run_LIANA_defined_celltype = function(subref,
                                '_ntop.', ntop, '.pdf'), 
              width = 30, height = min(c(10*ntop/20, 50)), limitsize = FALSE)
     }
-    
     
   }
   
