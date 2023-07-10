@@ -40,6 +40,9 @@ run_LIANA = function(refs,
   require(sparseMatrixStats)
   
   # celltypes_timeSpecific = celltypes_BZ_timeSpecific[[1]]
+  cat('output directory : ', outDir,  '\n')
+  system(paste0('mkdir -p ', outDir))
+  
   
   ## double check timepoint_specific and celltype 
   if(!timepoint_specific){
@@ -90,7 +93,6 @@ run_LIANA = function(refs,
   }
   
   # prepre for the LIANA loop
-  system(paste0('mkdir -p ', outDir))
   Idents(refs) = as.factor(refs$celltypes)
   
   if(!timepoint_specific){
@@ -132,7 +134,7 @@ run_LIANA = function(refs,
       table(subref$celltypes)
       #subref = subset(x = subref, downsample = 1000)
       
-      cat('celltype to consider -- ', names(table(subref$celltypes)), '\n')
+      #cat('celltype to consider -- ', names(table(subref$celltypes)), '\n')
       
       Idents(subref) = subref$celltypes
       
@@ -140,7 +142,8 @@ run_LIANA = function(refs,
       run_LIANA_defined_celltype(subref,
                                  celltypes = celltypes,
                                  receivers = receivers,
-                                 additionalLabel = paste0('_', receivers))
+                                 additionalLabel = paste0('_', receivers),
+                                 outDir = outDir)
 
     }
   
@@ -154,6 +157,7 @@ run_LIANA_defined_celltype = function(subref,
                                       celltypes,
                                       receivers = NULL,
                                       additionalLabel = '_fixedCelltypes',
+                                      outDir = outDir,
                                       Test.geneExpresion = TRUE)
 {
   source('functions_scRNAseq.R')
@@ -336,11 +340,12 @@ assembly.liana.plot = function()
 ########################################################
 run_Diff_NicheNet = function(refs = refs, 
                              timepoint_specific = TRUE,
+                             include_autocrine = TRUE,
                              celltypes = NULL,
-                             celltypes_BZ_timeSpecific = NULL, 
-                             celltypes_RZ_timeSpecific = NULL,
-                             receivers_BZ_timeSpecific = list(c('CM_IS')),
-                             receivers_RZ_timeSpecific = list(c('CM_ROBO2')), 
+                             celltypes_BZ_specificDay = NULL, 
+                             celltypes_RZ_specificDay = NULL,
+                             #receivers_BZ_specificDay = list(c('CM_IS')),
+                             #receivers_RZ_specificDay = list(c('CM_ROBO2')), 
                              outDir = outDir,
                              ntop = c(50, 100, 150, 200))
 {
@@ -358,6 +363,7 @@ run_Diff_NicheNet = function(refs = refs,
   source('functions_scRNAseq.R')
   source('functions_Visium.R')
   
+  # celltypes_BZ_specificDay = celltypes_BZ_timeSpecific[[n]]; celltypes_RZ_specificDay = celltypes_RZ_timeSpecific[[n]]
   ## double check timepoint_specific and celltype 
   if(!timepoint_specific){
     cat(' -- no timepoint to consider -- \n')
@@ -379,64 +385,64 @@ run_Diff_NicheNet = function(refs = refs,
   }else{
     cat('-- time specific to consider -- \n\n')
     
-    if(is.null(celltypes_BZ_timeSpecific)| is.null(celltypes_RZ_timeSpecific)){
+    if(is.null(celltypes_BZ_specificDay)| is.null(celltypes_RZ_specificDay)){
       stop('no list of time-specific cell types BZ or RZ found \n')
     }else{
-      if(!is.list(celltypes_BZ_timeSpecific) | length(celltypes_BZ_timeSpecific) == 0 |
-         !is.list(celltypes_RZ_timeSpecific) | length(celltypes_RZ_timeSpecific) == 0){
+      if(!is.list(celltypes_BZ_specificDay) | length(celltypes_BZ_specificDay) == 0 |
+         !is.list(celltypes_RZ_specificDay) | length(celltypes_RZ_specificDay) == 0){
         stop('lists of time-specific BZ/RZ cell types expected \n')
         
       }else{
-        cat(length(celltypes_BZ_timeSpecific), 'time points specified for BZ  \n')
-        cat(names(celltypes_BZ_timeSpecific), '\n\n')
+        #cat(length(celltypes_BZ_specificDay), 'time points specified for BZ  \n')
+        cat( 'receivers in BZ :', names(celltypes_BZ_specificDay), '\n\n')
         
-        cat(length(celltypes_RZ_timeSpecific), 'time points specified for RZ \n')
-        cat(names(celltypes_RZ_timeSpecific), '\n\n')
+        #cat(length(celltypes_RZ_specificDay), 'time points specified for RZ \n')
+        cat('receivers in RZ :', names(celltypes_RZ_specificDay), ' \n')
         
-        if(length(celltypes_BZ_timeSpecific) != length(celltypes_RZ_timeSpecific)){
+        if(length(celltypes_BZ_specificDay) != length(celltypes_RZ_specificDay)){
           stop('not the same time points specified for BZ and RZ')
         } 
         
-        for(n in 1:length(celltypes_BZ_timeSpecific))
+        # double check the celltypes defined in BZ
+        for(n in 1:length(celltypes_BZ_specificDay))
         {
-          celltypes = celltypes_BZ_timeSpecific[[n]]
+          celltypes = unique(c(celltypes_BZ_specificDay[[n]], names(celltypes_BZ_specificDay[n])))
           mm = match(celltypes, refs$celltypes)
           if(length(which(is.na(mm)))>0){
-            stop(names(celltypes_BZ_timeSpecific)[n], 
+            stop(names(celltypes_BZ_specificDay)[n], 
                  ': some selected cell types in BZ not found in refs  -- ', celltypes[which(is.na(mm))])
           }else{
-            cat(names(celltypes_BZ_timeSpecific)[n], celltypes,'\n')
+            cat(celltypes,'\n')
             cat('--all selected cell types of BZ were found in the refs \n')
           }
         }
         
-        for(n in 1:length(celltypes_RZ_timeSpecific))
+        for(n in 1:length(celltypes_RZ_specificDay))
         {
-          celltypes = celltypes_RZ_timeSpecific[[n]]
+          celltypes = unique(c(celltypes_RZ_specificDay[[n]], names(celltypes_RZ_specificDay)[n]))
           mm = match(celltypes, refs$celltypes)
           if(length(which(is.na(mm)))>0){
-            stop(names(celltypes_RZ_timeSpecific)[n], 
+            stop(names(celltypes_RZ_specificDay)[n], 
                  ': some selected cell types in RZ not found in refs  -- ', celltypes[which(is.na(mm))])
           }else{
-            cat(names(celltypes_RZ_timeSpecific)[n], celltypes,'\n')
+            cat(celltypes,'\n')
             cat('--all selected cell types of RZ were found in the refs \n')
           }
         }
-        
-        for(n in length(receivers_BZ_timeSpecific))
-        {
-          # n = 1
-          receivers = receivers_BZ_timeSpecific[[n]]
-          receivers.ctl =  receivers_RZ_timeSpecific[[n]]
-          
-          mm = match(receivers, celltypes_BZ_timeSpecific[[n]])
-          if(any(is.na(mm))){stop(receivers, ' not found in the celltypes_BZ') }
-          
-          if(length(receivers.ctl)!= 1) stop('only one control receiver is allowed at each time point')
-          mm.ctl = match(receivers.ctl, celltypes_RZ_timeSpecific[[n]])
-          if(is.na(mm.ctl)){stop(receivers.ctl, ' not found in the celltype_RZ')}
-          
-        }
+        # for(n in length(receivers_BZ_specificDay))
+        # {
+        #   # n = 1
+        #   receivers = receivers_BZ_specificDay[[n]]
+        #   receivers.ctl =  receivers_RZ_specificDay[[n]]
+        #   
+        #   mm = match(receivers, celltypes_BZ_specificDay[[n]])
+        #   if(any(is.na(mm))){stop(receivers, ' not found in the celltypes_BZ') }
+        #   
+        #   if(length(receivers.ctl)!= 1) stop('only one control receiver is allowed at each time point')
+        #   mm.ctl = match(receivers.ctl, celltypes_RZ_specificDay[[n]])
+        #   if(is.na(mm.ctl)){stop(receivers.ctl, ' not found in the celltype_RZ')}
+        #   
+        # }
       }
     }
   }
@@ -475,22 +481,27 @@ run_Diff_NicheNet = function(refs = refs,
     inner_join(lr_network %>% 
                  distinct(ligand,receptor), by = c("ligand","receptor"))
   
-  
   ##########################################
-  # loop over the time points
+  # loop over the receiver cells
   ##########################################
-  for(n in 1:length(celltypes_BZ_timeSpecific))
+  for(n in 1:length(celltypes_BZ_specificDay))
   {
-    # n = 2
-    timepoint = names(celltypes_BZ_timeSpecific)[n]
+    # n = 1
+    celltypes_BZ = celltypes_BZ_specificDay[[n]]
+    celltypes_RZ = celltypes_RZ_specificDay[[n]]
     
-    celltypes_BZ = celltypes_BZ_timeSpecific[[n]]
-    celltypes_RZ = celltypes_RZ_timeSpecific[[n]]
+    receivers_BZ = names(celltypes_BZ_specificDay)[n]
+    receivers_RZ = names(celltypes_RZ_specificDay)[n]
     
-    receivers_BZ = receivers_BZ_timeSpecific[[n]]
-    receivers_RZ = receivers_RZ_timeSpecific[[n]]
+    if(include_autocrine){
+      cat('-- autocrine is considerede -- \n')
+      celltypes_BZ = unique(c(celltypes_BZ, receivers_BZ))
+      celltypes_RZ = unique(c(celltypes_RZ, receivers_RZ))
+    }
     
-    cat(n, '-- ', timepoint, '\n')
+    #timepoint = receivers_BZ # in case this variable still remains
+    
+    #cat(n, '-- ', timepoint, '\n')
     cat('BZ cell types : \n ', celltypes_BZ, '\n')
     cat('RZ cell types : \n ', celltypes_RZ, '\n')
     
@@ -507,6 +518,7 @@ run_Diff_NicheNet = function(refs = refs,
     celltypes_sel = unique(c(celltypes_BZ, receivers_BZ, 
                              celltypes_RZ, receivers_RZ)
     )
+    
     Idents(refs) = as.factor(refs$celltypes)
     subref = subset(refs, cells = colnames(refs)[!is.na(match(refs$celltypes, celltypes_sel))])
     subref$celltypes = droplevels(as.factor(subref$celltypes))
@@ -663,11 +675,12 @@ run_Diff_NicheNet = function(refs = refs,
       saveRDS(res, file = paste0(outDir, '/nichenet_prioritization_tables_output',
                             '_receiverBZ.', receiver,
                             '_receiverRZ.', receiver_ctl, 
-                            '_timepoint.', timepoint, '.rds'))
+                            #'_timepoint.', timepoint, 
+                            '.rds'))
       
       # res = readRDS(file = paste0(outDir, '/nichenet_prioritization_tables_output',
-      #                             '_receiverBZ.', receivers_BZ_timeSpecific,
-      #                             '_receiverRZ.', receivers_RZ_timeSpecific, 
+      #                             '_receiverBZ.', receivers_BZ_specificDay,
+      #                             '_receiverRZ.', receivers_RZ_specificDay, 
       #                             '_timepoint.', timepoint, '.rds'))
       
       prioritization_tables = res[[1]]
@@ -731,7 +744,7 @@ run_Diff_NicheNet = function(refs = refs,
         ggsave(paste0(outDir, '/Ligand_receptors_LFC', 
                       '_receiverBZ.', receiver,
                       '_receiverRZ.', receiver_ctl, 
-                      '_timepoint.', timepoint,
+                      #'_timepoint.', timepoint,
                       '_ntop.', ntop, '.pdf'), 
                width = 12, height = 12*ntop/50, limitsize = FALSE)
         
@@ -752,7 +765,7 @@ run_Diff_NicheNet = function(refs = refs,
         ggsave(paste0(outDir, '/Combined_plots_ligand_noFiltering',
                       '_receiverBZ.', receiver,
                       '_receiverRZ.', receiver_ctl, 
-                      '_timepoint.', timepoint,
+                      #'_timepoint.', timepoint,
                       '_ntop.', ntop, '.pdf'), 
                width = 60, height = 12*ntop/50, limitsize = FALSE)
         

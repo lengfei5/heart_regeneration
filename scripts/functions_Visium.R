@@ -1153,6 +1153,60 @@ plot.RCTD.results = function(RCTD_out = '../results/RCTD_out',
   
 }
 
+Run_imputation_snRNAseq_visium = function(stx, refs, slice, normalized_weights = TRUE)
+{
+  ## preapre the reference 
+  cat('-- prepare global reference --\n')
+  
+  E_refs = GetAssayData(object = refs, slot = "data")
+  E_refs = expm1(E_refs) # linear scale of corrected gene expression
+  
+  ### summarize the expression for each subtypes
+  cell_types_ref <- unique(refs@meta.data$celltypes)
+  
+  X = matrix(NA, ncol = length(cell_types_ref), nrow = nrow(E_refs))
+  colnames(X) = cell_types_ref
+  rownames(X) = rownames(E_refs)
+  
+  for(n in 1:ncol(X))
+  {
+    cat(n, '--', colnames(X)[n], '\n')
+    X[,n] = rowMeans(E_refs[,which(refs@meta.data$celltypes == colnames(X)[n])])
+  }
+  
+  cell_types_ref = gsub('CM_Robo2', 'CM_ven_Robo2', cell_types_ref)
+  cell_types_ref = gsub('CM_Cav3.1', 'CM_ven_Cav3_1', cell_types_ref)
+  colnames(X) = cell_types_ref
+  
+  ## import the inferred cell type proportions
+  RCTD_out = paste0('../results/visium_axolotl_R12830_resequenced_20220308/',
+                    'RCTD_subtype_out_42subtypes_ref.time.specific_v4.3')
+  resultsdir <- paste0(RCTD_out)
+ 
+  myRCTD = readRDS(file = paste0(resultsdir, '/RCTD_out_doubletMode_', slice, '.rds'))
+  results <- myRCTD@results
+  
+  # normalize the cell type proportions to sum to 1.
+  #norm_weights = sweep(results$weights, 1, rowSums(results$weights), '/') 
+  norm_weights = normalize_weights(results$weights) 
+  cell_type_names <- myRCTD@cell_type_info$info[[2]] #list of cell type names
+  weights = results$weights
+  
+  mm = match(cell_type_names, cell_types_ref)
+  
+  X1 = X[,mm]
+  if(normalized_weights){
+    y = as.matrix(X1) %*% t(as.matrix(norm_weights))
+  }else{
+    y = as.matrix(X1) %*% t(as.matrix(weights))
+  }
+  
+  # y = log2(y+1)
+  stx[['imputated']] = CreateAssayObject(data = y)
+  
+  return(stx)
+  
+}
 ########################################################
 ########################################################
 # Section : define boarder zone, injury zone and remote zone
