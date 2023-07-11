@@ -75,9 +75,13 @@ Idents(st) = st$condition
 
 for(n in 1:length(cc))
 {
-  # n = 3
+  # n = 1
   cat(n, '  slice -- ', cc[n], '\n')
   slice = cc[n]
+  
+  outDir = paste0(resDir, '/', slice, '/')
+  if(!dir.exists(outDir)) dir.create(outDir)
+  
   stx = subset(st, condition == slice)
   DefaultAssay(stx) = 'Spatial'
   
@@ -87,15 +91,22 @@ for(n in 1:length(cc))
   ggs = rownames(stx)[grep('GAS6|AXL', rownames(stx))]
   SpatialFeaturePlot(stx, features = ggs, images = cc[n])
   
+  ggsave(paste0(outDir, 'GAS6_AXL_expression_SCT.pdf'), 
+         width = 14, height = 6)
+  
   # Dimensional reduction with all cells
   stx <- RunPCA(stx, assay = "SCT", verbose = FALSE)
   stx <- FindNeighbors(stx, reduction = "pca", dims = 1:30)
-  stx <- FindClusters(stx, verbose = FALSE, resolution = 1.0)
+  stx <- FindClusters(stx, verbose = FALSE, resolution = 1.5)
   stx <- RunUMAP(stx, reduction = "pca", dims = 1:30)
   p1 <- DimPlot(stx, reduction = "umap",group.by = 'seurat_clusters', label = TRUE)
   p2 <- SpatialDimPlot(stx, label = TRUE, group.by = 'seurat_clusters', label.size = 3, images = cc[n])
   p1 + p2
-
+  
+  ggsave(paste0(outDir, 'visium_clusters.pdf'), 
+         width = 14, height = 6)
+  
+  
   ##########################################
   # # Format Spatial Coordinates and Normalize
   ##########################################
@@ -108,10 +119,14 @@ for(n in 1:length(cc))
   ggs = rownames(stx)[grep('GAS6|AXL', rownames(stx))]
   SpatialFeaturePlot(stx, features = ggs, images = cc[n])
   
+  ggsave(paste0(outDir, 'GAS6_AXL_expression_logNormalize.pdf'), 
+         width = 14, height = 6)
+  
+  
   ##########################################
   # # Impute and Run NICHES
   ##########################################
-  Use_ALRA_impuation = FALSE
+  Use_ALRA_impuation = TRUE
   if(Use_ALRA_impuation){
     DefaultAssay(stx) <- "Spatial"
     stx <- SeuratWrappers::RunALRA(stx)
@@ -119,6 +134,9 @@ for(n in 1:length(cc))
     DefaultAssay(stx) = 'alra'
     ggs = rownames(stx)[grep('GAS6|AXL', rownames(stx))]
     SpatialFeaturePlot(stx, features = ggs, images = cc[n])
+    
+    ggsave(paste0(outDir, 'GAS6_AXL_expression_ALRA.imputation.pdf'), 
+           width = 14, height = 6)
     
     cat('change the feature names  \n')
     mat = stx@assays$alra@data
@@ -142,7 +160,7 @@ for(n in 1:length(cc))
                                position.x = 'x',
                                position.y = 'y',
                                k = 4, 
-                               blend = 'sum',
+                               #blend = 'sum',
                                cell_types = "seurat_clusters",
                                min.cells.per.ident = 0,
                                min.cells.per.gene = NULL,
@@ -166,116 +184,11 @@ for(n in 1:length(cc))
       ggtitle('Cellular Microenvironment') + 
       NoLegend()
     
-    # Find markers
-    mark <- FindAllMarkers(niche,min.pct = 0.25,only.pos = T, test.use = "roc")
-    GOI_niche <- mark %>% group_by(cluster) %>% top_n(5,myAUC)
-    DoHeatmap(niche,features = unique(GOI_niche$gene))+ 
-      scale_fill_gradientn(colors = c("grey","white", "blue"))
-    
-    # Check that these make sense and print little plots
-    # DefaultAssay(stx) <- 'alra'
-    # p1 <- SpatialFeaturePlot(stx, crop = TRUE, features = "Fgf1",slot = "data",min.cutoff =  'q1',
-    #                          max.cutoff = 'q99')+ggtitle("Ligand")+theme(legend.position = "right")
-    # p2 <- SpatialFeaturePlot(stx, crop = TRUE, features = "Fgfr2",slot = "data",min.cutoff =  'q1',
-    #                          max.cutoff = 'q99')+ggtitle("Receptor")+theme(legend.position = "right")
-    # 
-    # ggpubr::ggarrange(p1,p2)
-    
-    # Add Niches output as an assay
-    niches.data <- GetAssayData(object =  niche[['NeighborhoodToCell']], slot = 'data')
-    colnames(niches.data) <- niche[['ReceivingCell']]$ReceivingCell
-    stx[["NeighborhoodToCell"]] <- CreateAssayObject(data = niches.data )
-    
-    
-    DefaultAssay(stx) = 'alra'
-    ggs = rownames(stx)[grep('GAS6|AXL', rownames(stx))]
-    SpatialFeaturePlot(stx, features = ggs, images = cc[n])
-    
-    ggsave(paste0(resDir, '/GAS6_AXL_expression_visium_ALRAimputation', cc[n], '.pdf'), 
-           width = 10, height = 6)
-    
-    
-    # Plot celltype specific niche signaling
-    DefaultAssay(stx) <- "NeighborhoodToCell"
-    stx <- ScaleData(stx)
-    SpatialFeaturePlot(stx,
-                       features = c('GAS6—AXL'),
-                       slot = 'scale.data', images = cc[n])
-    
-    ggsave(paste0(resDir, '/GAS6_AXL_interaction_visium_ALRAimputation', cc[n], '.pdf'), 
-           width = 10, height = 6)
-    
-    
-  }
-  
-  ##########################################
-  # use snRNA-seq data to imputate the visium data 
-  ##########################################
-  Use_snRNAseq_imputation = FALSE
-  if(Use_snRNAseq_imputation){
-    DefaultAssay(stx) <- "Spatial"
-    # n = 3
-    source('functions_Visium.R')
-    slice = cc[n]
-    stx <- Run_imputation_snRNAseq_visium(stx, refs, slice = slice, normalized_weights = FALSE)
-    
-    DefaultAssay(stx) = 'imputated'
-    ggs = rownames(stx)[grep('GAS6|AXL', rownames(stx))]
-    SpatialFeaturePlot(stx, features = ggs, images = slice)
-    
-    ggsave(paste0(resDir, '/GAS6_AXL_expression_visium_snRNAimputation', cc[n], '.pdf'), 
-           width = 10, height = 6)
-    
-    cat('change the feature names  \n')
-    mat = stx@assays$imputated@data
-    meta = stx@meta.data
-    ggs = get_geneName(rownames(mat))
-    mat = mat[match(unique(ggs), ggs), ]
-    rownames(mat) = get_geneName(rownames(mat))
-    
-    srat <- CreateSeuratObject(counts = mat, data = mat,  assay = "imputation", meta.data = meta) # create object
-    # 
-    # image <- Read10X_Image(image.dir = paste0(topdir, "mock/outs/spatial/"),
-    #                        filter.matrix = FALSE) # read in the images
-    # image <- image[Cells(x = srat)] # filter image by the spots
-    # DefaultAssay(object = image) <- "Spatial" # set default assay
-    # srat[[keyname]] <- image # slice name might be changed
-    # 
-    NICHES_output <- RunNICHES(object = srat,
-                               LR.database = "fantom5",
-                               species = "human",
-                               assay = "imputation",
-                               position.x = 'x',
-                               position.y = 'y',
-                               k = 4, 
-                               cell_types = "seurat_clusters",
-                               min.cells.per.ident = 0,
-                               min.cells.per.gene = NULL,
-                               meta.data.to.map = c('orig.ident','seurat_clusters'),
-                               CellToCell = F, CellToSystem = F,SystemToCell = F,
-                               CellToCellSpatial = F,CellToNeighborhood = F, 
-                               NeighborhoodToCell = T)
-    
-    
-    niche <- NICHES_output[['NeighborhoodToCell']]
-    Idents(niche) <- niche[['ReceivingType']]
-    
-    # Scale and visualize
-    niche <- ScaleData(niche)
-    niche <- FindVariableFeatures(niche,selection.method = "disp")
-    niche <- RunPCA(niche)
-    ElbowPlot(niche,ndims = 50)
-    
-    niche <- RunUMAP(niche,dims = 1:10)
-    DimPlot(niche,reduction = 'umap',pt.size = 0.5,shuffle = T, label = T) +
-      ggtitle('Cellular Microenvironment') + 
-      NoLegend()
-    
-    # Find markers
-    mark <- FindAllMarkers(niche,min.pct = 0.25,only.pos = T, test.use = "roc")
-    GOI_niche <- mark %>% group_by(cluster) %>% top_n(5,myAUC)
-    DoHeatmap(niche,features = unique(GOI_niche$gene))+ 
-      scale_fill_gradientn(colors = c("grey","white", "blue"))
+    # # Find markers
+    # mark <- FindAllMarkers(niche,min.pct = 0.25,only.pos = T, test.use = "roc")
+    # GOI_niche <- mark %>% group_by(cluster) %>% top_n(5,myAUC)
+    # DoHeatmap(niche,features = unique(GOI_niche$gene))+ 
+    #   scale_fill_gradientn(colors = c("grey","white", "blue"))
     
     # Check that these make sense and print little plots
     # DefaultAssay(stx) <- 'alra'
@@ -299,14 +212,120 @@ for(n in 1:length(cc))
     # Plot celltype specific niche signaling
     DefaultAssay(stx) <- "NeighborhoodToCell"
     stx <- ScaleData(stx)
-    SpatialFeaturePlot(stx,
-                       features = c('GAS6—AXL'),
-                       slot = 'scale.data', images = cc[n])
     
-    ggsave(paste0(resDir, '/GAS6_AXL_interaction_visium_snRNAimputation', cc[n], '.pdf'), 
-           width = 10, height = 6)
+    saveRDS(stx, file = paste0(outDir, 'st_res_NICHES_NeighborhoodToCell_alra.rds'))
+    
+    SpatialFeaturePlot(stx,
+                       features = c('GAS6—AXL', "NRG1—ERBB2"),
+                       slot = 'scale.data', images = slice)
+    
+    ggsave(paste0(outDir, '/GAS6_AXL_examples_interaction_visium_ALRAimputation.pdf'), 
+           width = 14, height = 6)
     
   }
   
+  ##########################################
+  # use snRNA-seq data to imputate the visium data 
+  ##########################################
+  Use_snRNAseq_imputation = TRUE
+  if(Use_snRNAseq_imputation){
+    DefaultAssay(stx) <- "Spatial"
+    # n = 3
+    source('functions_Visium.R')
+    
+    stx2 <- Run_imputation_snRNAseq_visium(stx, refs, slice = slice, normalized_weights = FALSE)
+    
+    DefaultAssay(stx2) = 'imputated'
+    ggs = rownames(stx2)[grep('GAS6|AXL', rownames(stx2))]
+    SpatialFeaturePlot(stx2, features = ggs, images = slice)
+    
+    ggsave(paste0(outDir, 'GAS6_AXL_expression_visium_snRNAimputation.pdf'), 
+           width = 14, height = 6)
+    
+    cat('change the feature names  \n')
+    mat = stx2@assays$imputated@data
+    meta = stx2@meta.data
+    ggs = get_geneName(rownames(mat))
+    mat = mat[match(unique(ggs), ggs), ]
+    rownames(mat) = get_geneName(rownames(mat))
+    
+    srat <- CreateSeuratObject(counts = mat, data = mat,  assay = "imputation", meta.data = meta) # create object
+    # 
+    # image <- Read10X_Image(image.dir = paste0(topdir, "mock/outs/spatial/"),
+    #                        filter.matrix = FALSE) # read in the images
+    # image <- image[Cells(x = srat)] # filter image by the spots
+    # DefaultAssay(object = image) <- "Spatial" # set default assay
+    # srat[[keyname]] <- image # slice name might be changed
+    # 
+    NICHES_output <- RunNICHES(object = srat,
+                               LR.database = "fantom5",
+                               species = "human",
+                               assay = "imputation",
+                               position.x = 'x',
+                               position.y = 'y',
+                               k = 4, 
+                               #blend = 'sum',
+                               cell_types = "seurat_clusters",
+                               min.cells.per.ident = 0,
+                               min.cells.per.gene = NULL,
+                               meta.data.to.map = c('orig.ident','seurat_clusters'),
+                               CellToCell = F, CellToSystem = F,SystemToCell = F,
+                               CellToCellSpatial = F,CellToNeighborhood = F, 
+                               NeighborhoodToCell = T)
+    
+    
+    niche <- NICHES_output[['NeighborhoodToCell']]
+    Idents(niche) <- niche[['ReceivingType']]
+    
+    # Scale and visualize
+    niche <- ScaleData(niche)
+    niche <- FindVariableFeatures(niche,selection.method = "disp")
+    niche <- RunPCA(niche)
+    ElbowPlot(niche,ndims = 50)
+    
+    niche <- RunUMAP(niche,dims = 1:10)
+    DimPlot(niche,reduction = 'umap',pt.size = 0.5,shuffle = T, label = T) +
+      ggtitle('Cellular Microenvironment') + 
+      NoLegend()
+    
+    # Find markers
+    # mark <- FindAllMarkers(niche,min.pct = 0.25,only.pos = T, test.use = "roc")
+    # GOI_niche <- mark %>% group_by(cluster) %>% top_n(5,myAUC)
+    # DoHeatmap(niche,features = unique(GOI_niche$gene))+ 
+    #   scale_fill_gradientn(colors = c("grey","white", "blue"))
+    
+    # Check that these make sense and print little plots
+    # DefaultAssay(stx2) <- 'alra'
+    # p1 <- SpatialFeaturePlot(stx2, crop = TRUE, features = "Fgf1",slot = "data",min.cutoff =  'q1',
+    #                          max.cutoff = 'q99')+ggtitle("Ligand")+theme(legend.position = "right")
+    # p2 <- SpatialFeaturePlot(stx2, crop = TRUE, features = "Fgfr2",slot = "data",min.cutoff =  'q1',
+    #                          max.cutoff = 'q99')+ggtitle("Receptor")+theme(legend.position = "right")
+    # 
+    # ggpubr::ggarrange(p1,p2)
+    
+    # Add Niches output as an assay
+    niches.data <- GetAssayData(object =  niche[['NeighborhoodToCell']], slot = 'data')
+    colnames(niches.data) <- niche[['ReceivingCell']]$ReceivingCell
+    stx2[["NeighborhoodToCell"]] <- CreateAssayObject(data = niches.data )
+    
+    
+    #DefaultAssay(stx2) = 'alra'
+    #ggs = rownames(stx2)[grep('GAS6|AXL', rownames(stx2))]
+    #SpatialFeaturePlot(stx2, features = ggs, images = cc[n])
+    
+    # Plot celltype specific niche signaling
+    DefaultAssay(stx2) <- "NeighborhoodToCell"
+    stx2 <- ScaleData(stx2)
+    saveRDS(stx2, file = paste0(outDir, 'st_res_NICHES_NeighborhoodToCell_snRNA.imputation.rds'))
+    
+    SpatialFeaturePlot(stx2,
+                       features = c('GAS6—AXL', "NRG1—ERBB2"),
+                       slot = 'scale.data', images = slice)
+    
+    ggsave(paste0(outDir, 'GAS6_AXL_examples_interaction_visium_snRNAimputation', cc[n], '.pdf'), 
+           width = 14, height = 6)
+    
+  
+  }
   
 }

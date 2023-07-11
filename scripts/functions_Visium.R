@@ -1155,6 +1155,11 @@ plot.RCTD.results = function(RCTD_out = '../results/RCTD_out',
 
 Run_imputation_snRNAseq_visium = function(stx, refs, slice, normalized_weights = TRUE)
 {
+  library(spacexr)
+  require(Matrix)
+  require(scatterpie)
+  require(cowplot)
+  library(RColorBrewer)
   ## preapre the reference 
   cat('-- prepare global reference --\n')
   
@@ -1202,6 +1207,13 @@ Run_imputation_snRNAseq_visium = function(stx, refs, slice, normalized_weights =
   }
   
   # y = log2(y+1)
+  
+  cell.shared = intersect(colnames(stx), colnames(y))
+  if(length(cell.shared) < ncol(stx)){
+    stx = subset(stx, cells = cell.shared)
+  }
+  y = y[, match(cell.shared, colnames(y))]
+  
   stx[['imputated']] = CreateAssayObject(data = y)
   
   return(stx)
