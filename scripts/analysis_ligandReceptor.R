@@ -272,7 +272,7 @@ if(version_testing_all.subtype.pairs){
                                                ),
                                    
                                    day4 = list(CM_Prol_IS = c('CM_IS',"CM_Robo2", 'EC', 'FB_TNXB',  
-                                                              'Mo.Macs_SNX22', "Mo.Macs_FAXDC2"),
+                                                              'Mo.Macs_SNX22', "Mo.Macs_FAXDC2")
                                                
                                                ),
                                             
@@ -304,33 +304,64 @@ if(version_testing_all.subtype.pairs){
 outDir_version = paste0(resDir, '/Ligand_Receptor_analysis/LIANA_v5.4_allpairs_intraOnly')
 if(!dir.exists(outDir_version)) dir.create(outDir_version)
 
+out_misty = paste0('../results/visium_axolotl_R12830_resequenced_20220308/neighborhood_test/',
+                   'Run_misty_v1.8_short/Plots_RCTD_density')
+misty_cutoff = 1
+
 # run LIANA day by day
 timepoint_specific = TRUE
 
-out_misty = paste0('../results/visium_axolotl_R12830_resequenced_20220308/neighborhood_test/',
-                   'Run_misty_v1.8_short/Plots_RCTD_density')
-intra = read.csv2(paste0(out_misty, '/Amex_d4_all_summary_table_intra.csv'), row.names = 1)
-juxta = read.csv2(paste0(out_misty, '/Amex_d4_all_summary_table_juxta5.csv'), row.names = 1)
+times_slice = c('d1', 'd4', 'd7', 'd14')
 
-misty_cutoff = 0.5
-intra = intra > misty_cutoff
-juxta = juxta > misty_cutoff
+subtypes = unique(refs$celltypes)
 
-pairs = intra + juxta
-
-for(n in 1:length(celltypes_BZ_timeSpecific))
+for(n in 1:length(times_slice))
 {
   # n = 2
   source('functions_cccInference.R')
-  time = names(celltypes_BZ_timeSpecific)[n]
+  time = times_slice[n]
   cat(' run LIANA for time -- ', time, '\n')
+  
   outDir = paste(outDir_version, '/', time, collapse = '')
   outDir = gsub(' ', '', outDir)
+  
+  ## select the interacting subtype pairs  
+  intra = read.csv2(paste0(out_misty, '/Amex_', time, '_all_summary_table_intra.csv'), row.names = 1)
+  juxta = read.csv2(paste0(out_misty, '/Amex_', time, '_all_summary_table_juxta5.csv'), row.names = 1)
+    
+  intra = intra > misty_cutoff
+  juxta = juxta > misty_cutoff
+  
+  intra[which(is.na(intra))] = FALSE
+  juxta[which(is.na(juxta))] = FALSE
+  
+  pairs = intra + juxta > 0
+  pairs = pairs[which(rownames(pairs) != 'RBC'), which(colnames(pairs) != 'RBC')]
+  ss_row = apply(pairs, 1, sum)
+  ss_col = apply(pairs, 2, sum)
+  
+  pairs = pairs[ ,which(ss_col >= 1)] # at least interacting with 1 receivers
+  pairs = pairs[which(ss_row >= 3), ] # at least have 3 senders 
+  
+  colnames(pairs) = gsub("Cav3_1", "Cav3.1", gsub('Mo_Macs', 'Mo.Macs', gsub('[.]','_', colnames(pairs))))
+  rownames(pairs) = gsub("Cav3_1", "Cav3.1", gsub('Mo_Macs', 'Mo.Macs', gsub('[.]','_', rownames(pairs))))
+  
+  cat(match(colnames(pairs), subtypes), '\n')
+  cat(match(rownames(pairs), subtypes), '\n')
+  
+  celltypes_BZ_timeSpecific = vector("list", nrow(pairs))
+  for(m in 1:nrow(pairs))
+  {
+    celltypes_BZ_timeSpecific[[m]] = colnames(pairs)[which(pairs[m, ] == TRUE)]
+    #x = pairs[which(rownames(pairs) == 'CM.Prol.IS'), ]
+    names(celltypes_BZ_timeSpecific)[m] = colnames(pairs)[m]
+    
+  }
   
   run_LIANA(refs, 
             timepoint_specific = TRUE,
             include_autocrine = TRUE,
-            celltypes_timeSpecific = celltypes_BZ_timeSpecific[[n]],
+            celltypes_timeSpecific = celltypes_BZ_timeSpecific,
             outDir = outDir
   )
   

@@ -119,13 +119,15 @@ run_LIANA = function(refs,
       #timepoint = names(celltypes_timeSpecific)[n]
       receivers = names(celltypes_timeSpecific)[n]
       
+      cat('---------- run LIANA for ', receivers, ' -----------\n')
+      cat('---------- senders : ', celltypes, '\n')
+      #cat('---- receivers : ', receivers, "\n")
+      
+      
       if(include_autocrine) {
         cat('-- autocrine is considerede -- \n')
         celltypes = unique(c(celltypes, receivers))
       }
-      
-      cat('---- celltype : ', celltypes, '\n')
-      cat('---- receivers : ', receivers, "\n")
       
       celltypes_sel = unique(c(celltypes, receivers))
       
