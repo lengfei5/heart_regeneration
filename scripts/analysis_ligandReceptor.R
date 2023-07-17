@@ -263,7 +263,6 @@ if(OnlyFB_version_for_Prateek)
 ### all pairs of subtypes
 version_testing_all.subtype.pairs = FALSE
 if(version_testing_all.subtype.pairs){
-  timepoint_specific = TRUE
   
   # define cell subtype pairs in the border zone 
   celltypes_BZ_timeSpecific = list(day1 = list(CM_IS = c("CM_Cav3.1", "CM_Robo2", "EC_WNT4", 
@@ -273,7 +272,9 @@ if(version_testing_all.subtype.pairs){
                                                ),
                                    
                                    day4 = list(CM_Prol_IS = c('CM_IS',"CM_Robo2", 'EC', 'FB_TNXB',  
-                                                              'Mo.Macs_SNX22', "Mo.Macs_FAXDC2")),
+                                                              'Mo.Macs_SNX22', "Mo.Macs_FAXDC2"),
+                                               
+                                               ),
                                             
                                    day7 = list(CM_Prol_IS = c("CM_Robo2",'EC_IS_LOX', "EC_NOS3",
                                                               "FB_PKD1", "FB_TNXB",
@@ -300,10 +301,23 @@ if(version_testing_all.subtype.pairs){
 # run LIANA 
 ##########################################
 # set parameter for ligand-receptor analysis
-outDir_version = paste0(resDir, '/Ligand_Receptor_analysis/LIANA_v5.1_allpairs_intraOnly')
+outDir_version = paste0(resDir, '/Ligand_Receptor_analysis/LIANA_v5.4_allpairs_intraOnly')
 if(!dir.exists(outDir_version)) dir.create(outDir_version)
 
 # run LIANA day by day
+timepoint_specific = TRUE
+
+out_misty = paste0('../results/visium_axolotl_R12830_resequenced_20220308/neighborhood_test/',
+                   'Run_misty_v1.8_short/Plots_RCTD_density')
+intra = read.csv2(paste0(out_misty, '/Amex_d4_all_summary_table_intra.csv'), row.names = 1)
+juxta = read.csv2(paste0(out_misty, '/Amex_d4_all_summary_table_juxta5.csv'), row.names = 1)
+
+misty_cutoff = 0.5
+intra = intra > misty_cutoff
+juxta = juxta > misty_cutoff
+
+pairs = intra + juxta
+
 for(n in 1:length(celltypes_BZ_timeSpecific))
 {
   # n = 2
