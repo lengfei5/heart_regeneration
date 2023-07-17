@@ -7,17 +7,43 @@
 # Date of creation: Tue Jul 11 17:09:43 2023
 ##########################################################################
 ##########################################################################
+rm(list = ls())
 
+library(Seurat)
+library(SeuratData)
+library(ggplot2)
+library(cowplot)
+library(patchwork)
+library(dplyr)
+library(SeuratWrappers)
+library(NICHES)
+library(viridis)
+
+species = 'axolotl'
+version.analysis = '_R12830_resequenced_20220308'
+resDir = paste0("../results/visium_axolotl", version.analysis, '/LR_visualization')
+RdataDir = paste0('../results/Rdata/')
+
+if(!dir.exists(resDir)) dir.create(resDir)
+if(!dir.exists(RdataDir)) dir.create(RdataDir)
+
+source('functions_Visium.R')
+source('functions_scRNAseq.R')
+library(pryr) # monitor the memory usage
+require(ggplot2)
+options(future.globals.maxSize = 100000 * 1024^2)
+
+library(nichenetr)
+library(tidyverse)
+library(circlize)
+
+mem_used()
 ########################################################
 ########################################################
 # Section : test Circos plot from NicheNet 
 # https://github.com/saeyslab/nichenetr/blob/master/vignettes/circos.md
 ########################################################
 ########################################################
-
-library(nichenetr)
-library(tidyverse)
-library(circlize)
 
 hnscc_expression = readRDS(url("https://zenodo.org/record/3260758/files/hnscc_expression.rds"))
 expression = hnscc_expression$expression
@@ -147,6 +173,7 @@ target_order = circos_links$target %>% unique()
 ligand_order = c(CAF_specific_ligands,general_ligands,endothelial_specific_ligands) %>% c(paste(.," ")) %>% intersect(circos_links$ligand)
 order = c(ligand_order,target_order)
 
+## Prepare the circos visualization: define the gaps between the different segments
 width_same_cell_same_ligand_type = 0.5
 width_different_cell = 6
 width_ligand_target = 15
@@ -169,8 +196,14 @@ gaps = c(
   width_ligand_target
 )
 
+## Render the circos plot (all links same transparancy). 
+# Only the widths of the blocks that indicate each target gene is proportional 
+# the ligand-target regulatory potential (~prior knowledge supporting the regulatory interaction).
 circos.par(gap.degree = gaps)
-chordDiagram(links_circle, directional = 1,order=order,link.sort = TRUE, link.decreasing = FALSE, grid.col = grid_col,transparency = 0, diffHeight = 0.005, direction.type = c("diffHeight", "arrows"),link.arr.type = "big.arrow", link.visible = links_circle$weight >= cutoff_include_all_ligands,annotationTrack = "grid", 
+chordDiagram(links_circle, directional = 1,order=order,link.sort = TRUE, link.decreasing = FALSE, 
+             grid.col = grid_col,transparency = 0, diffHeight = 0.005, 
+             direction.type = c("diffHeight", "arrows"),link.arr.type = "big.arrow", 
+             link.visible = links_circle$weight >= cutoff_include_all_ligands,annotationTrack = "grid", 
              preAllocateTracks = list(track.height = 0.075))
 # we go back to the first track and customize sector labels
 circos.track(track.index = 1, panel.fun = function(x, y) {
@@ -180,12 +213,153 @@ circos.track(track.index = 1, panel.fun = function(x, y) {
 
 circos.clear()
 
-
+## Render the circos plot (degree of transparancy determined by the regulatory potential value 
+# of a ligand-target interaction)
 circos.par(gap.degree = gaps)
-chordDiagram(links_circle, directional = 1,order=order,link.sort = TRUE, link.decreasing = FALSE, grid.col = grid_col,transparency = transparency, diffHeight = 0.005, direction.type = c("diffHeight", "arrows"),link.arr.type = "big.arrow", link.visible = links_circle$weight >= cutoff_include_all_ligands,annotationTrack = "grid", 
+chordDiagram(links_circle, directional = 1, order=order, link.sort = TRUE, link.decreasing = FALSE, 
+             grid.col = grid_col,
+             transparency = transparency, 
+             diffHeight = 0.005, 
+             direction.type = c("diffHeight", "arrows"),
+             link.arr.type = "big.arrow", 
+             link.visible = links_circle$weight >= cutoff_include_all_ligands,annotationTrack = "grid", 
+             preAllocateTracks = list(track.height = 0.075))
+
+# we go back to the first track and customize sector labels
+circos.track(track.index = 1, panel.fun = function(x, y) {
+  circos.text(CELL_META$xcenter, CELL_META$ylim[1], CELL_META$sector.index,
+              facing = "clockwise", niceFacing = TRUE, adj = c(0, 0.55), cex = 1)
+}, bg.border = NA) #
+
+circos.clear()
+
+# Save circos plot to an svg file
+svg(paste0(resDir, "/ligand_target_circos_test.svg"), width = 10, height = 10)
+circos.par(gap.degree = gaps)
+chordDiagram(links_circle, directional = 1,order=order,link.sort = TRUE, link.decreasing = FALSE, grid.col = grid_col,transparency = transparency, diffHeight = 0.005, direction.type = c("diffHeight", "arrows"),link.arr.type = "big.arrow", link.visible = links_circle$weight >= cutoff_include_all_ligands,annotationTrack = "grid",
              preAllocateTracks = list(track.height = 0.075))
 # we go back to the first track and customize sector labels
 circos.track(track.index = 1, panel.fun = function(x, y) {
   circos.text(CELL_META$xcenter, CELL_META$ylim[1], CELL_META$sector.index,
               facing = "clockwise", niceFacing = TRUE, adj = c(0, 0.55), cex = 1)
 }, bg.border = NA) #
+circos.clear()
+dev.off()
+
+##########################################
+# Visualize ligand-receptor interactions of the prioritized ligands in a circos plot
+##########################################
+# get the ligand-receptor network of the top-ranked ligands
+lr_network_top = lr_network %>% 
+  filter(from %in% best_upstream_ligands & to %in% expressed_receptors) %>% 
+  distinct(from,to)
+best_upstream_receptors = lr_network_top %>% pull(to) %>% unique()
+
+# get the weights of the ligand-receptor interactions as used in the NicheNet model
+weighted_networks = readRDS(url("https://zenodo.org/record/3260758/files/weighted_networks.rds"))
+lr_network_top_df = weighted_networks$lr_sig %>% 
+  filter(from %in% best_upstream_ligands & to %in% best_upstream_receptors) %>% 
+  rename(ligand = from, receptor = to)
+
+lr_network_top_df = lr_network_top_df %>% 
+  mutate(receptor_type = "p_emt_receptor") %>% 
+  inner_join(ligand_type_indication_df)
+
+## prepare the plots
+grid_col_ligand =c("General" = "lawngreen",
+                   "CAF-specific" = "royalblue",
+                   "Endothelial-specific" = "gold")
+grid_col_receptor =c(
+  "p_emt_receptor" = "darkred")
+
+grid_col_tbl_ligand = tibble(ligand_type = grid_col_ligand %>% names(), 
+                             color_ligand_type = grid_col_ligand)
+grid_col_tbl_receptor = tibble(receptor_type = grid_col_receptor %>% names(), 
+                               color_receptor_type = grid_col_receptor)
+
+# extra space: make a difference between a gene as ligand and a gene as receptor!
+circos_links = lr_network_top_df %>% mutate(ligand = paste(ligand," ")) 
+
+circos_links = circos_links %>% inner_join(grid_col_tbl_ligand) %>% inner_join(grid_col_tbl_receptor)
+links_circle = circos_links %>% select(ligand,receptor, weight)
+
+ligand_color = circos_links %>% distinct(ligand,color_ligand_type)
+grid_ligand_color = ligand_color$color_ligand_type %>% set_names(ligand_color$ligand)
+receptor_color = circos_links %>% distinct(receptor,color_receptor_type)
+grid_receptor_color = receptor_color$color_receptor_type %>% set_names(receptor_color$receptor)
+
+grid_col =c(grid_ligand_color,grid_receptor_color)
+
+# give the option that links in the circos plot will be transparant ~ ligand-receptor potential score
+transparency = circos_links %>% 
+  mutate(weight =(weight-min(weight))/(max(weight)-min(weight))) %>% 
+  mutate(transparency = 1-weight) %>% 
+  .$transparency 
+
+# Prepare the circos visualization: order ligands and receptors
+receptor_order = circos_links$receptor %>% unique()
+
+ligand_order = c(CAF_specific_ligands, general_ligands, endothelial_specific_ligands) %>% 
+  c(paste(.," ")) %>% 
+  intersect(circos_links$ligand)
+order = c(ligand_order,receptor_order)
+
+# Prepare the circos visualization: define the gaps between the different segments
+width_same_cell_same_ligand_type = 0.5
+width_different_cell = 6
+width_ligand_receptor = 15
+width_same_cell_same_receptor_type = 0.5
+
+gaps = c(
+  # width_ligand_receptor,
+  rep(width_same_cell_same_ligand_type, 
+      times = (circos_links %>% filter(ligand_type == "CAF-specific") %>% distinct(ligand) %>% nrow() -1)),
+  width_different_cell,
+  rep(width_same_cell_same_ligand_type, 
+      times = (circos_links %>% filter(ligand_type == "General") %>% distinct(ligand) %>% nrow() -1)),
+  width_different_cell,
+  rep(width_same_cell_same_ligand_type, 
+      times = (circos_links %>% filter(ligand_type == "Endothelial-specific") %>% distinct(ligand) %>% nrow() -1)), 
+  width_ligand_receptor,
+  rep(width_same_cell_same_receptor_type, 
+      times = (circos_links %>% filter(receptor_type == "p_emt_receptor") %>% distinct(receptor) %>% nrow() -1)),
+  width_ligand_receptor
+)
+
+# Render the circos plot 
+# (degree of transparancy determined by the prior interaction weight of the ligand-receptor interaction - 
+# just as the widths of the blocks indicating each receptor)
+circos.par(gap.degree = gaps)
+chordDiagram(links_circle, 
+             directional = 1, 
+             order=order,
+             link.sort = TRUE, 
+             link.decreasing = FALSE, 
+             grid.col = grid_col,
+             transparency = transparency, 
+             diffHeight = 0.005, 
+             direction.type = c("diffHeight", "arrows"),
+             link.arr.type = "big.arrow", 
+             link.visible = links_circle$weight >= cutoff_include_all_ligands,
+             annotationTrack = "grid", 
+             preAllocateTracks = list(track.height = 0.075))
+# we go back to the first track and customize sector labels
+circos.track(track.index = 1, panel.fun = function(x, y) {
+  circos.text(CELL_META$xcenter, CELL_META$ylim[1], CELL_META$sector.index,
+              facing = "clockwise", niceFacing = TRUE, adj = c(0, 0.55), cex = 0.8)
+}, bg.border = NA) #
+
+circos.clear()
+
+svg(paste0(resDir, "/ligand_receptor_circos_test.svg"), width = 15, height = 15)
+circos.par(gap.degree = gaps)
+chordDiagram(links_circle, directional = 1,order=order,link.sort = TRUE, link.decreasing = FALSE, grid.col = grid_col,transparency = transparency, diffHeight = 0.005, direction.type = c("diffHeight", "arrows"),link.arr.type = "big.arrow", link.visible = links_circle$weight >= cutoff_include_all_ligands,annotationTrack = "grid",
+             preAllocateTracks = list(track.height = 0.075))
+# we go back to the first track and customize sector labels
+circos.track(track.index = 1, panel.fun = function(x, y) {
+  circos.text(CELL_META$xcenter, CELL_META$ylim[1], CELL_META$sector.index,
+              facing = "clockwise", niceFacing = TRUE, adj = c(0, 0.55), cex = 0.8)
+}, bg.border = NA) #
+
+circos.clear()
+dev.off()
