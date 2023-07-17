@@ -26,6 +26,7 @@ run_LIANA = function(refs,
                      #receiver_cells = list(c('CM_IS')),
                      outDir = '../results/Ligand_Receptor_analysis',
                      ntop = 100,
+                     plotGeneExpression.LR = FALSE,
                      RUN.CPDB.alone = FALSE)
 {
   require(tidyverse)
@@ -145,7 +146,8 @@ run_LIANA = function(refs,
                                  celltypes = celltypes,
                                  receivers = receivers,
                                  additionalLabel = paste0('_', receivers),
-                                 outDir = outDir)
+                                 outDir = outDir, 
+                                 Test.geneExpresion = plotGeneExpression.LR)
 
     }
   
