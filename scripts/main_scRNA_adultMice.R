@@ -638,7 +638,7 @@ if(Double.check.adult.cardiomyocyte.major.celltypes.subtypes){
   xx = DietSeurat(aa, counts = TRUE, data = TRUE, scale.data = FALSE, assays = 'RNA', dimreducs = 'umap')
   rm(aa)
   saveRDS(xx, file = paste0(RdataDir, 'Forte2020_logNormalize_allgenes_majorCellTypes_subtypes.rds'))
-  
+    
 }
 
 ##########################################
@@ -654,5 +654,5 @@ refs = subset(refs, cells = colnames(refs)[which(refs$celltype != 'SMC')])
 DimPlot(refs, reduction = 'umap', group.by = 'celltype')
 DimPlot(refs, reduction = 'umap', group.by = 'subtype')
 
-saveRDS(refs, file = paste0('data_examples/ref_scRNAseq.rds'))
+saveRDS(refs, file = paste0('../data/data_examples/ref_scRNAseq.rds'))
 

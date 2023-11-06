@@ -89,7 +89,6 @@ for(n in 1:nrow(design))
 ##########################################
 # cell and gene filtering
 ##########################################
-
 load(file = paste0(RdataDir, 'seuratObject_design_variableGenes_', species, '.Rdata'))
 # saveRDS(st, file = paste0(RdataDir, 'seuratObject_visium_UMIcounts_Image_', species, '_2share.rds'))
 
@@ -256,54 +255,175 @@ if(QCs.with.marker.genes){
 # 
 ########################################################
 ########################################################
-load(file = paste0(RdataDir, 'seuratObject_design_variableGenes_', species, '_umap.clustered.Rdata'))
 source('functions_Visium.R')
 
-##########################################
-# spatial domain searching and potential define remote regions and border zone 
-##########################################
-obj.list <- SplitObject(st, split.by = "condition")
-# select day4
-aa = obj.list[[2]]
+load(file = paste0(RdataDir, 'seuratObject_design_variableGenes_', species, 
+                   '_umap.clustered.Rdata'))
+refs = readRDS(file = paste0('../data/data_examples/ref_scRNAseq.rds'))
 
-saveRDS(aa, file = paste0('data_examples/st_visium.rds'))
-
-aa$sampleID = design$sampleID[which(design$condition == names(table(aa$condition)))]
-
-# import manually defined spatial domain by Elad
-sdomain = read.csv('/groups/tanaka/Collaborations/Jingkui-Elad/Mouse_Visium_annotations/Anno_166906.csv')
-sdomain = sdomain[which(sdomain$Anno_1 != ''), ]
-aa$spatial_domain_manual = NA
-
-cells = gsub('_2_1', '',  colnames(aa))
-aa$spatial_domain_manual[match(sdomain$Barcode, cells)] = sdomain$Anno_1
-
-aa = run_bayesSpace(aa)
+DimPlot(refs, reduction = 'umap', group.by = 'celltype')
+DimPlot(refs, reduction = 'umap', group.by = 'subtype')
+DimPlot(refs, reduction = 'umap', group.by = 'timepoints')
 
 ##########################################
-# cell type deconvolution
+# cell type deconvolution for cell types
 ##########################################
-refs = readRDS(file = paste0('data_examples/ref_scRNAseq.rds'))
+table(refs$subtypes)
+length(table(refs$subtypes))
+
+refs$subtypes = droplevels(refs$subtypes) 
+length(table(refs$subtypes)) # only 41 subtype annotations from Elad, with additional annotation "doublet" with 0 cell
+
+## prepare the celltype to use and also specify the time-specific subtypes
+refs$celltype_toUse = as.character(refs$subtypes)
+length(table(refs$celltype_toUse))
+
+refs$condition = gsub('_scRNA', '', refs$condition)
+refs$celltype_toUse = gsub('Mo/Macs', 'Mo.Macs', refs$celltype_toUse)
+refs$celltype_toUse = gsub("[(]", '', refs$celltype_toUse)
+refs$celltype_toUse = gsub("[)]", '', refs$celltype_toUse)
+
+table(refs$celltype_toUse)
+length(table(refs$celltype_toUse))
+
+## preapre the paramters for RCTD subtypes
+DefaultAssay(refs) = 'integrated'
+DefaultAssay(st) = 'Spatial'
+require_int_SpatialRNA = FALSE
+
+condition.specific.ref = FALSE
+
+outDir = paste0(resDir, '/celltype_deconvolution')
+RCTD_out = paste0(outDir, '/RCTD_subtype_out_42subtypes_ref.time.specific_v4.3')
+max_cores = 32
+# st = subset(st, condition == 'Amex_d4')
+
+source('functions_Visium.R')
+Run.celltype.deconvolution.RCTD(st, refs, 
+                                condition.specific.ref = condition.specific.ref,
+                                condition.specific_celltypes = condition.specific_celltypes,
+                                require_int_SpatialRNA = require_int_SpatialRNA,
+                                max_cores = max_cores,
+                                RCTD_out = RCTD_out,
+                                plot.RCTD.summary = FALSE, 
+                                PLOT.scatterpie = FALSE
+)
+
+saveRDS(condition.specific_celltypes, 'RCTD_refs_condition_specificity.rds')
+saveRDS(refs, file = paste0(RdataDir, 'RCTD_refs_subtypes_final_20221117.rds'))
+
+source('functions_Visium.R')
+plot.RCTD.results(RCTD_out = RCTD_out,
+                  plot.RCTD.summary = FALSE)
+
+
+##########################################
+# cell type deconvolution for subtypes
+##########################################
+table(refs$subtypes)
+length(table(refs$subtypes))
+
+refs$subtypes = droplevels(refs$subtypes) 
+length(table(refs$subtypes)) # only 41 subtype annotations from Elad, with additional annotation "doublet" with 0 cell
+
+## prepare the celltype to use and also specify the time-specific subtypes
+refs$celltype_toUse = as.character(refs$subtypes)
+length(table(refs$celltype_toUse))
+
+refs$condition = gsub('_scRNA', '', refs$condition)
+refs$celltype_toUse = gsub('Mo/Macs', 'Mo.Macs', refs$celltype_toUse)
+refs$celltype_toUse = gsub("[(]", '', refs$celltype_toUse)
+refs$celltype_toUse = gsub("[)]", '', refs$celltype_toUse)
+
+table(refs$celltype_toUse)
+length(table(refs$celltype_toUse))
+
+## preapre the paramters for RCTD subtypes
+DefaultAssay(refs) = 'integrated'
+DefaultAssay(st) = 'Spatial'
+require_int_SpatialRNA = FALSE
+
+condition.specific.ref = FALSE
+
+outDir = paste0(resDir, '/celltype_deconvolution')
+RCTD_out = paste0(outDir, '/RCTD_subtype_out_42subtypes_ref.time.specific_v4.3')
+max_cores = 32
+# st = subset(st, condition == 'Amex_d4')
+
+source('functions_Visium.R')
+Run.celltype.deconvolution.RCTD(st, refs, 
+                                condition.specific.ref = condition.specific.ref,
+                                condition.specific_celltypes = condition.specific_celltypes,
+                                require_int_SpatialRNA = require_int_SpatialRNA,
+                                max_cores = max_cores,
+                                RCTD_out = RCTD_out,
+                                plot.RCTD.summary = FALSE, 
+                                PLOT.scatterpie = FALSE
+)
+
+saveRDS(condition.specific_celltypes, 'RCTD_refs_condition_specificity.rds')
+saveRDS(refs, file = paste0(RdataDir, 'RCTD_refs_subtypes_final_20221117.rds'))
+
+source('functions_Visium.R')
+plot.RCTD.results(RCTD_out = RCTD_out,
+                  plot.RCTD.summary = FALSE)
+
+
 
 st = Run.celltype.deconvolution.RCTD(st, refs)
 
+
+########################################################
+########################################################
+# Section III : proximicity enrichment analysis
+# 
+########################################################
+########################################################
+##########################################
+# spatial domain searching and potential define remote regions and border zone 
+##########################################
+Run_BayesSpace_for_spatialDomain = FALSE
+if(Run_BayesSpace_for_spatialDomain){
+  obj.list <- SplitObject(st, split.by = "condition")
+  # select day4
+  aa = obj.list[[2]]
+  
+  saveRDS(aa, file = paste0('data_examples/st_visium.rds'))
+  
+  aa$sampleID = design$sampleID[which(design$condition == names(table(aa$condition)))]
+  
+  # import manually defined spatial domain by Elad
+  sdomain = read.csv('/groups/tanaka/Collaborations/Jingkui-Elad/Mouse_Visium_annotations/Anno_166906.csv')
+  sdomain = sdomain[which(sdomain$Anno_1 != ''), ]
+  aa$spatial_domain_manual = NA
+  
+  cells = gsub('_2_1', '',  colnames(aa))
+  aa$spatial_domain_manual[match(sdomain$Barcode, cells)] = sdomain$Anno_1
+  
+  aa = run_bayesSpace(aa)
+  
+}
 
 ##########################################
 # cell proximity analysis 
 ##########################################
 run_cell_proximity_analysis(aa)
 
-##########################################
-# ligand-receptor-target prediction 
-##########################################
+########################################################
+########################################################
+# Section IV: ligand-receptor-target prediction 
+# LIANA and NICHNET  
+########################################################
+########################################################
 source('functions_Visium.R')
 run_LIANA()
 
 run_NicheNet()
 
+
 ########################################################
 ########################################################
-# Section IV: spatial organization of cell types and genes  
+# Section V: spatial organization of cell types and genes  
 # 
 ########################################################
 ########################################################
@@ -311,12 +431,4 @@ load(file = paste0(RdataDir, 'seuratObject_design_variableGenes_', species, '_um
 
 source('functions_Visium.R')
 st = Find.SpatialDE(st)
-
-########################################################
-########################################################
-# Section : cell-cell signaling pathway analysis
-# 
-########################################################
-########################################################
-
 

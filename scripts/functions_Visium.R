@@ -227,7 +227,6 @@ Run.celltype.deconvolution.RCTD = function(st, # spatial transcriptome seurat ob
     # n = 1
     cat('slice -- ', cc[n], '\n')
     
-    
     ## prepare condition-specific refs
     if(condition.specific.ref | !is.null(condition.specific_celltypes)){
       cat('-- prepare refs for ', cc[n], '\n')
