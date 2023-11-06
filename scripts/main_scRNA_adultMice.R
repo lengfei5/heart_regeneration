@@ -375,11 +375,16 @@ if(Merge.adult.mice.cardiomyocyte.noncardiomyocyte){
 # Section III: post-integration: double check the celltypes  
 # 
 ########################################################
-########################################################
+aa = readRDS(file = paste0(RdataDir, 
+                           'Seurat.obj_adultMiceHeart_Forte2020.nonCM_Ren2020CM_refCombined_',
+                           'cleanAnnot_logNormalize_v4.rds'))
+
+##########################################
 # prepare reference data and double check the main cell types and subtypes 
 ##########################################
-Double.check.adult.cardiomyocyte.major.celltypes.subtypes = function(aa)
-{
+Double.check.adult.cardiomyocyte.major.celltypes.subtypes = FALSE
+if(Double.check.adult.cardiomyocyte.major.celltypes.subtypes){
+  
   p1 = DimPlot(aa, reduction = 'umap', group.by = 'seurat_clusters')
   p2 = DimPlot(aa, reduction = "umap", group.by = c("CellType"))
   p1 + p2 
@@ -480,8 +485,9 @@ Double.check.adult.cardiomyocyte.major.celltypes.subtypes = function(aa)
   
 }
 
-Double.check.adult.non.cardiomyocyte.major.celltypes.subtypes = function(aa)
-{
+Double.check.adult.non.cardiomyocyte.major.celltypes.subtypes = FALSE
+if(Double.check.adult.cardiomyocyte.major.celltypes.subtypes){
+  
   # modify the cell annotations
   aa$celltype = as.character(aa$my_annot)
   
@@ -523,11 +529,12 @@ Double.check.adult.non.cardiomyocyte.major.celltypes.subtypes = function(aa)
   aa$celltype[grep('GN|MCT|Mphage|NK', aa$subtype)]  = 'immune'
   aa$celltype[which(aa$subtype == 'B')] = 'immune'
   
-  p0 = DimPlot(aa, reduction = 'umap_0.05', group.by = 'celltype') + ggtitle('Shoval UMAP')
+  p0 = DimPlot(aa, reduction = 'umap', group.by = 'celltype') + ggtitle('Shoval UMAP')
   
   p1 = DimPlot(aa, reduction = 'umap', group.by = 'celltype') + ggtitle(paste0(Normalization, ' - Elad umap'))
   
-  p0 + p1 
+  p0 + p1
+  
   ggsave(paste0(resDir, '/Ref_Forte2020_majorCelltypes_Shoval.umap_vs_Elad.umap.', Normalization, '.pdf'), 
          width = 18, height = 8)
   
@@ -633,4 +640,19 @@ Double.check.adult.non.cardiomyocyte.major.celltypes.subtypes = function(aa)
   saveRDS(xx, file = paste0(RdataDir, 'Forte2020_logNormalize_allgenes_majorCellTypes_subtypes.rds'))
   
 }
+
+##########################################
+# actually used the reference 
+##########################################
+refs = readRDS(file = paste0('../results/Rdata/', 
+                             'Seurat.obj_adultMiceHeart_Forte2020.nonCM_Ren2020CM_refCombined_cleanAnnot_',
+                             'logNormalize_v4.rds'))
+
+refs$celltype[which(refs$celltype == 'immune.others')] = 'Mphage.MCT'
+refs = subset(refs, cells = colnames(refs)[which(refs$celltype != 'SMC')])
+
+DimPlot(refs, reduction = 'umap', group.by = 'celltype')
+DimPlot(refs, reduction = 'umap', group.by = 'subtype')
+
+saveRDS(refs, file = paste0('data_examples/ref_scRNAseq.rds'))
 

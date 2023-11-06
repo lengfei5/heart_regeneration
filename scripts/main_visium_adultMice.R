@@ -283,15 +283,10 @@ aa = run_bayesSpace(aa)
 ##########################################
 # cell type deconvolution
 ##########################################
-refs = readRDS(file = paste0('../results/Rdata/', 
-                             'Seurat.obj_adultMiceHeart_Forte2020.nonCM_Ren2020CM_refCombined_cleanAnnot_logNormalize_v4.rds'))
-
-refs$celltype[which(refs$celltype == 'immune.others')] = 'Mphage.MCT'
-refs = subset(refs, cells = colnames(refs)[which(refs$celltype != 'SMC')])
-
-saveRDS(refs, file = paste0('data_examples/ref_scRNAseq.rds'))
+refs = readRDS(file = paste0('data_examples/ref_scRNAseq.rds'))
 
 st = Run.celltype.deconvolution.RCTD(st, refs)
+
 
 ##########################################
 # cell proximity analysis 
@@ -316,7 +311,6 @@ load(file = paste0(RdataDir, 'seuratObject_design_variableGenes_', species, '_um
 
 source('functions_Visium.R')
 st = Find.SpatialDE(st)
-
 
 ########################################################
 ########################################################
