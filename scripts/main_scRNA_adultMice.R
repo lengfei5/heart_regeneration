@@ -1,7 +1,7 @@
 ##########################################################################
 ##########################################################################
 # Project: Heart regeneration 
-# Script purpose: prepare the single cell/nucleus RNA-seq data for the cell type reference
+# Script purpose: process and analyze the single cell/nucleus RNA-seq data for the cell type reference
 # for adult heart there are tww references: cardiomyocyte and non-cardiomycyte. 
 # because the ST-specific deconvolution method requires UMI counts as input, at the end the deconvolution has to be done 
 # separately with two reference and integration post-hoc 
@@ -12,9 +12,9 @@
 ##########################################################################
 rm(list = ls())
 
-version.analysis = '_scRNAseq_reference_20211111'
+version.analysis = '_reference_20211111'
 
-resDir = paste0("../results/scRNAseq_mouse", version.analysis)
+resDir = paste0("../results/scRNAseq_adultMouse", version.analysis)
 RdataDir = paste0('../results/Rdata/')
 
 if(!dir.exists(resDir)) dir.create(resDir)
@@ -224,7 +224,7 @@ Double.check.adult.non.cardiomyocyte.major.celltypes.subtypes(aa)
 
 ########################################################
 ########################################################
-# Section III: # integrate Ren2020 and Forte2020 to have one reference using SCTransform and RPCA from Seurat
+# Section II: # integrate Ren2020 and Forte2020 to have one reference using SCTransform and RPCA from Seurat
 # original code from https://satijalab.org/seurat/articles/integration_rpca.html
 # 
 ########################################################
@@ -360,9 +360,277 @@ if(Merge.adult.mice.cardiomyocyte.noncardiomyocyte){
   rm(ref.combined)
   
   saveRDS(refs, file = paste0(RdataDir, 
-                              'Seurat.obj_adultMiceHeart_Forte2020.nonCM_Ren2020CM_refCombined_cleanAnnot_logNormalize_v4.rds'))
+                              'Seurat.obj_adultMiceHeart_Forte2020.nonCM_Ren2020CM_refCombined_',
+                              'cleanAnnot_logNormalize_v4.rds'))
   saveRDS(refs, file = paste0(RdataDir, 
-                              'SeuratObj_adultMiceHeart_refCombine_Forte2020.nonCM_Ren2020CM_cleanAnnot_logNormalize_v4.rds'))
-  
+                              'SeuratObj_adultMiceHeart_refCombine_Forte2020.nonCM_Ren2020CM_',
+                              'cleanAnnot_logNormalize_v4.rds'))
   
 }
+
+
+
+########################################################
+########################################################
+# Section III: post-integration: double check the celltypes  
+# 
+########################################################
+########################################################
+# prepare reference data and double check the main cell types and subtypes 
+##########################################
+Double.check.adult.cardiomyocyte.major.celltypes.subtypes = function(aa)
+{
+  p1 = DimPlot(aa, reduction = 'umap', group.by = 'seurat_clusters')
+  p2 = DimPlot(aa, reduction = "umap", group.by = c("CellType"))
+  p1 + p2 
+  
+  p3 = DimPlot(aa, reduction = 'umap', group.by = 'condition')
+  p4 = DimPlot(aa, reduction = 'umap', group.by = 'sample')
+  (p1 + p2)/(p3 + p4)
+  ggsave(paste0(resDir, '/Umap_Ren2020_week0.week2_newClusters_vs_cellType.original_conditions_samples_seuratNorm.pdf'), 
+         width = 12, height = 8)
+  
+  # double check the cardiomyocyte markers from Elad 
+  gg.examples =  c('Nppa', 'Nppb', 'Myh6', 'Tnnc1', 'Tnni3', 
+                   'Tnnt2', 'Actn2', 'Gata4', 'Nkx2-5', 'Gja1', 
+                   'Myl2', 'Tpm1', 'Ryr2', 'Atp2a2', 'Acta1')
+  
+  p5 = FeaturePlot(aa, reduction = 'umap', features = gg.examples)
+  
+  p2 / p5 + ggsave(paste0(resDir, '/Umap_cellType.original_FeatuerPlot_cardiomyocyoteMarkers_seuratNorm.pdf'), 
+                   width = 14, height = 20)
+  
+  p6 = VlnPlot(aa, features = gg.examples, group.by = 'CellType')
+  
+  p6 + ggsave(paste0(resDir, '/Umap_VlnPlot_cardiomyocyoteMarkers_seuratNorm.pdf'), 
+              width = 14, height = 10)
+  
+  p1 + p2 + ggsave(paste0(resDir, '/Umap_newClusters_vs_cellType.original_seuratNorm.pdf'), 
+                   width = 12, height = 8)
+  
+  #DimPlot(aa, reduction = "umap", group.by = c("SubCluster"))
+  
+  FeaturePlot(aa, reduction = 'umap', features = c('Csf1r', 'Cd163'))
+  FeaturePlot(aa, reduction = 'umap', features = c('S100a3', 'S100a9'))
+  
+  ##########################################
+  # double check the subtypes of CM 
+  ##########################################
+  aa$celltype = aa$CellType
+  aa$subtype = aa$SubCluster
+  
+  mcells = 'CM'
+  ax = subset(aa, cells = colnames(aa)[which(aa$CellType == mcells)])
+  table(ax$celltype)
+  table(ax$subtype)
+  
+  ax <- FindVariableFeatures(ax, selection.method = "vst", nfeatures = 5000)
+  ax <- ScaleData(ax, features = rownames(ax))
+  
+  ax <- RunPCA(ax, verbose = FALSE, weight.by.var = TRUE)
+  ElbowPlot(ax, ndims = 30)
+  
+  # UMAP to visualize subtypes
+  ax <- RunUMAP(ax, dims = 1:10, n.neighbors = 20, min.dist = 0.05, n_threads = 6)
+  
+  DimPlot(ax, reduction = 'umap', group.by = 'subtype') + 
+    ggtitle(paste0(mcells, '-', ' cells UMAP (', Normalization, ' nfeature = 5000, ndim=10, neighbors=20, mdist=0.05)'))
+  
+  ggsave(paste0(resDir, '/Ref_Ren2020_UMAP_', mcells, '_subcelltypes.pdf'), 
+         width = 10, height = 8)
+  
+  ax <- FindNeighbors(ax, dims = 1:10)
+  
+  ax <- FindClusters(ax, verbose = FALSE, algorithm = 3, resolution = 0.5)
+  p1 = DimPlot(ax, reduction = 'umap', group.by = 'seurat_clusters')
+  p0 = DimPlot(ax, reduction = 'umap', group.by = 'subtype')
+  
+  p0 + p1
+  
+  ax$subtype = paste0('CM', ax$seurat_clusters)
+  Idents(ax) = ax$subtype
+  
+  FeaturePlot(ax, features = c('Sln', 'Myl4', 'Myl7', 'Nppa', 'Myl1', # Atrial CM markers
+                               'Fabp3', 'Pln', 'Myl2', 'Myl3', 'Pin', 'Mb' # Ventricular CMs
+  ))
+  
+  
+  VlnPlot(ax, features = c('Sln', 'Myl4', 'Myl7', 'Nppa', 'Myl1', # Atrial CM markers
+                           'Fabp3', 'Pln', 'Myl2', 'Myl3', 'Pin', 'Mb' # Ventricular CMs
+  ))
+  
+  ggsave(paste0(resDir, '/VlnPLot_Atrial_Ventricular_markerGenes_', mcells, '_subtypes.pdf'), width = 12, height = 10)
+  
+  ax.markers <- FindAllMarkers(ax, only.pos = TRUE, min.pct = 0.2, logfc.threshold = 0.3)
+  # saveRDS(ax.markers, file = paste0(RdataDir, 'Forte2020_logNormalize_allgenes_majorCellTypes_markerGenes.rds'))
+  
+  ax.markers %>%
+    group_by(cluster) %>%
+    top_n(n = 20, wt = avg_log2FC) -> top10
+  
+  DoHeatmap(ax, features = top10$gene)
+  
+  ggsave(paste0(resDir, '/heatmap_markerGenes_', mcells, '_subtypes.pdf'), width = 12, height = 26)
+  
+  aa$subtype[match(colnames(ax), colnames(aa))] = ax$subtype
+  saveRDS(aa, file =  paste0(RdataDir, 'Seurat.obj_adultMiceHeart_week0.week2_Ren2020_seuratNormalization_umap_subtypes.rds'))
+  
+  rm(aa)
+  rm(ax)
+  
+}
+
+Double.check.adult.non.cardiomyocyte.major.celltypes.subtypes = function(aa)
+{
+  # modify the cell annotations
+  aa$celltype = as.character(aa$my_annot)
+  
+  # major cell type FB
+  aa$celltype[which(aa$celltype == '0 - Fibro-I')] = 'FB1'
+  aa$celltype[which(aa$celltype == '9 - Fibro-II')] = 'FB2'
+  aa$celltype[which(aa$celltype == '11 - Fibro-III')] = 'FB3'
+  aa$celltype[which(aa$celltype == '15 - Fibro-IV')] = 'FB4'
+  aa$celltype[which(aa$celltype == '3 - MyoF')] = 'myoFB'
+  
+  # major cell type EC
+  aa$celltype[which(aa$celltype == '2 - EC-I')] = 'EC1'
+  aa$celltype[which(aa$celltype == '18 - EC-II')] = 'EC2'
+  aa$celltype[which(aa$celltype == '19 - EC-III')] = 'EC3'
+  aa$celltype[which(aa$celltype == '17 - Lymph-EC')] = 'Lymph.EC'
+  
+  # major cell type smooth muscle cells
+  aa$celltype[which(aa$celltype == '16 - SMC')] = 'SMC'
+  
+  # immune cells
+  aa$celltype[which(aa$celltype == '6 - B cell')] = 'B'
+  aa$celltype[which(aa$celltype == '4 - GRN')] = 'GN'
+  aa$celltype[which(aa$celltype == '12 - NK/T')] = 'NK.T'
+  aa$celltype[which(aa$celltype == '13 - Monon/DC')] = 'MCT.DC'
+  aa$celltype[which(aa$celltype == '5 - Chil3 Mono')] = 'MCT.Chil3'
+  
+  aa$celltype[which(aa$celltype == '1 - Trem2 Macs')] = 'Mphage.Trem2'
+  aa$celltype[which(aa$celltype == '10 - Arg1 Macs')] = 'Mphage.Argl'
+  aa$celltype[which(aa$celltype == '7 - MHCII Macs')] = 'MHCII.Mphage'
+  aa$celltype[which(aa$celltype == '14 - Proliferating Macs')] = 'prolife.Mphage'
+  
+  # merge major cell types
+  aa$subtype = aa$celltype
+  
+  aa$celltype[grep('FB', aa$subtype)]  = 'FB'
+  aa$celltype[grep('EC1|EC2|EC3|Lymph.EC', aa$subtype)]  = 'EC'
+  aa$celltype[grep('SMC', aa$subtype)] = 'SMC'
+  
+  aa$celltype[grep('GN|MCT|Mphage|NK', aa$subtype)]  = 'immune'
+  aa$celltype[which(aa$subtype == 'B')] = 'immune'
+  
+  p0 = DimPlot(aa, reduction = 'umap_0.05', group.by = 'celltype') + ggtitle('Shoval UMAP')
+  
+  p1 = DimPlot(aa, reduction = 'umap', group.by = 'celltype') + ggtitle(paste0(Normalization, ' - Elad umap'))
+  
+  p0 + p1 
+  ggsave(paste0(resDir, '/Ref_Forte2020_majorCelltypes_Shoval.umap_vs_Elad.umap.', Normalization, '.pdf'), 
+         width = 18, height = 8)
+  
+  
+  for(mcells in c('all', 'FB', 'EC', 'immune'))
+  {
+    # mcells = 'immune.others'
+    
+    if(mcells == 'all'){
+      ax = aa
+      
+      Idents(ax) = ax$celltype
+      
+    }else{
+      ax = subset(aa, cells = colnames(aa)[which(aa$celltype == mcells & aa$subtype != 'B' & aa$subtype != 'GN' &
+                                                   aa$subtype != 'NK.T')] )
+      table(ax$celltype)
+      table(ax$subtype)
+      
+      ax <- FindVariableFeatures(ax, selection.method = "vst", nfeatures = 3000)
+      ax <- ScaleData(ax, features = rownames(ax))
+      
+      ax <- RunPCA(ax, verbose = FALSE, weight.by.var = TRUE)
+      ElbowPlot(ax, ndims = 30)
+      
+      # UMAP to visualize subtypes
+      ax <- RunUMAP(ax, dims = 1:30, n.neighbors = 30, min.dist = 0.05, n_threads = 6)
+      
+      DimPlot(ax, reduction = 'umap', group.by = 'subtype') + 
+        ggtitle(paste0(mcells, '-', ' cells UMAP (', Normalization, ' nfeature = 3000, ndim=30, neighbors=30, mdist=0.05)'))
+      
+      ggsave(paste0(resDir, '/Ref_Forte2020_UMAP_', mcells, '_excluding B GN NK.T_subcelltypes.pdf'), 
+             width = 10, height = 8)
+      
+      ax <- FindNeighbors(ax, dims = 1:20)
+      
+      ax <- FindClusters(ax, verbose = FALSE, algorithm = 3, resolution = 0.4)
+      p1 = DimPlot(ax, reduction = 'umap', group.by = 'seurat_clusters')
+      p0 = DimPlot(ax, reduction = 'umap', group.by = 'subtype')
+      
+      p0 + p1
+      # marker genes and heatmaps
+      Idents(ax) = ax$subtype
+      
+      gg.examples = c('Col1a2', 'Vim', 'Fstl1', 'Ddr2', 'Acta2', 'Postn', 'Tcf21', 'Pdgfra', 'Col3a1', 'Col1a1', 
+                      'Gsn', 'Fbln2', 'Sparc', 'Mmp2', 'Msln', 'Rspo1', 'Lum', 'Col8a1')
+      
+      gg.examples = c('Tek', 'Pecam1', 'Emcn', 'Cdh5', 'Kdr', 'Vwf', 'Fabp4', 'Tie1', 
+                      'Flt1', 'Epas1', 'Ednrb', 'Gpihbp1', 'Npr3')
+      VlnPlot(ax, features = gg.examples)
+      ggsave(paste0(resDir, '/VlnPlot_markerGenes_', mcells, '_subtypes.pdf'), width = 20, height = 16)
+      
+      
+    }
+    
+    ax.markers <- FindAllMarkers(ax, only.pos = TRUE, min.pct = 0.1, logfc.threshold = 0.25)
+    # saveRDS(ax.markers, file = paste0(RdataDir, 'Forte2020_logNormalize_allgenes_majorCellTypes_markerGenes.rds'))
+    
+    ax.markers %>%
+      group_by(cluster) %>%
+      top_n(n = 10, wt = avg_log2FC) -> top10
+    
+    DoHeatmap(ax, features = top10$gene)
+    
+    ggsave(paste0(resDir, '/heatmap_markerGenes_', mcells, '_subtypes.pdf'), width = 12, height = 20)
+    
+  }
+  
+  ##########################################
+  # add distinct immune cells as major cell types  
+  ##########################################
+  jj = which(aa$subtype == 'B')
+  aa$celltype[jj] = aa$subtype[jj] 
+  
+  jj = which(aa$subtype == 'GN')
+  aa$celltype[jj] = aa$subtype[jj] 
+  
+  jj = which(aa$subtype == 'NK.T')
+  aa$celltype[jj] = aa$subtype[jj] 
+  
+  jj = which(aa$subtype == 'prolife.Mphage')
+  aa$celltype[jj] = aa$subtype[jj] 
+  
+  jj = which(aa$subtype == 'MHCII.Mphage')
+  aa$celltype[jj] = aa$subtype[jj] 
+  
+  jj = which(aa$subtype == 'MCT.DC')
+  aa$celltype[jj] = 'immune.others'
+  
+  jj = which(aa$celltype == 'immune')
+  aa$celltype[jj] = 'immune.others'
+  
+  p0 = DimPlot(aa, reduction = 'umap', group.by = 'celltype')
+  p1 = DimPlot(aa, reduction = 'umap', group.by = 'subtype')
+  
+  p0 + p1
+  ggsave(paste0(resDir, '/heatmap_markerGenes_', mcells, '_majoyCelltypes_subtypes.pdf'), width = 12, height = 20)
+  
+  rm(ax)
+  
+  xx = DietSeurat(aa, counts = TRUE, data = TRUE, scale.data = FALSE, assays = 'RNA', dimreducs = 'umap')
+  rm(aa)
+  saveRDS(xx, file = paste0(RdataDir, 'Forte2020_logNormalize_allgenes_majorCellTypes_subtypes.rds'))
+  
+}
+
