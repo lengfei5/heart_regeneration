@@ -75,7 +75,7 @@ Idents(st) = st$condition
 
 for(n in 1:length(cc))
 {
-  # n = 1
+  # n = 2
   cat(n, '  slice -- ', cc[n], '\n')
   slice = cc[n]
   
@@ -89,9 +89,9 @@ for(n in 1:length(cc))
   stx <- SCTransform(stx, assay = "Spatial", verbose = FALSE)
   
   ggs = rownames(stx)[grep('GAS6|AXL', rownames(stx))]
-  SpatialFeaturePlot(stx, features = ggs, images = cc[n])
+  SpatialFeaturePlot(stx, features = ggs, images = cc[n], max.cutoff = 'q5')
   
-  ggsave(paste0(outDir, 'GAS6_AXL_expression_SCT.pdf'), 
+  ggsave(paste0(outDir, 'GAS6_AXL_expression_SCT_v2.pdf'), 
          width = 14, height = 6)
   
   # Dimensional reduction with all cells
@@ -103,7 +103,7 @@ for(n in 1:length(cc))
   p2 <- SpatialDimPlot(stx, label = TRUE, group.by = 'seurat_clusters', label.size = 3, images = cc[n])
   p1 + p2
   
-  ggsave(paste0(outDir, 'visium_clusters.pdf'), 
+  ggsave(paste0(outDir, 'visium_clusters_v2.pdf'), 
          width = 14, height = 6)
   
   
@@ -119,7 +119,7 @@ for(n in 1:length(cc))
   ggs = rownames(stx)[grep('GAS6|AXL', rownames(stx))]
   SpatialFeaturePlot(stx, features = ggs, images = cc[n])
   
-  ggsave(paste0(outDir, 'GAS6_AXL_expression_logNormalize.pdf'), 
+  ggsave(paste0(outDir, 'GAS6_AXL_expression_logNormalize_v2.pdf'), 
          width = 14, height = 6)
   
   
@@ -318,11 +318,15 @@ for(n in 1:length(cc))
     stx2 <- ScaleData(stx2)
     saveRDS(stx2, file = paste0(outDir, 'st_res_NICHES_NeighborhoodToCell_snRNA.imputation.rds'))
     
+    stx2 = readRDS(file = paste0(outDir, 'st_res_NICHES_NeighborhoodToCell_snRNA.imputation.rds'))
+    
     SpatialFeaturePlot(stx2,
                        features = c('GAS6—AXL', "NRG1—ERBB2"),
-                       slot = 'scale.data', images = slice)
+                       slot = 'scale.data', images = slice, 
+                       min.cutoff = c(-1, -1),
+                       max.cutoff = c(2, 3))
     
-    ggsave(paste0(outDir, 'GAS6_AXL_examples_interaction_visium_snRNAimputation', cc[n], '.pdf'), 
+    ggsave(paste0(outDir, 'GAS6_AXL_examples_interaction_visium_snRNAimputation', cc[n], '_v2.pdf'), 
            width = 14, height = 6)
     
   

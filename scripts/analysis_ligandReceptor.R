@@ -306,12 +306,13 @@ if(!dir.exists(outDir_version)) dir.create(outDir_version)
 
 out_misty = paste0('../results/visium_axolotl_R12830_resequenced_20220308/neighborhood_test/',
                    'Run_misty_v1.8_short/Plots_RCTD_density')
-misty_cutoff = 1
+misty_cutoff = 0.5
 
 # run LIANA day by day
 timepoint_specific = TRUE
 
-times_slice = c('d1', 'd4', 'd7', 'd14')
+#times_slice = c('d1', 'd4', 'd7', 'd14')
+times_slice = c('d1', 'd7', 'd14')
 
 subtypes = unique(refs$celltypes)
 
@@ -352,9 +353,10 @@ for(n in 1:length(times_slice))
   celltypes_BZ_timeSpecific = vector("list", nrow(pairs))
   for(m in 1:nrow(pairs))
   {
+    # m = 16
     celltypes_BZ_timeSpecific[[m]] = colnames(pairs)[which(pairs[m, ] == TRUE)]
     #x = pairs[which(rownames(pairs) == 'CM.Prol.IS'), ]
-    names(celltypes_BZ_timeSpecific)[m] = colnames(pairs)[m]
+    names(celltypes_BZ_timeSpecific)[m] = rownames(pairs)[m]
     
   }
   
