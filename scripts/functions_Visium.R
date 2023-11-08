@@ -191,10 +191,8 @@ Run.celltype.deconvolution.RCTD = function(st, # spatial transcriptome seurat ob
   # first for major cell types 
   # secondly for subtypes
   ##########################################
-  
   if(!condition.specific.ref){
-    cat('-- prepare global reference --\n')
-    
+    cat('-- prepare global reference for all conditions --\n')
     E_refs = GetAssayData(object = refs, slot = "data")
     E_refs = expm1(E_refs) # linear scale of corrected gene expression
     
@@ -217,7 +215,7 @@ Run.celltype.deconvolution.RCTD = function(st, # spatial transcriptome seurat ob
   # loop over all conditions of st for now
   ##########################################
   cat('-- check visium conditions -- \n')
-  st$condition = droplevels(st$condition)
+  st$condition = droplevels(factor(st$condition))
   print(table(st$condition))
   cc = names(table(st$condition))
   
@@ -524,7 +522,9 @@ Run.celltype.deconvolution.RCTD = function(st, # spatial transcriptome seurat ob
   
 }
 
-plot.RCTD.results = function(RCTD_out = '../results/RCTD_out', 
+plot.RCTD.results = function(st, 
+                             species = 'axolotl',
+                             RCTD_out = '../results/RCTD_out', 
                              plot.RCTD.summary = TRUE,
                              PLOT.scatterpie = TRUE)
 {
@@ -558,7 +558,9 @@ plot.RCTD.results = function(RCTD_out = '../results/RCTD_out',
     
     resultsdir <- paste0(RCTD_out, '/', slice)
     system(paste0('mkdir -p ', resultsdir))
-    #resultsdir <- paste0(RCTD_out, '/', slice, '_Plots') ## you may change this to a more accessible directory on your computer.
+    
+    ## you may change this to a more accessible directory on your computer.
+    #resultsdir <- paste0(RCTD_out, '/', slice, '_Plots') 
     #dir.create(resultsdir)
     
     ##########################################
@@ -579,9 +581,17 @@ plot.RCTD.results = function(RCTD_out = '../results/RCTD_out',
     stx$condition = droplevels(stx$condition)
     DefaultAssay(stx) = 'SCT'
     
-    SpatialFeaturePlot(stx, images =  slice, #slot = 'data',
-                       features = "LOC115076416-AMEX60DD051098") +
-      ggtitle('NPPA-AMEX60DD051098')
+    if(species == 'axolotl'){
+      SpatialFeaturePlot(stx, images =  slice, #slot = 'data',
+                         features = "LOC115076416-AMEX60DD051098") +
+        ggtitle('NPPA-AMEX60DD051098')
+    }
+    if(species == 'mouse_adult'|species == 'mouse_neonatal'){
+      SpatialFeaturePlot(stx, images =  slice, #slot = 'data',
+                         features = "Nppa") +
+        ggtitle('Nppa')
+    }
+   
     #coord_flip() + 
     #ggplot2::scale_y_reverse() # rotate the coordinates to have the same as RCTD 
     ggsave(filename =  paste0(RCTD_out, "/Spatial_patterning_", slice, "_NPPA.pdf"), width = 12, height = 8)

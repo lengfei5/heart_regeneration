@@ -261,30 +261,35 @@ load(file = paste0(RdataDir, 'seuratObject_design_variableGenes_', species,
                    '_umap.clustered.Rdata'))
 refs = readRDS(file = paste0('../data/data_examples/ref_scRNAseq.rds'))
 
-DimPlot(refs, reduction = 'umap', group.by = 'celltype')
-DimPlot(refs, reduction = 'umap', group.by = 'subtype')
-DimPlot(refs, reduction = 'umap', group.by = 'timepoints')
+jj = which(refs$dataset == 'Ren2020')
+refs$timepoints[jj] = refs$condition[jj]
+refs$condition = refs$timepoints
+
+p1 = DimPlot(refs, reduction = 'umap', group.by = 'dataset')
+p2 = DimPlot(refs, reduction = 'umap', group.by = 'celltype')
+p3 = DimPlot(refs, reduction = 'umap', group.by = 'subtype')
+p4 = DimPlot(refs, reduction = 'umap', group.by = 'timepoints')
+
+(p1 + p2)/(p3 + p4)
+
+ggsave(filename = paste0(resDir, '/UMAP_scRNAseq_refrence_dataset_timepoints_celltypes.pdf'), 
+       width = 32, height = 16)
 
 ##########################################
 # cell type deconvolution for cell types
 ##########################################
-table(refs$subtypes)
-length(table(refs$subtypes))
-
-refs$subtypes = droplevels(refs$subtypes) 
-length(table(refs$subtypes)) # only 41 subtype annotations from Elad, with additional annotation "doublet" with 0 cell
+refs$celltype_toUse = as.character(refs$celltype)
+length(table(refs$celltype_toUse))
+table(refs$celltype_toUse)
+DimPlot(refs, reduction = 'umap', group.by = 'celltype')
 
 ## prepare the celltype to use and also specify the time-specific subtypes
-refs$celltype_toUse = as.character(refs$subtypes)
-length(table(refs$celltype_toUse))
-
-refs$condition = gsub('_scRNA', '', refs$condition)
-refs$celltype_toUse = gsub('Mo/Macs', 'Mo.Macs', refs$celltype_toUse)
-refs$celltype_toUse = gsub("[(]", '', refs$celltype_toUse)
-refs$celltype_toUse = gsub("[)]", '', refs$celltype_toUse)
+table(refs$condition)
 
 table(refs$celltype_toUse)
 length(table(refs$celltype_toUse))
+st$condition = factor(st$condition)
+table(st$condition)
 
 ## preapre the paramters for RCTD subtypes
 DefaultAssay(refs) = 'integrated'
@@ -294,49 +299,47 @@ require_int_SpatialRNA = FALSE
 condition.specific.ref = FALSE
 
 outDir = paste0(resDir, '/celltype_deconvolution')
-RCTD_out = paste0(outDir, '/RCTD_subtype_out_42subtypes_ref.time.specific_v4.3')
-max_cores = 32
+RCTD_out = paste0(outDir, '/RCTD_9celltypes_ref_v0.1')
+max_cores = 16
 # st = subset(st, condition == 'Amex_d4')
 
 source('functions_Visium.R')
 Run.celltype.deconvolution.RCTD(st, refs, 
                                 condition.specific.ref = condition.specific.ref,
-                                condition.specific_celltypes = condition.specific_celltypes,
+                                #condition.specific_celltypes = condition.specific_celltypes,
                                 require_int_SpatialRNA = require_int_SpatialRNA,
                                 max_cores = max_cores,
                                 RCTD_out = RCTD_out,
                                 plot.RCTD.summary = FALSE, 
                                 PLOT.scatterpie = FALSE
+                                
 )
 
-saveRDS(condition.specific_celltypes, 'RCTD_refs_condition_specificity.rds')
-saveRDS(refs, file = paste0(RdataDir, 'RCTD_refs_subtypes_final_20221117.rds'))
+#saveRDS(condition.specific_celltypes, paste0(RdataDir, 'RCTD_refs_condition_specificity.rds'))
+#saveRDS(refs, file = paste0(RdataDir, 'RCTD_refs_subtypes_final_20221117.rds'))
 
 source('functions_Visium.R')
-plot.RCTD.results(RCTD_out = RCTD_out,
+plot.RCTD.results(st = st, 
+                  RCTD_out = RCTD_out,
+                  species = species,
                   plot.RCTD.summary = FALSE)
 
 
 ##########################################
 # cell type deconvolution for subtypes
 ##########################################
-table(refs$subtypes)
-length(table(refs$subtypes))
-
-refs$subtypes = droplevels(refs$subtypes) 
-length(table(refs$subtypes)) # only 41 subtype annotations from Elad, with additional annotation "doublet" with 0 cell
+refs$celltype_toUse = as.character(refs$subtype)
+length(table(refs$celltype_toUse))
+table(refs$celltype_toUse)
+DimPlot(refs, reduction = 'umap', group.by = 'celltype_toUse')
 
 ## prepare the celltype to use and also specify the time-specific subtypes
-refs$celltype_toUse = as.character(refs$subtypes)
-length(table(refs$celltype_toUse))
-
-refs$condition = gsub('_scRNA', '', refs$condition)
-refs$celltype_toUse = gsub('Mo/Macs', 'Mo.Macs', refs$celltype_toUse)
-refs$celltype_toUse = gsub("[(]", '', refs$celltype_toUse)
-refs$celltype_toUse = gsub("[)]", '', refs$celltype_toUse)
+table(refs$condition)
 
 table(refs$celltype_toUse)
 length(table(refs$celltype_toUse))
+st$condition = factor(st$condition)
+table(st$condition)
 
 ## preapre the paramters for RCTD subtypes
 DefaultAssay(refs) = 'integrated'
@@ -346,31 +349,29 @@ require_int_SpatialRNA = FALSE
 condition.specific.ref = FALSE
 
 outDir = paste0(resDir, '/celltype_deconvolution')
-RCTD_out = paste0(outDir, '/RCTD_subtype_out_42subtypes_ref.time.specific_v4.3')
+RCTD_out = paste0(outDir, '/RCTD_', length(table(refs$celltype_toUse)), 'Subtype_ref_v0.1')
 max_cores = 32
-# st = subset(st, condition == 'Amex_d4')
 
 source('functions_Visium.R')
 Run.celltype.deconvolution.RCTD(st, refs, 
                                 condition.specific.ref = condition.specific.ref,
-                                condition.specific_celltypes = condition.specific_celltypes,
+                                #condition.specific_celltypes = condition.specific_celltypes,
                                 require_int_SpatialRNA = require_int_SpatialRNA,
                                 max_cores = max_cores,
                                 RCTD_out = RCTD_out,
                                 plot.RCTD.summary = FALSE, 
                                 PLOT.scatterpie = FALSE
+                                
 )
 
-saveRDS(condition.specific_celltypes, 'RCTD_refs_condition_specificity.rds')
-saveRDS(refs, file = paste0(RdataDir, 'RCTD_refs_subtypes_final_20221117.rds'))
+#saveRDS(condition.specific_celltypes, paste0(RdataDir, 'RCTD_refs_condition_specificity.rds'))
+#saveRDS(refs, file = paste0(RdataDir, 'RCTD_refs_subtypes_final_20221117.rds'))
 
 source('functions_Visium.R')
-plot.RCTD.results(RCTD_out = RCTD_out,
+plot.RCTD.results(st = st, 
+                  RCTD_out = RCTD_out,
+                  species = species,
                   plot.RCTD.summary = FALSE)
-
-
-
-st = Run.celltype.deconvolution.RCTD(st, refs)
 
 
 ########################################################
