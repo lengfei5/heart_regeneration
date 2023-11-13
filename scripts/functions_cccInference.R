@@ -2139,6 +2139,3 @@ circos_plot_customized = function(ligand_receptor_frame,
   
 }
 
-
-
-
