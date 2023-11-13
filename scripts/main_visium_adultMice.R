@@ -10,6 +10,20 @@
 # setup for data import and sequencing QCs
 rm(list = ls())
 
+library(pryr) # monitor the memory usage
+require(ggplot2)
+library(nichenetr)
+library(Seurat) # please update to Seurat V4
+library(tidyverse)
+library(circlize)
+library(RColorBrewer)
+require(scran)
+require(scater)
+source('functions_scRNAseq.R')
+source('functions_Visium.R')
+dataPath_nichenet = '../data/NicheNet/'
+
+
 version.analysis = '_R11934_20210827'
 
 resDir = paste0("../results/visium_adultMice", version.analysis)
@@ -436,20 +450,34 @@ if(Import.manual.spatial.domains){
   require(SPATA2) # installation https://themilolab.github.io/SPATA2/articles/spata-v2-installation.html
   
   st$segmentation = NA
+  #sdomain = read.csv('/groups/tanaka/Collaborations/Jingkui-Elad/Mouse_Visium_annotations/Anno_166906.csv')
+  inputDir = '/groups/tanaka/Collaborations/Jingkui-Elad/Mouse_Visium_annotations/'
   
-  inputDir = '/groups/tanaka/Collaborations/Jingkui-Elad/visium_axolotl_reseq/spata2_manual_regions/'
   #manual_selection_spots_image_Spata
   for(n in 1:length(cc))
   {
-    # n = 1
-    cat('slice -- ', cc[n], '\n')
+    # n = 2
+    
     slice = cc[n]
+    cat('slice -- ', slice, '\n')
     
-    aa = readRDS(file = paste0(inputDir, 'visium_manual_segmentation_', slice, '.rds'))
-    Idents(aa) = as.factor(aa$segmentation)
-    SpatialDimPlot(aa)
+    sdomain = read.csv(file = paste0(inputDir, 'Anno_', design$sampleID[which(design$condition == slice)], 
+                                    '.csv'))
     
-    st$segmentation[match(colnames(aa), colnames(st))] = aa$segmentation
+    colnames(sdomain) = c('Barcode', 'Anno')
+    sdomain = sdomain[which(sdomain$Anno != ''), ]
+    table(sdomain$Anno)
+    
+    kk = which(st$condition == slice)
+    cells_slice = sapply(colnames(st)[kk], function(x){unlist(strsplit(as.character(x), '_'))[1]})
+    
+    mm = match(sdomain$Barcode, cells_slice)
+    head(mm)
+    cat(length(which(is.na(mm))), ' cells with no mapping out of ', length(mm),  ' \n ')
+    
+    st$segmentation[kk[mm]] = sdomain$Anno
+    
+    rm(sdomain)
     
   }
   
@@ -458,6 +486,9 @@ if(Import.manual.spatial.domains){
   SpatialDimPlot(st)
   
   ggsave(paste0(resDir, '/Manual_segmentation_spata2_Elad.pdf'), width = 16, height = 6)
+  
+  st$segmentation = gsub('Mixed Inj_BZ', 'Mixed_Inj_BZ', st$segmentation)
+  st$segmentation = gsub('Proximal BZ', 'Proximal_BZ', st$segmentation)
   
   save(st, design, file = paste0(RdataDir, 'seuratObject_design_variableGenes_umap.clustered_manualSegmentation', 
                                  species, '.Rdata'))
@@ -469,47 +500,395 @@ if(Import.manual.spatial.domains){
   
 }
 
+##########################################
+# Step 2): cell neighborhood analysis
+##########################################
+##########################################
+# load ST data with additional region annotations
+load(file = paste0(RdataDir, 'seuratObject_design_variableGenes_umap.clustered_manualSegmentation', 
+                   species, '.Rdata'))
+
+st$segmentation = gsub('Distal_BZ', 'BZ', st$segmentation)
+st$segmentation = gsub('Proximal_BZ', 'BZ', st$segmentation)
+st$segmentation = gsub('Remote_1|Remote_2|Remote_3|Remote_3_septum', 'Remote', st$segmentation)
+
+table(st$segmentation, st$condition)
+
+## snRNA-seq reference  
+refs = readRDS(file = paste0('../data/data_examples/ref_scRNAseq.rds'))
+
+jj = which(refs$dataset == 'Ren2020')
+refs$timepoints[jj] = refs$condition[jj]
+refs$condition = refs$timepoints
+
+#refs = readRDS(file = paste0(RdataDir, 'RCTD_refs_subtypes_final_20221117.rds'))
+refs$subtypes = refs$subtype
+#refs$celltypes = refs$celltype_toUse
+
+table(refs$subtypes)
+length(table(refs$subtypes))
+
+refs$subtypes = as.factor(refs$subtypes) 
+
+#refs$celltypes = gsub('CM_ven_Robo2', 'CM_Robo2', refs$celltypes)
+#refs$celltypes = gsub('CM_ven_Cav3_1', 'CM_Cav3.1', refs$celltypes)
+
+Run_Neighborhood_Enrichment_Analysis = FALSE
+if(Run_Neighborhood_Enrichment_Analysis){
+  
+  outDir = paste0(resDir, '/neighborhood_test/Run_misty_v0.1/')
+  RCTD_out = paste0('../results/visium_adultMice_R11934_20210827/celltype_deconvolution/', 
+                    'RCTD_26Subtype_ref_v0.1')
+  
+  
+  levels(refs$subtypes)
+  
+  # condition-specific subtypes selected
+  #condSpec_celltypes = readxl::read_xlsx("../data/neighbourhood_analysis_list_short.xlsx")
+  #condSpec_celltypes = as.data.frame(condSpec_celltypes)
+  
+  # condSpec_celltypes = list(d1 = c('EC', "EC_CEMIP", "EC_LHX6", 'EC_NOS3', "EC_WNT4", 'EC_IS_IARS1',
+  #                                  "FB_TNXB",'FB_IS_TFPI2',
+  #                                  'Mo.Macs_SNX22', "Neu_DYSF",
+  #                                  "CM_Cav3.1", "CM_Robo2", 'CM_IS',
+  #                                  "Megakeryocytes","RBC"),
+  #                           d4 = c('EC', "EC_CEMIP", "EC_LHX6", 'EC_NOS3', "EC_WNT4", 'EC_IS_IARS1',
+  #                                  "EC_IS_LOX",
+  #                                  "FB_PKD1", "FB_TNXB",
+  #                                  "Mo.Macs_resident",  "Mo.Macs_FAXDC2", 'Mo.Macs_SNX22', 'Neu_DYSF',
+  #                                  "CM_Cav3.1", "CM_Robo2", 'CM_IS',  'CM_Prol_IS',
+  #                                  "Megakeryocytes", 'RBC'),
+  #                           d7 = c('EC', "EC_CEMIP", "EC_LHX6", 'EC_NOS3', "EC_WNT4", "EC_IS_LOX",
+  #                                  "FB_PKD1", "FB_TNXB", "FB_VWA2",
+  #                                  "Mo.Macs_resident", "Mo.Macs_FAXDC2", 'Neu_DYSF',
+  #                                  "CM_Robo2", "CM_Cav3.1",  'CM_IS',  'CM_Prol_IS',
+  #                                  "Megakeryocytes", 'RBC'),
+  #                           d14 = c('EC', "EC_CEMIP", "EC_LHX6", 'EC_NOS3', "EC_WNT4", "EC_IS_LOX",
+  #                                   "FB_PKD1", "FB_TNXB", "FB_VWA2",
+  #                                   "Mo.Macs_resident", 'Neu_DYSF',
+  #                                   "CM_Robo2", "CM_Cav3.1",  'CM_IS',
+  #                                   "Megakeryocytes", 'RBC')
+  # )
+  
+  source('functions_Visium.R')
+  run_misty_colocalization_analysis(st, 
+                                    outDir = outDir,
+                                    RCTD_out = RCTD_out,
+                                    condSpec_celltypes = NULL
+  )
+  
+  
+}
+
+########################################################
+########################################################
+# Section : ligand-receptor prediction analysis with 
+# LIANA and NicheNet
+# time-specifc and space-specific niches for nichenet
+########################################################
+########################################################
+
+# subtype time-specificity 
+# condition.specific_celltypes = readRDS(paste0(RdataDir, 'RCTD_refs_condition_specificity.rds'))
 
 ##########################################
-# spatial domain searching and potential define remote regions and border zone 
+# specific sub-populations to compare
+# sender cells, receiver cells
+# BZ-specific and Remote-specific populations (Nichenet specific)
 ##########################################
-Run_BayesSpace_for_spatialDomain = FALSE
-if(Run_BayesSpace_for_spatialDomain){
-  obj.list <- SplitObject(st, split.by = "condition")
-  # select day4
-  aa = obj.list[[2]]
+# define a list of cell type for each time point, either manual defined or from neighborhood enrichment analysis
+#celltypes = c('EC', 'EC_NOS3', 'EC_IS_IARS1', 'FB_IS_TFPI2', 'Mo.Macs_SNX22', 'Neu_IL1R1', 
+#              'CM_IS', "RBC")
+
+version_testing_short = FALSE
+if(version_testing){
+  timepoint_specific = TRUE
   
-  saveRDS(aa, file = paste0('data_examples/st_visium.rds'))
+  celltypes_BZ_timeSpecific = list(day1 = c('EC', 'EC_NOS3', 'EC_IS_IARS1', 'FB_IS_TFPI2', 'Mo.Macs_SNX22',
+                                            'Neu_IL1R1',
+                                            'CM_IS', "RBC"),
+                                   day4 = c('EC_IS_LOX', 'EC_IS_Prol', 'Mo.Macs_SNX22', 'Neu_DYSF', 'CM_IS',
+                                            'CM_Prol_IS', 'RBC'),
+                                   day7 = c('EC_IS_LOX', 'EC_IS_Prol', 'Mo.Macs_FAXDC2', 'Neu_DYSF', 'Neu_IL1R1',
+                                            'CM_IS',
+                                            'CM_Prol_IS', 'RBC'),
+                                   day14 = c('EC_IS_LOX', 'EC_IS_Prol', 'FB_PKD1', 'Neu_DYSF', 'CM_IS', 'Megakeryocytes',
+                                             'RBC')
+  )
+  celltypes_RZ_timeSpecific = list(day1 = c('EC', 'EC_NOS3', 'FB_PKD1', 'CM_Robo2'),
+                                   day4 = c('EC', 'EC_NOS3', 'FB_PKD1', 'CM_Robo2'),
+                                   day7 = c('EC', 'EC_NOS3', 'FB_PKD1', 'CM_Robo2'),
+                                   day14 = c('EC', 'EC_NOS3', 'FB_PKD1', 'CM_Robo2')
+  )
+  receivers_BZ_timeSpecific = list(day1 = c("CM_IS"),
+                                   day4 = c('CM_Prol_IS', "CM_IS"),
+                                   day7 = c('CM_Prol_IS', "CM_IS"),
+                                   day14 = c('CM_Prol_IS', "CM_IS")
+  )
   
-  aa$sampleID = design$sampleID[which(design$condition == names(table(aa$condition)))]
+  receivers_RZ_timeSpecific = list(day1 = c("CM_Robo2"),
+                                   day4 = c("CM_Robo2"),
+                                   day7 = c("CM_Robo2"),
+                                   day14 = c("CM_Robo2")
+  )
   
-  # import manually defined spatial domain by Elad
-  sdomain = read.csv('/groups/tanaka/Collaborations/Jingkui-Elad/Mouse_Visium_annotations/Anno_166906.csv')
-  sdomain = sdomain[which(sdomain$Anno_1 != ''), ]
-  aa$spatial_domain_manual = NA
+}
+
+
+version_testing_long = FALSE
+if(version_testing_long){
+  timepoint_specific = TRUE
   
-  cells = gsub('_2_1', '',  colnames(aa))
-  aa$spatial_domain_manual[match(sdomain$Barcode, cells)] = sdomain$Anno_1
+  celltypes_BZ_timeSpecific = list(day1 = c('EC', 'EC_NOS3', "FB_TNXB", 
+                                            "CM_Cav3.1", "CM_Robo2", "CM_IS", 
+                                            "Megakeryocytes", "RBC"),
+                                   day4 = c('EC', 'EC_IS_LOX', "FB_PKD1", 
+                                            "Mo.Macs_FAXDC2", 'Mo.Macs_SNX22', 
+                                            'Neu_DYSF', "CM_Robo2", 'CM_Prol_IS', "CM_IS",
+                                            "Megakeryocytes" ,'RBC'),
+                                   day7 = c('EC_NOS3', 'EC_IS_LOX', "FB_PKD1","FB_TNXB", 
+                                            "Mo.Macs_FAXDC2", 'Neu_DYSF',
+                                            "CM_Robo2", 'CM_Prol_IS', "CM_IS",
+                                            "Megakeryocytes" ,'RBC'),
+                                   day14 = c('EC_NOS3', "FB_PKD1", "FB_TNXB", 
+                                             "Mo.Macs_resident", 'Neu_DYSF', "CM_IS", 'CM_Prol_IS',
+                                             "CM_Robo2", 'RBC')
+  )
   
-  aa = run_bayesSpace(aa)
+  celltypes_RZ_timeSpecific = list(day1 = c('EC', 'EC_NOS3', "FB_TNXB", 'Mo.Macs_SNX22',
+                                            "CM_Cav3.1", "CM_Robo2", 'RBC'),
+                                   day4 = c('EC', 'EC_NOS3', 'FB_PKD1', 'CM_Robo2', 'CM_Prol_IS', "RBC"),
+                                   day7 = c('EC', 'EC_NOS3', 'FB_PKD1', "FB_TNXB", 'CM_Robo2'),
+                                   day14 = c('EC', 'EC_NOS3', 'FB_PKD1', 'CM_Robo2', "RBC")
+  )
+  
+  
+  receivers_BZ_timeSpecific = list(day1 = c("CM_IS"),
+                                   day4 = c('CM_Prol_IS', "CM_IS"),
+                                   day7 = c('CM_Prol_IS', "CM_IS"),
+                                   day14 = c('CM_Prol_IS', "CM_IS")
+  )
+  
+  receivers_RZ_timeSpecific = list(day1 = c("CM_Robo2"),
+                                   day4 = c("CM_Robo2"),
+                                   day7 = c("CM_Robo2"),
+                                   day14 = c("CM_Robo2")
+  )
+  
+}
+
+### version for Prateek
+OnlyFB_version_for_Prateek = FALSE
+if(OnlyFB_version_for_Prateek)
+{
+  timepoint_specific = TRUE
+  celltypes_BZ_timeSpecific = list(day1 = c('FB_TNXB'),
+                                   day4 = c('FB_TNXB', 'FB_PKD1'),
+                                   day7 = c('FB_TNXB', 'FB_PKD1'),
+                                   day14 = c('FB_TNXB', 'FB_PKD1')
+  )
+  receivers_BZ_timeSpecific = list(day1 = c("CM_IS"),
+                                   day4 = c('CM_Prol_IS'),
+                                   day7 = c('CM_Prol_IS'),
+                                   day14 = c("CM_IS")
+  )
+  
+}
+
+
+### all pairs of subtypes
+version_testing_all.subtype.pairs = FALSE
+if(version_testing_all.subtype.pairs){
+  
+  # define cell subtype pairs in the border zone 
+  celltypes_BZ_timeSpecific = list(day1 = list(CM_IS = c("CM_Cav3.1", "CM_Robo2", "EC_WNT4", 
+                                                         'Mo.Macs_SNX22','Neu_IL1R1', "RBC")
+                                               #CM_Prol_IS = c("CM_Cav3.1", "CM_Robo2", "EC_WNT4", 
+                                               #           'Mo.Macs_SNX22','Neu_IL1R1', "RBC")
+  ),
+  
+  day4 = list(CM_Prol_IS = c('CM_IS',"CM_Robo2", 'EC', 'FB_TNXB',  
+                             'Mo.Macs_SNX22', "Mo.Macs_FAXDC2")
+              
+  ),
+  
+  day7 = list(CM_Prol_IS = c("CM_Robo2",'EC_IS_LOX', "EC_NOS3",
+                             "FB_PKD1", "FB_TNXB",
+                             'Mo.Macs_FAXDC2','Neu_DYSF','RBC')),
+  
+  day14 = list(CM_IS = c("CM_Prol_3", "CM_Robo2", 'EC_IS_LOX', 
+                         'FB_PKD1', "FB_TNXB", "Mo.Macs_resident", 'RBC'))
+  
+  )
+  
+  # define cell subtype pairs in the remote zone as control for NicheNet
+  celltypes_RZ_timeSpecific = list(day1 = list(CM_Robo2 = c("CM_Cav3.1", "EC_IS_IARS1", "EC_WNT4")),
+                                   day4 = list(CM_Robo2 = c('CM_Robo2',"FB_TNXB", "Megakeryocytes",
+                                                            'Mo.Macs_resident', 'RBC')),
+                                   day7 = list(CM_Robo2 = c("EC_NOS3", "EC_WNT4", "Mo.Macs_resident", "RBC")),
+                                   day14 = list(CM_Robo2 = c("CM_Cav3.1", "EC_IS_IARS1", "FB_TNXB", 
+                                                             "Mo.Macs_resident"))
+  )
+  
+}
+
+
+##########################################
+# run LIANA 
+##########################################
+# set parameter for ligand-receptor analysis
+outDir_version = paste0(resDir, '/Ligand_Receptor_analysis/LIANA_v5.4_allpairs_intraOnly')
+if(!dir.exists(outDir_version)) dir.create(outDir_version)
+
+out_misty = paste0('../results/visium_axolotl_R12830_resequenced_20220308/neighborhood_test/',
+                   'Run_misty_v1.8_short/Plots_RCTD_density')
+misty_cutoff = 0.5
+
+# run LIANA day by day
+timepoint_specific = TRUE
+
+#times_slice = c('d1', 'd4', 'd7', 'd14')
+times_slice = c('d1', 'd7', 'd14')
+
+subtypes = unique(refs$celltypes)
+
+for(n in 1:length(times_slice))
+{
+  # n = 2
+  source('functions_cccInference.R')
+  time = times_slice[n]
+  cat(' run LIANA for time -- ', time, '\n')
+  
+  outDir = paste(outDir_version, '/', time, collapse = '')
+  outDir = gsub(' ', '', outDir)
+  
+  ## select the interacting subtype pairs  
+  intra = read.csv2(paste0(out_misty, '/Amex_', time, '_all_summary_table_intra.csv'), row.names = 1)
+  juxta = read.csv2(paste0(out_misty, '/Amex_', time, '_all_summary_table_juxta5.csv'), row.names = 1)
+  
+  intra = intra > misty_cutoff
+  juxta = juxta > misty_cutoff
+  
+  intra[which(is.na(intra))] = FALSE
+  juxta[which(is.na(juxta))] = FALSE
+  
+  pairs = intra + juxta > 0
+  pairs = pairs[which(rownames(pairs) != 'RBC'), which(colnames(pairs) != 'RBC')]
+  ss_row = apply(pairs, 1, sum)
+  ss_col = apply(pairs, 2, sum)
+  
+  pairs = pairs[ ,which(ss_col >= 1)] # at least interacting with 1 receivers
+  pairs = pairs[which(ss_row >= 3), ] # at least have 3 senders 
+  
+  colnames(pairs) = gsub("Cav3_1", "Cav3.1", gsub('Mo_Macs', 'Mo.Macs', gsub('[.]','_', colnames(pairs))))
+  rownames(pairs) = gsub("Cav3_1", "Cav3.1", gsub('Mo_Macs', 'Mo.Macs', gsub('[.]','_', rownames(pairs))))
+  
+  cat(match(colnames(pairs), subtypes), '\n')
+  cat(match(rownames(pairs), subtypes), '\n')
+  
+  celltypes_BZ_timeSpecific = vector("list", nrow(pairs))
+  for(m in 1:nrow(pairs))
+  {
+    # m = 16
+    celltypes_BZ_timeSpecific[[m]] = colnames(pairs)[which(pairs[m, ] == TRUE)]
+    #x = pairs[which(rownames(pairs) == 'CM.Prol.IS'), ]
+    names(celltypes_BZ_timeSpecific)[m] = rownames(pairs)[m]
+    
+  }
+  
+  run_LIANA(refs, 
+            timepoint_specific = TRUE,
+            include_autocrine = TRUE,
+            celltypes_timeSpecific = celltypes_BZ_timeSpecific,
+            outDir = outDir
+  )
+  
+  #res = aggregate_output_LIANA(paste(outDir, time))
+  
+}
+
+
+## double check the ligand and receptor expression distribution
+#FeaturePlot(refs, features = rownames(refs)[grep('EGFC|VIPR2', rownames(refs))])
+
+########################################################
+# diff Nichenet for ligand-receptor analysis
+# original code from https://github.com/saeyslab/nichenetr/blob/master/vignettes/seurat_steps.md
+########################################################
+outDir_version = paste0(resDir, '/Ligand_Receptor_analysis/DiffNicheNet_v5.1_allpairs_intraOnly')
+
+for(n in 1:length(celltypes_BZ_timeSpecific))
+{
+  # n = 2
+  source('functions_cccInference.R')
+  time = names(celltypes_BZ_timeSpecific)[n]
+  cat(' run DiffNicheNet for time -- ', time, '\n')
+  outDir = paste(outDir_version, '/', time, collapse = '')
+  outDir = gsub(' ', '', outDir)
+  
+  system(paste0('mkdir -p ', outDir))
+  
+  source('functions_cccInference.R')
+  
+  run_Diff_NicheNet(refs = refs, 
+                    timepoint_specific = TRUE,
+                    include_autocrine = TRUE,
+                    celltypes_BZ_specificDay = celltypes_BZ_timeSpecific[[n]],
+                    celltypes_RZ_specificDay = celltypes_RZ_timeSpecific[[n]],
+                    outDir = outDir
+  )
+  
+  # extract_tables_from_res_Diff_NicheNet(outDir)
   
 }
 
 ##########################################
-# cell proximity analysis 
+# ## quick construction of GAS6-AXL to targets 
 ##########################################
-run_cell_proximity_analysis(aa)
+library(nichenetr)
+library(tidyverse)
 
-########################################################
-########################################################
-# Section IV: ligand-receptor-target prediction 
-# LIANA and NICHNET  
-########################################################
-########################################################
-source('functions_Visium.R')
-run_LIANA()
+weighted_networks = readRDS(url("https://zenodo.org/record/3260758/files/weighted_networks.rds"))
+ligand_tf_matrix = readRDS(url("https://zenodo.org/record/3260758/files/ligand_tf_matrix.rds"))
 
-run_NicheNet()
+lr_network = readRDS(url("https://zenodo.org/record/3260758/files/lr_network.rds"))
+sig_network = readRDS(url("https://zenodo.org/record/3260758/files/signaling_network.rds"))
+gr_network = readRDS(url("https://zenodo.org/record/3260758/files/gr_network.rds"))
 
+
+ligands_all = "GAS6" # this can be a list of multiple ligands if required
+targets_all = unique(table_targets$target[which(table_targets$ligand == ligands_all)])
+
+targets_all = c("EGFR", "ETS1","LEF1", 'MYH9', 'SMAD3', 'STAT1')
+
+
+active_signaling_network = get_ligand_signaling_path(ligand_tf_matrix = ligand_tf_matrix, 
+                                                     ligands_all = ligands_all, 
+                                                     targets_all = targets_all, 
+                                                     weighted_networks = weighted_networks)
+
+# For better visualization of edge weigths: normalize edge weights to make them comparable between signaling and 
+# gene regulatory interactions
+active_signaling_network_min_max = active_signaling_network
+active_signaling_network_min_max$sig = active_signaling_network_min_max$sig %>% 
+  mutate(weight = ((weight-min(weight))/(max(weight)-min(weight))) + 0.75)
+active_signaling_network_min_max$gr = active_signaling_network_min_max$gr %>% 
+  mutate(weight = ((weight-min(weight))/(max(weight)-min(weight))) + 0.75)
+
+graph_min_max = diagrammer_format_signaling_graph(signaling_graph_list = active_signaling_network_min_max, 
+                                                  ligands_all = ligands_all, 
+                                                  targets_all = targets_all, 
+                                                  sig_color = "indianred", 
+                                                  gr_color = "steelblue")
+
+# To render the graph: uncomment following line of code
+DiagrammeR::render_graph(graph_min_max, layout = "kk")
+
+
+data_source_network = infer_supporting_datasources(signaling_graph_list = active_signaling_network, 
+                                                   lr_network = lr_network, 
+                                                   sig_network = sig_network, 
+                                                   gr_network = gr_network)
+head(data_source_network) 
 
 

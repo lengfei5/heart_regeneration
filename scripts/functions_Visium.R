@@ -1393,19 +1393,28 @@ run_misty_colocalization_analysis = function(st,
     DefaultAssay(stx) = 'Spatial'
     
     # import the cell type deconvolution result
-    myRCTD = readRDS(file = paste0(RCTD_out,  '/RCTD_out_doubletMode_', slice, '.rds'))
+    file_RCTD = paste0(RCTD_out,  '/RCTD_out_doubletMode_', slice, '.rds')
+    if(!file.exists(file_RCTD)){
+      file_RCTD = paste0(RCTD_out, '/', slice, '/RCTD_out_doubletMode_', slice, '.rds')
+      if(!file.exists(file_RCTD)){
+        cat(file_RCTD, ' not found \n');
+      }
+    }
+    
+    myRCTD = readRDS(file = file_RCTD)
     results <- myRCTD@results
     
     weights = results$weights
     
-    colnames(weights) = gsub('CM_ven_Robo2', 'CM_Robo2', colnames(weights))
-    colnames(weights) = gsub('CM_ven_Cav3_1', 'CM_Cav3.1', colnames(weights))
+    #colnames(weights) = gsub('CM_ven_Robo2', 'CM_Robo2', colnames(weights))
+    #colnames(weights) = gsub('CM_ven_Cav3_1', 'CM_Cav3.1', colnames(weights))
     
     norm_weights = normalize_weights(weights)
     weights = as.matrix(t(weights))
     norm_weights = as.matrix(t(norm_weights))
     
     if(!is.null(condSpec_celltypes)){
+      cat('-- condition-specific cell types were specified --\n')
       celltypes_sels = condSpec_celltypes[[which(names(condSpec_celltypes) == gsub('Amex_', '', cc[n]))]]
       mm = match(celltypes_sels, rownames(weights))
       #celltypes_sels[which(is.na(mm))]
@@ -1417,7 +1426,23 @@ run_misty_colocalization_analysis = function(st,
       }else{
         stop(paste0(celltypes_sels[which(is.na(mm))], collapse = ' '), ' not found \n')
       }
+    }else{
+      cat('-- NO condition-specific cell types were specified --\n')
+      
+      # celltypes_sels = unique() 
+      # mm = match(celltypes_sels, rownames(weights))
+      # #celltypes_sels[which(is.na(mm))]
+      # 
+      # if(length(which(is.na(mm))) == 0){
+      #   weights = weights[mm, ]
+      #   norm_weights = norm_weights[mm, ]
+      #   cat('--', nrow(weights), ' celltypes to use -- \n')
+      # }else{
+      #   stop(paste0(celltypes_sels[which(is.na(mm))], collapse = ' '), ' not found \n')
+      # }
+      
     }
+    
     
     # filter the subtypes without matching
     mm = match(colnames(stx), colnames(norm_weights))
@@ -1443,8 +1468,15 @@ run_misty_colocalization_analysis = function(st,
           stx_sel = stx
           cv.folds = 10
         }else{
-          stx_sel = subset(stx, cells = colnames(stx)[grep(segment, stx$segmentation)])
-          cv.folds = 5
+          #jj = grep(segment, stx$segmentation)
+          jj = which(stx$segmentation == segment)
+          if(length(jj)>0){
+            stx_sel = subset(stx, cells = colnames(stx)[jj])
+            cv.folds = 5
+          }else{
+            cat('no spots annoated in segment: ', segment, '\n')
+          }
+          
         }
         
         xx = GetAssayData(stx_sel, slot = 'data', assay = assay)
@@ -1533,7 +1565,6 @@ run_misty_colocalization_analysis = function(st,
     }
   
   }
-  
   
 }
 
