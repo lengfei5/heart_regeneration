@@ -278,6 +278,7 @@ ggsave(filename = paste0(resDir, '/UMAP_scRNAseq_refrence_dataset_timepoints_cel
 ##########################################
 # cell type deconvolution for cell types
 ##########################################
+
 refs$celltype_toUse = as.character(refs$celltype)
 length(table(refs$celltype_toUse))
 table(refs$celltype_toUse)
@@ -351,6 +352,8 @@ condition.specific.ref = FALSE
 outDir = paste0(resDir, '/celltype_deconvolution')
 RCTD_out = paste0(outDir, '/RCTD_', length(table(refs$celltype_toUse)), 'Subtype_ref_v0.1')
 max_cores = 32
+
+# st = subset(st, condition == 'adult.day7'); st$condition = droplevels(st$condition)
 
 source('functions_Visium.R')
 Run.celltype.deconvolution.RCTD(st, refs, 

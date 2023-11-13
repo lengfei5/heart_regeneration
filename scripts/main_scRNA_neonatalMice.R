@@ -26,7 +26,12 @@ require(ggplot2)
 library(dplyr)
 library(patchwork)
 require(tictoc)
+library(DropletUtils)
+library(edgeR)
+library(future)
+options(future.globals.maxSize = 160000 * 1024^2)
 library(pryr) # monitor the memory usage
+
 mem_used()
 
 Normalization = 'lognormal' # ('lognormal or SCT')
@@ -37,90 +42,164 @@ Normalization = 'lognormal' # ('lognormal or SCT')
 # Cui et al., Dev Cell 2020
 ########################################################
 ########################################################
-Process.Cardiomyocyte.Ren.2020 = FALSE
-if(Process.Cardiomyocyte.Ren.2020){
-  dataDir = '../published_dataset/neonatal_mice/Cui_2020_DevCell/'
-  counts = fread(file = paste0(dataDir, 'GSE130699_P1_8_AllCM.txt'), nThread = 6)
-  rownames(counts) = counts$V1
+Process.Cardiomyocyte.Cui.et.al.2020 = FALSE
+if(Process.Cardiomyocyte.Cui.et.al.2020){
+  dataDir = '../published_dataset/neonatal_mice/Cui_2020_DevCell/GSE130699_RAW'
   
-  #metadata = read.delim(file = paste0(dataDir, '/GSE120064_TAC_clean_cell_info_summary.txt'), 
-  #                      sep = '\t', header = TRUE)
+  outDir = paste0(resDir, '/QCs')
+  if(!dir.exists(outDir)) dir.create(outDir)
   
-  # align the cellID in metadata and in the count table
-  mm = match(metadata$CellID, colnames(counts))
-  counts = counts[, c(1, mm), with=FALSE]
+  matrix_list = list.files(path =  dataDir, 
+                           pattern = '*_matrix.mtx.gz',
+                           full.names = TRUE)
+  design = data.frame(sampleID = basename(matrix_list),
+                      condition = basename(matrix_list))
   
-  # keep only the week 0 data
-  jj = which(metadata$condition == '0w' | metadata$condition == '2w')
+  design$condition = sapply(design$condition, function(x){unlist(strsplit(x, '_'))[2]})
   
-  metadata = metadata[jj, ]
-  counts = counts[, c(1, jj+1), with = FALSE]
-  counts = as.data.frame(counts)
-  rownames(counts) = counts$V1
-  counts = counts[, -1]
   
-  # remove genes with 0 umi counts
-  ss = apply(as.matrix(counts), 1, sum)
-  counts = counts[which(ss>0), ]
   
-  metadata = data.frame(metadata)
-  rownames(metadata) = metadata$CellID
+  # import data from cellranger output
+  for(n in 1:nrow(design))
+  {
+    # n = 1
+    cat(n, ' : ', design$condition[n], '\n')
+    
+    exp = Matrix::readMM(paste0(dataDir, '/', design$sampleID[n])) #read matrix
+    bc = read.csv(paste0(dataDir, "/", gsub('matrix.mtx.gz', 'barcodes.tsv.gz', design$sampleID[n])), 
+                  header = F, stringsAsFactors = F)
+    g = read.csv(paste0(dataDir, "/", gsub('matrix.mtx.gz', 'genes.tsv.gz', design$sampleID[n])), 
+                 header = F, stringsAsFactors = F, sep = '\t')
+    
+    ## make unique gene names
+    g$name = g$V2
+    gg.counts = table(g$V2)
+    gg.dup = names(gg.counts)[which(gg.counts>1)]
+    index.dup = which(!is.na(match(g$V2, gg.dup)))
+    g$name[index.dup] = paste0(g$V2[index.dup], '_', g$V1[index.dup])
+    
+    colnames(exp) = bc$V1
+    rownames(exp) = g$name
+    
+    count.data = exp
+    rm(exp);
+    
+    cat('get empty drops with UMI rank \n')
+    
+    # get emptyDrops and default cutoff cell estimates
+    iscell_dd = defaultDrops(count.data, expected = 5000) # default cell estimate, similar to 10x cellranger
+    sum(iscell_dd, na.rm=TRUE)
+    
+    ## not used the emptyDrops too slow 
+    # eout = emptyDrops(count.data, lower = 200)
+    # eout$FDR[is.na(eout$FDR)] = 1
+    # iscell_ed = eout$FDR<=0.01
+    # sum(iscell_ed, na.rm=TRUE)
+    
+    meta = data.frame(row.names = colnames(count.data), condition = design$condition[n],
+                      iscell_dd = iscell_dd)
+    
+    # plot rankings for number of UMI
+    br.out <- barcodeRanks(count.data)
+    
+    pdf(paste0(outDir, "/UMIrank_emptyDrop_", design$condition[n], "_", design$sampleID[n],  ".pdf"), 
+        height = 6, width =10, useDingbats = FALSE)
+    
+    plot(br.out$rank, br.out$total, log="xy", xlab="Rank", ylab="Total")
+    
+    o <- order(br.out$rank)
+    lines(br.out$rank[o], br.out$fitted[o], col="red")
+    abline(h=metadata(br.out)$knee, col="dodgerblue", lty=2)
+    abline(h=metadata(br.out)$inflection, col="forestgreen", lty=2)
+    abline(v = sum(iscell_dd), col = 'darkgreen', lwd = 2.0)
+    abline(v = c(3000, 5000, 8000, 10000, 12000), col = 'gray')
+    text(x = c(3000, 5000, 8000, 10000, 12000), y =10000, labels = c(3000, 5000, 8000, 10000, 12000), 
+         col = 'red')
+    legend("bottomleft", lty=2, col=c("dodgerblue", "forestgreen"),
+           legend=c("knee", "inflection"))
+    
+    dev.off()
+    
+    # use defaultDrop to select cells.
+    aa = CreateSeuratObject(counts = count.data[, iscell_dd],
+                            meta.data = meta[iscell_dd, ], 
+                            min.cells = 20, min.features = 100)
+    aa$cell.id = paste0(colnames(aa), '_', design$condition[n], '_', design$sampleID[n])
+    
+    if(n == 1) {
+      mnt = aa
+    }else{
+      mnt = merge(mnt, aa)
+    }
+  }
   
-  save(metadata, counts, file = paste0(RdataDir, 'metadata_counts_week0.week2.Rdata'))
+  mnt[["percent.mt"]] <- PercentageFeatureSet(mnt, pattern = "^mt-")
   
-}
-
-##########################################
-# make Seurat object with metadata and counts  
-##########################################
-load(file = paste0(RdataDir, 'metadata_counts_week0.week2.Rdata'))
-
-myo <- CreateSeuratObject(counts = counts, project = "adult", min.cells = 50, min.features = 500)
-myo = AddMetaData(myo, metadata, col.name = NULL) 
-
-myo[["percent.mt"]] <- PercentageFeatureSet(myo, pattern = "^mt-")
-
-plot1 <- FeatureScatter(myo, feature1 = "nCount_RNA", feature2 = "percent.mt")
-plot2 <- FeatureScatter(myo, feature1 = "nCount_RNA", feature2 = "nFeature_RNA")
-plot1 + plot2
-
-aa = subset(myo, subset = nFeature_RNA > 500 & nFeature_RNA < 5000 & nCount_RNA < 5*10^5)
-rm(myo)
-rm(counts)
-
-if(SCT.normalization){
-  aa <- SCTransform(aa, assay = "RNA", verbose = FALSE, variable.features.n = 3000, return.only.var.genes = FALSE, 
-                    min_cells=5) 
+  save(design, mnt, 
+      file = paste0(RdataDir, 'metadata_counts_Cui.et.al.2020.Rdata'))
   
-}else{
-  aa <- NormalizeData(aa, normalization.method = "LogNormalize", scale.factor = 10000)
-  aa <- FindVariableFeatures(aa, selection.method = "vst", nfeatures = 3000)
   
-  plot1 <- VariableFeaturePlot(aa)
+  ##########################################
+  # make Seurat object with metadata and counts  
+  ##########################################
+  load(file = paste0(RdataDir, 'metadata_counts_Cui.et.al.2020.Rdata'))
+  aa = mnt
+  rm(mnt)
   
-  top10 <- head(VariableFeatures(aa), 10)
-  plot2 <- LabelPoints(plot = plot1, points = top10, repel = TRUE)
+  plot1 <- FeatureScatter(aa, feature1 = "nCount_RNA", feature2 = "percent.mt")
+  plot2 <- FeatureScatter(aa, feature1 = "nCount_RNA", feature2 = "nFeature_RNA")
   plot1 + plot2
   
-  all.genes <- rownames(aa)
-  aa <- ScaleData(aa, features = all.genes)
+  Idents(aa) = factor(aa$condition)
+  
+  p1 = VlnPlot(aa, features = 'nFeature_RNA', y.max = 5000) +
+    geom_hline(yintercept = c(200, 500, 1000)) + NoLegend()
+  p2 = VlnPlot(aa, features = 'nCount_RNA', y.max = 50000) + NoLegend()
+  p3 = VlnPlot(aa, features = 'percent.mt', y.max = 100) + NoLegend()
+  
+  p1 | p2 | p3
+  
+  aa = subset(aa, subset = nFeature_RNA > 200  & nCount_RNA < 25000 &  percent.mt < 25)
+  
+  
+  if(SCT.normalization){
+    aa <- SCTransform(aa, assay = "RNA", verbose = FALSE, variable.features.n = 3000, return.only.var.genes = FALSE, 
+                      min_cells=5) 
+    
+  }else{
+    aa <- NormalizeData(aa, normalization.method = "LogNormalize", scale.factor = 10000)
+    aa <- FindVariableFeatures(aa, selection.method = "vst", nfeatures = 3000)
+    
+    plot1 <- VariableFeaturePlot(aa)
+    
+    top10 <- head(VariableFeatures(aa), 10)
+    plot2 <- LabelPoints(plot = plot1, points = top10, repel = TRUE)
+    plot1 + plot2
+    
+    all.genes <- rownames(aa)
+    aa <- ScaleData(aa, features = all.genes)
+    
+  }
+  
+  aa <- RunPCA(aa, verbose = FALSE, weight.by.var = TRUE)
+  ElbowPlot(aa, ndims = 30)
+  
+  aa <- FindNeighbors(aa, dims = 1:20)
+  aa <- FindClusters(aa, verbose = FALSE, algorithm = 3, resolution = 0.5)
+  
+  if(Normalization == 'SCT'){
+    aa = RunUMAP(aa, dims = 1:20, n.neighbors = 30, min.dist = 0.1)
+    #saveRDS(aa, file =  paste0(RdataDir, 'Seurat.obj_adultMiceHeart_week0.week2_Ren2020_SCT_umap.rds'))
+  }else{
+    
+    aa <- RunUMAP(aa, dims = 1:20, n.neighbors = 50, min.dist = 0.3)
+    
+    DimPlot(aa, label = TRUE, repel = TRUE, group.by = 'condition', raster=FALSE)
+    
+    saveRDS(aa, file =  paste0(RdataDir, 'Seurat.obj_neonatalMice_Normalization_umap_CM_Cui2020.rds'))
+    
+  }
   
 }
 
-aa <- RunPCA(aa, verbose = FALSE, weight.by.var = TRUE)
-ElbowPlot(aa, ndims = 30)
 
-aa <- FindNeighbors(aa, dims = 1:10)
-aa <- FindClusters(aa, verbose = FALSE, algorithm = 3, resolution = 0.5)
-
-### KEEP the umap configuration for only week0: nfeatures = 2000, dims = 1:20, n.neighbors = 30 and min.dist = 0.05 (sctransform)
-### umap configuraiton for week0 and week2: nfeatures = 3000, dims = 1:20, n.neighbors = 30/50, min.dist = 0.1 (sctransform)
-### umap configuration for week0 and week2: nfeatures = 3000, dims = 1:20, n.neighbors = 20, min.dist = 0.05 (seurat.norm)
-
-if(Normalization == 'SCT'){
-  aa = RunUMAP(aa, dims = 1:20, n.neighbors = 30, min.dist = 0.1)
-  #saveRDS(aa, file =  paste0(RdataDir, 'Seurat.obj_adultMiceHeart_week0.week2_Ren2020_SCT_umap.rds'))
-}else{
-  aa <- RunUMAP(aa, dims = 1:20, n.neighbors = 20, min.dist = 0.05)
-  #saveRDS(aa, file =  paste0(RdataDir, 'Seurat.obj_adultMiceHeart_week0.week2_Ren2020_seuratNormalization_umap.rds'))
-}
