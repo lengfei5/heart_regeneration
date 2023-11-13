@@ -278,111 +278,198 @@ ggsave(filename = paste0(resDir, '/UMAP_scRNAseq_refrence_dataset_timepoints_cel
 ##########################################
 # cell type deconvolution for cell types
 ##########################################
-
-refs$celltype_toUse = as.character(refs$celltype)
-length(table(refs$celltype_toUse))
-table(refs$celltype_toUse)
-DimPlot(refs, reduction = 'umap', group.by = 'celltype')
-
-## prepare the celltype to use and also specify the time-specific subtypes
-table(refs$condition)
-
-table(refs$celltype_toUse)
-length(table(refs$celltype_toUse))
-st$condition = factor(st$condition)
-table(st$condition)
-
-## preapre the paramters for RCTD subtypes
-DefaultAssay(refs) = 'integrated'
-DefaultAssay(st) = 'Spatial'
-require_int_SpatialRNA = FALSE
-
-condition.specific.ref = FALSE
-
-outDir = paste0(resDir, '/celltype_deconvolution')
-RCTD_out = paste0(outDir, '/RCTD_9celltypes_ref_v0.1')
-max_cores = 16
-# st = subset(st, condition == 'Amex_d4')
-
-source('functions_Visium.R')
-Run.celltype.deconvolution.RCTD(st, refs, 
-                                condition.specific.ref = condition.specific.ref,
-                                #condition.specific_celltypes = condition.specific_celltypes,
-                                require_int_SpatialRNA = require_int_SpatialRNA,
-                                max_cores = max_cores,
-                                RCTD_out = RCTD_out,
-                                plot.RCTD.summary = FALSE, 
-                                PLOT.scatterpie = FALSE
-                                
-)
-
-#saveRDS(condition.specific_celltypes, paste0(RdataDir, 'RCTD_refs_condition_specificity.rds'))
-#saveRDS(refs, file = paste0(RdataDir, 'RCTD_refs_subtypes_final_20221117.rds'))
-
-source('functions_Visium.R')
-plot.RCTD.results(st = st, 
-                  RCTD_out = RCTD_out,
-                  species = species,
-                  plot.RCTD.summary = FALSE)
-
+Use_coarse_celltypes = FALSE
+if(Use_coarse_celltypes){
+  refs$celltype_toUse = as.character(refs$celltype)
+  length(table(refs$celltype_toUse))
+  table(refs$celltype_toUse)
+  DimPlot(refs, reduction = 'umap', group.by = 'celltype')
+  
+  ## prepare the celltype to use and also specify the time-specific subtypes
+  table(refs$condition)
+  
+  table(refs$celltype_toUse)
+  length(table(refs$celltype_toUse))
+  st$condition = factor(st$condition)
+  table(st$condition)
+  
+  ## preapre the paramters for RCTD subtypes
+  DefaultAssay(refs) = 'integrated'
+  DefaultAssay(st) = 'Spatial'
+  require_int_SpatialRNA = FALSE
+  
+  condition.specific.ref = FALSE
+  
+  outDir = paste0(resDir, '/celltype_deconvolution')
+  RCTD_out = paste0(outDir, '/RCTD_9celltypes_ref_v0.1')
+  max_cores = 16
+  # st = subset(st, condition == 'Amex_d4')
+  
+  source('functions_Visium.R')
+  Run.celltype.deconvolution.RCTD(st, refs, 
+                                  condition.specific.ref = condition.specific.ref,
+                                  #condition.specific_celltypes = condition.specific_celltypes,
+                                  require_int_SpatialRNA = require_int_SpatialRNA,
+                                  max_cores = max_cores,
+                                  RCTD_out = RCTD_out,
+                                  plot.RCTD.summary = FALSE, 
+                                  PLOT.scatterpie = FALSE
+                                  
+  )
+  
+  #saveRDS(condition.specific_celltypes, paste0(RdataDir, 'RCTD_refs_condition_specificity.rds'))
+  #saveRDS(refs, file = paste0(RdataDir, 'RCTD_refs_subtypes_final_20221117.rds'))
+  
+  source('functions_Visium.R')
+  plot.RCTD.results(st = st, 
+                    RCTD_out = RCTD_out,
+                    species = species,
+                    plot.RCTD.summary = FALSE)
+  
+}
 
 ##########################################
 # cell type deconvolution for subtypes
 ##########################################
-refs$celltype_toUse = as.character(refs$subtype)
-length(table(refs$celltype_toUse))
-table(refs$celltype_toUse)
-DimPlot(refs, reduction = 'umap', group.by = 'celltype_toUse')
-
-## prepare the celltype to use and also specify the time-specific subtypes
-table(refs$condition)
-
-table(refs$celltype_toUse)
-length(table(refs$celltype_toUse))
-st$condition = factor(st$condition)
-table(st$condition)
-
-## preapre the paramters for RCTD subtypes
-DefaultAssay(refs) = 'integrated'
-DefaultAssay(st) = 'Spatial'
-require_int_SpatialRNA = FALSE
-
-condition.specific.ref = FALSE
-
-outDir = paste0(resDir, '/celltype_deconvolution')
-RCTD_out = paste0(outDir, '/RCTD_', length(table(refs$celltype_toUse)), 'Subtype_ref_v0.1')
-max_cores = 32
-
-# st = subset(st, condition == 'adult.day7'); st$condition = droplevels(st$condition)
-
-source('functions_Visium.R')
-Run.celltype.deconvolution.RCTD(st, refs, 
-                                condition.specific.ref = condition.specific.ref,
-                                #condition.specific_celltypes = condition.specific_celltypes,
-                                require_int_SpatialRNA = require_int_SpatialRNA,
-                                max_cores = max_cores,
-                                RCTD_out = RCTD_out,
-                                plot.RCTD.summary = FALSE, 
-                                PLOT.scatterpie = FALSE
-                                
-)
-
-#saveRDS(condition.specific_celltypes, paste0(RdataDir, 'RCTD_refs_condition_specificity.rds'))
-#saveRDS(refs, file = paste0(RdataDir, 'RCTD_refs_subtypes_final_20221117.rds'))
-
-source('functions_Visium.R')
-plot.RCTD.results(st = st, 
-                  RCTD_out = RCTD_out,
-                  species = species,
-                  plot.RCTD.summary = FALSE)
-
+Use_fineGrained_subtypes = FALSE
+if(Use_fineGrained_subtypes){
+  refs$celltype_toUse = as.character(refs$subtype)
+  length(table(refs$celltype_toUse))
+  table(refs$celltype_toUse)
+  DimPlot(refs, reduction = 'umap', group.by = 'celltype_toUse')
+  
+  ## prepare the celltype to use and also specify the time-specific subtypes
+  table(refs$condition)
+  
+  table(refs$celltype_toUse)
+  length(table(refs$celltype_toUse))
+  st$condition = factor(st$condition)
+  table(st$condition)
+  
+  ## preapre the paramters for RCTD subtypes
+  DefaultAssay(refs) = 'integrated'
+  DefaultAssay(st) = 'Spatial'
+  require_int_SpatialRNA = FALSE
+  
+  condition.specific.ref = FALSE
+  
+  outDir = paste0(resDir, '/celltype_deconvolution')
+  RCTD_out = paste0(outDir, '/RCTD_', length(table(refs$celltype_toUse)), 'Subtype_ref_v0.1')
+  max_cores = 32
+  
+  # st = subset(st, condition == 'adult.day7'); st$condition = droplevels(st$condition)
+  
+  source('functions_Visium.R')
+  Run.celltype.deconvolution.RCTD(st, refs, 
+                                  condition.specific.ref = condition.specific.ref,
+                                  #condition.specific_celltypes = condition.specific_celltypes,
+                                  require_int_SpatialRNA = require_int_SpatialRNA,
+                                  max_cores = max_cores,
+                                  RCTD_out = RCTD_out,
+                                  plot.RCTD.summary = FALSE, 
+                                  PLOT.scatterpie = FALSE
+                                  
+  )
+  
+  source('functions_Visium.R')
+  plot.RCTD.results(st = st, 
+                    RCTD_out = RCTD_out,
+                    species = species,
+                    plot.RCTD.summary = FALSE)
+  
+  
+}
 
 ########################################################
 ########################################################
-# Section III : proximicity enrichment analysis
+# Section III: spatial organization of cell types and genes  
 # 
 ########################################################
 ########################################################
+Spatial_variableGenes_analysis = FALSE
+if(Spatial_variableGenes_analysis){
+  load(file = paste0(RdataDir, 'seuratObject_design_variableGenes_', species, 
+                     '_umap.clustered.Rdata'))
+  
+  source('functions_Visium.R')
+  st = Find.SpatialDE(st)
+  
+}
+
+########################################################
+########################################################
+# Section IV : cell-to-cell communication analysis
+# 
+# 1) step: define spatial domain 
+# 2) step: neighborhood enrichment analysis
+# 3) step: ligand-receptor analysis
+########################################################
+########################################################
+source('functions_Visium.R')
+load(file = paste0(RdataDir, 'seuratObject_design_variableGenes_', species, 
+                   '_umap.clustered.Rdata'))
+
+st$condition = factor(st$condition, levels = design$condition)
+
+cat('visium conditions :\n')
+print(table(st$condition))
+cc = design$condition
+
+VlnPlot(st, features = 'nFeature_Spatial', group.by = 'condition') +
+  geom_hline(yintercept = c(200, 500, 1000, 2000))
+
+ggsave(paste0(resDir, '/QCs_nFeatures_mergedReseq.pdf'), width = 12, height = 8)
+
+VlnPlot(st, features = 'nFeature_SCT', group.by = 'condition') +
+  geom_hline(yintercept = c(200, 500, 1000, 2000))
+
+ggsave(paste0(resDir, '/QCs_nFeatures_SCT_mergedReseq.pdf'), width = 12, height = 8)
+
+
+##########################################
+# step 1) Spatial domain searching and potential define remote regions and border zone
+# here using computational methods to define regions of interest or cell niches
+##########################################
+## import manually defined spatial domains
+Import.manual.spatial.domains = TRUE
+if(Import.manual.spatial.domains){
+  require(SPATA2) # installation https://themilolab.github.io/SPATA2/articles/spata-v2-installation.html
+  
+  st$segmentation = NA
+  
+  inputDir = '/groups/tanaka/Collaborations/Jingkui-Elad/visium_axolotl_reseq/spata2_manual_regions/'
+  #manual_selection_spots_image_Spata
+  for(n in 1:length(cc))
+  {
+    # n = 1
+    cat('slice -- ', cc[n], '\n')
+    slice = cc[n]
+    
+    aa = readRDS(file = paste0(inputDir, 'visium_manual_segmentation_', slice, '.rds'))
+    Idents(aa) = as.factor(aa$segmentation)
+    SpatialDimPlot(aa)
+    
+    st$segmentation[match(colnames(aa), colnames(st))] = aa$segmentation
+    
+  }
+  
+  st$segmentation = as.factor(st$segmentation)
+  Idents(st) = as.factor(st$segmentation)
+  SpatialDimPlot(st)
+  
+  ggsave(paste0(resDir, '/Manual_segmentation_spata2_Elad.pdf'), width = 16, height = 6)
+  
+  save(st, design, file = paste0(RdataDir, 'seuratObject_design_variableGenes_umap.clustered_manualSegmentation', 
+                                 species, '.Rdata'))
+  
+  
+}else{ ### run bayesSpace to systematic spatial domain searching
+  source('functions_Visium.R')
+  run_bayesSpace(st, outDir = paste0(resDir, '/bayesSpace/'))
+  
+}
+
+
 ##########################################
 # spatial domain searching and potential define remote regions and border zone 
 ##########################################
@@ -425,14 +512,4 @@ run_LIANA()
 run_NicheNet()
 
 
-########################################################
-########################################################
-# Section V: spatial organization of cell types and genes  
-# 
-########################################################
-########################################################
-load(file = paste0(RdataDir, 'seuratObject_design_variableGenes_', species, '_umap.clustered.Rdata'))
-
-source('functions_Visium.R')
-st = Find.SpatialDE(st)
 
