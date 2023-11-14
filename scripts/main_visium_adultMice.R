@@ -527,6 +527,7 @@ length(table(refs$subtypes))
 
 refs$subtypes = as.factor(refs$subtypes) 
 
+
 RCTD_out = paste0('../results/visium_adultMice_R11934_20210827/celltype_deconvolution/', 
                   'RCTD_26Subtype_ref_v0.1')
 
@@ -634,6 +635,8 @@ timepoint_specific = TRUE
 times_slice = levels(st$condition)
 #times_slice = c('d1', 'd7', 'd14')
 
+refs$celltypes = refs$subtype
+
 subtypes = unique(refs$subtype)
 
 for(n in 1:length(times_slice))
@@ -684,7 +687,8 @@ for(n in 1:length(times_slice))
             timepoint_specific = TRUE,
             include_autocrine = TRUE,
             celltypes_timeSpecific = celltypes_BZ_timeSpecific,
-            outDir = outDir
+            outDir = outDir,
+            species = 'mm'
   )
   
   #res = aggregate_output_LIANA(paste(outDir, time))

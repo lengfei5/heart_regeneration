@@ -25,6 +25,7 @@ run_LIANA = function(refs,
                      celltypes_timeSpecific = NULL,
                      #receiver_cells = list(c('CM_IS')),
                      outDir = '../results/Ligand_Receptor_analysis',
+                     species = 'ax6',
                      ntop = 100,
                      plotGeneExpression.LR = FALSE,
                      RUN.CPDB.alone = FALSE)
@@ -147,6 +148,7 @@ run_LIANA = function(refs,
                                  receivers = receivers,
                                  additionalLabel = paste0('_', receivers),
                                  outDir = outDir, 
+                                 species = species,
                                  Test.geneExpresion = plotGeneExpression.LR)
 
     }
@@ -162,13 +164,20 @@ run_LIANA_defined_celltype = function(subref,
                                       receivers = NULL,
                                       additionalLabel = '_fixedCelltypes',
                                       outDir = outDir,
+                                      species = species,
                                       Test.geneExpresion = TRUE)
 {
   source('functions_scRNAseq.R')
   
   sce <- as.SingleCellExperiment(subref)
   colLabels(sce) = as.factor(sce$celltypes)
-  rownames(sce) = toupper(get_geneName(rownames(sce)))
+  
+  if(species == 'ax6'){
+    rownames(sce) = toupper(get_geneName(rownames(sce)))
+  }else{
+    rownames(sce) = toupper(rownames(sce))
+  }
+ 
   
   ave.counts <- calculateAverage(sce, assay.type = "counts")
   
@@ -176,8 +185,8 @@ run_LIANA_defined_celltype = function(subref,
   #     xlab=expression(Log[10]~"average count"))
   
   num.cells <- nexprs(sce, byrow=TRUE)
-  #smoothScatter(log10(ave.counts), num.cells, ylab="Number of cells",
-  #              xlab=expression(Log[10]~"average count"))
+  smoothScatter(log10(ave.counts), num.cells, ylab="Number of cells",
+                xlab=expression(Log[10]~"average count"))
   
   # detected in >= 5 cells, ave.counts >=5 but not too high
   genes.to.keep <- num.cells > 20 & ave.counts >= 10^-4  & ave.counts <10^2  
@@ -185,12 +194,19 @@ run_LIANA_defined_celltype = function(subref,
   
   sce <- sce[genes.to.keep, ]
   
-  
   ## run the liana wrap function by specifying resource and methods
   # Resource currently included in OmniPathR (and hence `liana`) include:
   show_resources()
   # Resource currently included in OmniPathR (and hence `liana`) include:
   show_methods()
+  
+  if(min(exec("logcounts", sce)) < 0){
+    xx = logcounts(sce)
+    xx[which(xx<0)] = 0
+    xx = Matrix(xx, sparse = TRUE)
+    logcounts(sce) = xx
+    rm(xx)
+  }
   
   liana_test <- liana_wrap(sce,  
                            method = c("natmi", "connectome", "logfc", "sca", "cytotalk"
