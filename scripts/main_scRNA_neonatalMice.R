@@ -202,6 +202,7 @@ if(Process.Cardiomyocyte.Cui.et.al.2020){
   
 }
 
+
 ##########################################
 # Import the scRNA-seq from shoval
 # original data from Wang et al., 2020 Cell Reports
@@ -209,24 +210,28 @@ if(Process.Cardiomyocyte.Cui.et.al.2020){
 process_otherCelltypes_Wang.et.al.2020 = FALSE
 if(process_otherCelltypes_Wang.et.al.2020){
   
-  aa = readRDS(file = paste0('/groups/tanaka/Collaborations/Jingkui-Elad/Mouse_data_shoval', 
-                             '/ZW_regeneration_scRNAseq.rds'))
+  dataDir = "/groups/tanaka/Collaborations/Jingkui-Elad/Mouse_data_shoval/"
+  xx = readRDS(file = paste0(dataDir, '/ZW_regeneration_scRNAseq.rds'))
+  aa = readRDS(file = paste0(dataDir, '/Wang_DevCell_2020_scRNAseq.rds'))
   
-  DimPlot(aa, label = TRUE, repel = TRUE, group.by = 'condition', raster=FALSE)
+  aa = readRDS(file = paste0(dataDir, '/seurObj_CM_norm_PCA_UMAP_jan21.rds'))
+  
+  DimPlot(aa, label = TRUE, repel = TRUE, group.by = 'orig.ident', raster=FALSE)
   
   DimPlot(aa, label = TRUE, repel = TRUE, group.by = 'FineID', raster=FALSE)
   
+  aa[["percent.mt"]] <- PercentageFeatureSet(aa, pattern = "^mt-")
+  #plot1 <- FeatureScatter(aa, feature1 = "nCount_RNA", feature2 = "percent.mt")
+  #plot2 <- FeatureScatter(aa, feature1 = "nCount_RNA", feature2 = "nFeature_RNA")
+  #plot1 + plot2
   
-  plot1 <- FeatureScatter(aa, feature1 = "nCount_RNA", feature2 = "percent.mt")
-  plot2 <- FeatureScatter(aa, feature1 = "nCount_RNA", feature2 = "nFeature_RNA")
-  plot1 + plot2
-  
+  DefaultAssay(aa) = 'RNA'
   Idents(aa) = factor(aa$condition)
   
-  p1 = VlnPlot(aa, features = 'nFeature_RNA', y.max = 5000) +
+  p1 = VlnPlot(aa, features = 'nFeature_RNA', y.max = 10000) +
     geom_hline(yintercept = c(200, 500, 1000)) + NoLegend()
-  p2 = VlnPlot(aa, features = 'nCount_RNA', y.max = 50000) + NoLegend()
-  p3 = VlnPlot(aa, features = 'percent.mt', y.max = 100) + NoLegend()
+  p2 = VlnPlot(aa, features = 'nCount_RNA', y.max = 100000) + NoLegend()
+  #p3 = VlnPlot(aa, features = 'percent.mt', y.max = 100) + NoLegend()
   
   p1 | p2 | p3
   
