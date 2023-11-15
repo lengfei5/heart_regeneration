@@ -43,7 +43,8 @@ Normalization = 'lognormal' # ('lognormal or SCT')
 Process.Cardiomyocyte.Ren.2020 = FALSE
 if(Process.Cardiomyocyte.Ren.2020){
   dataDir = '/groups/tanaka/People/current/jiwang/projects/heart_regeneration/published_dataset/Ren_2020'
-  metadata = read.delim(file = paste0(dataDir, '/GSE120064_TAC_clean_cell_info_summary.txt'), sep = '\t', header = TRUE)
+  metadata = read.delim(file = paste0(dataDir, '/GSE120064_TAC_clean_cell_info_summary.txt'), sep = '\t', 
+                        header = TRUE)
   counts = fread(file = paste0(dataDir, '/GSE120064_TAC_raw_umi_matrix.csv'), header = TRUE, nThread = 6)
   #rownames(counts) = counts$V1
   

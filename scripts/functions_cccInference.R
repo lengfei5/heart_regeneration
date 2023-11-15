@@ -209,10 +209,11 @@ run_LIANA_defined_celltype = function(subref,
   }
   
   liana_test <- liana_wrap(sce,  
-                           method = c("natmi", "connectome", "logfc", "sca", "cytotalk"
-                           ),
-                           resource = c("Consensus", 'CellPhoneDB', "OmniPath", "LRdb",
-                                        "CellChatDB",  "CellTalkDB"), 
+                           # method = c("natmi", "connectome", "logfc", "sca", "cytotalk"),
+                           method = c("natmi", "connectome", "logfc", "sca"),
+                           #resource = c("Consensus", 'CellPhoneDB', "OmniPath", "LRdb", "CellChatDB",  
+                           # "CellTalkDB"), 
+                           resource = c("Consensus", 'CellPhoneDB', "CellChatDB"),
                            assay.type = "logcounts", 
                            idents_col = 'celltypes')
   

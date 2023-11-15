@@ -23,7 +23,6 @@ source('functions_scRNAseq.R')
 source('functions_Visium.R')
 dataPath_nichenet = '../data/NicheNet/'
 
-
 version.analysis = '_R11934_20210827'
 
 resDir = paste0("../results/visium_adultMice", version.analysis)
@@ -703,33 +702,36 @@ for(n in 1:length(times_slice))
 # diff Nichenet for ligand-receptor analysis
 # original code from https://github.com/saeyslab/nichenetr/blob/master/vignettes/seurat_steps.md
 ########################################################
-outDir_NicheNet = paste0(resDir, '/Ligand_Receptor_analysis/DiffNicheNet_v5.1_allpairs_intraOnly')
-
-for(n in 1:length(celltypes_BZ_timeSpecific))
-{
-  # n = 2
-  source('functions_cccInference.R')
-  time = names(celltypes_BZ_timeSpecific)[n]
-  cat(' run DiffNicheNet for time -- ', time, '\n')
-  outDir = paste(outDir_NicheNet, '/', time, collapse = '')
-  outDir = gsub(' ', '', outDir)
+Run_DiffNicheNet = FALSE
+if(Run_DiffNicheNet){
+  outDir_NicheNet = paste0(resDir, '/Ligand_Receptor_analysis/DiffNicheNet_v5.1_allpairs_intraOnly')
   
-  system(paste0('mkdir -p ', outDir))
-  
-  source('functions_cccInference.R')
-  
-  run_Diff_NicheNet(refs = refs, 
-                    timepoint_specific = TRUE,
-                    include_autocrine = TRUE,
-                    celltypes_BZ_specificDay = celltypes_BZ_timeSpecific[[n]],
-                    celltypes_RZ_specificDay = celltypes_RZ_timeSpecific[[n]],
-                    outDir = outDir
-  )
-  
-  # extract_tables_from_res_Diff_NicheNet(outDir)
+  for(n in 1:length(celltypes_BZ_timeSpecific))
+  {
+    # n = 2
+    source('functions_cccInference.R')
+    time = names(celltypes_BZ_timeSpecific)[n]
+    cat(' run DiffNicheNet for time -- ', time, '\n')
+    outDir = paste(outDir_NicheNet, '/', time, collapse = '')
+    outDir = gsub(' ', '', outDir)
+    
+    system(paste0('mkdir -p ', outDir))
+    
+    source('functions_cccInference.R')
+    
+    run_Diff_NicheNet(refs = refs, 
+                      timepoint_specific = TRUE,
+                      include_autocrine = TRUE,
+                      celltypes_BZ_specificDay = celltypes_BZ_timeSpecific[[n]],
+                      celltypes_RZ_specificDay = celltypes_RZ_timeSpecific[[n]],
+                      outDir = outDir
+    )
+    
+    # extract_tables_from_res_Diff_NicheNet(outDir)
+    
+  }
   
 }
-
 
 ##########################################
 # ## quick construction of GAS6-AXL to targets 

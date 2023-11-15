@@ -202,4 +202,85 @@ if(Process.Cardiomyocyte.Cui.et.al.2020){
   
 }
 
+##########################################
+# Import the scRNA-seq from shoval
+# original data from Wang et al., 2020 Cell Reports
+##########################################
+process_otherCelltypes_Wang.et.al.2020 = FALSE
+if(process_otherCelltypes_Wang.et.al.2020){
+  
+  aa = readRDS(file = paste0('/groups/tanaka/Collaborations/Jingkui-Elad/Mouse_data_shoval', 
+                             '/ZW_regeneration_scRNAseq.rds'))
+  
+  DimPlot(aa, label = TRUE, repel = TRUE, group.by = 'condition', raster=FALSE)
+  
+  DimPlot(aa, label = TRUE, repel = TRUE, group.by = 'FineID', raster=FALSE)
+  
+  
+  plot1 <- FeatureScatter(aa, feature1 = "nCount_RNA", feature2 = "percent.mt")
+  plot2 <- FeatureScatter(aa, feature1 = "nCount_RNA", feature2 = "nFeature_RNA")
+  plot1 + plot2
+  
+  Idents(aa) = factor(aa$condition)
+  
+  p1 = VlnPlot(aa, features = 'nFeature_RNA', y.max = 5000) +
+    geom_hline(yintercept = c(200, 500, 1000)) + NoLegend()
+  p2 = VlnPlot(aa, features = 'nCount_RNA', y.max = 50000) + NoLegend()
+  p3 = VlnPlot(aa, features = 'percent.mt', y.max = 100) + NoLegend()
+  
+  p1 | p2 | p3
+  
+  aa = subset(aa, subset = nFeature_RNA > 200  & nCount_RNA < 25000 &  percent.mt < 25)
+  
+  
+  if(SCT.normalization){
+    aa <- SCTransform(aa, assay = "RNA", verbose = FALSE, variable.features.n = 3000, return.only.var.genes = FALSE, 
+                      min_cells=5) 
+    
+  }else{
+    aa <- NormalizeData(aa, normalization.method = "LogNormalize", scale.factor = 10000)
+    aa <- FindVariableFeatures(aa, selection.method = "vst", nfeatures = 3000)
+    
+    plot1 <- VariableFeaturePlot(aa)
+    
+    top10 <- head(VariableFeatures(aa), 10)
+    plot2 <- LabelPoints(plot = plot1, points = top10, repel = TRUE)
+    plot1 + plot2
+    
+    all.genes <- rownames(aa)
+    aa <- ScaleData(aa, features = all.genes)
+    
+  }
+  
+  aa <- RunPCA(aa, verbose = FALSE, weight.by.var = TRUE)
+  ElbowPlot(aa, ndims = 30)
+  
+  aa <- FindNeighbors(aa, dims = 1:20)
+  aa <- FindClusters(aa, verbose = FALSE, algorithm = 3, resolution = 0.5)
+  
+  if(Normalization == 'SCT'){
+    aa = RunUMAP(aa, dims = 1:20, n.neighbors = 30, min.dist = 0.1)
+    #saveRDS(aa, file =  paste0(RdataDir, 'Seurat.obj_adultMiceHeart_week0.week2_Ren2020_SCT_umap.rds'))
+  }else{
+    
+    aa <- RunUMAP(aa, dims = 1:20, n.neighbors = 50, min.dist = 0.3)
+    
+    DimPlot(aa, label = TRUE, repel = TRUE, group.by = 'condition', raster=FALSE)
+    
+    DimPlot(aa, label = TRUE, repel = TRUE, group.by = 'FineID', raster=FALSE)
+    
+    saveRDS(aa, file =  paste0(RdataDir, 'Seurat.obj_neonatalMice_Normalization_umap_CM_Cui2020.rds'))
+    
+  }
+  
+}
+
+
+########################################################
+########################################################
+# Section II : 
+# 
+########################################################
+########################################################
+
 
