@@ -40,6 +40,7 @@ Normalization = 'lognormal' # ('lognormal or SCT')
 ########################################################
 # Section I : First process the neonatal cardiomyocyte from 
 # Cui et al., Dev Cell 2020
+# still used here, because the CM dataset from Shoval was too stringently filtered 
 ########################################################
 ########################################################
 Process.Cardiomyocyte.Cui.et.al.2020 = FALSE
@@ -159,7 +160,7 @@ if(Process.Cardiomyocyte.Cui.et.al.2020){
   
   p1 | p2 | p3
   
-  aa = subset(aa, subset = nFeature_RNA > 200  & nCount_RNA < 25000 &  percent.mt < 25)
+  aa = subset(aa, subset = nFeature_RNA > 200  & nCount_RNA < 20000 &  percent.mt < 25)
   
   
   if(SCT.normalization){
@@ -202,23 +203,66 @@ if(Process.Cardiomyocyte.Cui.et.al.2020){
   
 }
 
+########################################################
+########################################################
+# Section II : process the data shared by Shoval
+# Wang et al., 2020 Cell Reports and 
+# Cui et al., Dev Cell 2020
+########################################################
+########################################################
+dataDir = "/groups/tanaka/Collaborations/Jingkui-Elad/Mouse_data_shoval/"
+
+double_check_two_seuratObjects = FALSE
+if(double_check_two_seuratObjects){
+  xx = readRDS(file = paste0(dataDir, '/ZW_regeneration_scRNAseq.rds'))
+  aa = readRDS(file = paste0(dataDir, '/Wang_DevCell_2020_scRNAseq.rds'))
+  
+  p1 = DimPlot(aa, label = TRUE, repel = TRUE, group.by = 'orig.ident', raster=FALSE)
+  p2 = DimPlot(xx, label = TRUE, repel = TRUE, group.by = 'orig.ident', raster=FALSE)
+  
+  p1 + p2
+  
+  p1 = DimPlot(aa, label = TRUE, repel = TRUE, group.by = 'FineID', raster=FALSE)
+  p2 = DimPlot(xx, label = TRUE, repel = TRUE, group.by = 'FineID', raster=FALSE)
+  
+  p1 + p2
+  
+  identical(aa, xx) # the same R object
+  
+  saveRDS(aa, file = paste0(RdataDir, 'Wang_DevCell_2020_scRNAseq.rds'))
+  
+  ## CM cells
+  aa = readRDS(file =  paste0(RdataDir, 'Seurat.obj_neonatalMice_Normalization_umap_CM_Cui2020.rds'))
+  xx = readRDS(file = paste0(dataDir, '/seurObj_CM_norm_PCA_UMAP_jan21.rds')) # with 18818 cells
+  #xx = readRDS(file = paste0(dataDir, '/CMs.rds')) # with 16934 cells
+  identical(aa, xx)
+  
+  p1 = DimPlot(aa, label = TRUE, repel = TRUE, group.by = 'condition', raster=FALSE)
+  p2 = DimPlot(xx, label = TRUE, repel = TRUE, group.by = 'orig.ident', raster=FALSE)
+  
+  p1 + p2
+  
+  mm = match(colnames(xx), colnames(aa))
+  
+  p1 = DimPlot(aa, label = TRUE, repel = TRUE, group.by = 'seurat_clusters', raster=FALSE)
+  p2 = DimPlot(xx, label = TRUE, repel = TRUE, group.by = 'seurat_clusters', raster=FALSE)
+  
+  p1 + p2
+  
+  
+  
+}
+
+
 
 ##########################################
 # Import the scRNA-seq from shoval
-# original data from Wang et al., 2020 Cell Reports
+# original data from 
 ##########################################
 process_otherCelltypes_Wang.et.al.2020 = FALSE
 if(process_otherCelltypes_Wang.et.al.2020){
   
-  dataDir = "/groups/tanaka/Collaborations/Jingkui-Elad/Mouse_data_shoval/"
-  xx = readRDS(file = paste0(dataDir, '/ZW_regeneration_scRNAseq.rds'))
-  aa = readRDS(file = paste0(dataDir, '/Wang_DevCell_2020_scRNAseq.rds'))
-  
-  aa = readRDS(file = paste0(dataDir, '/seurObj_CM_norm_PCA_UMAP_jan21.rds'))
-  
-  DimPlot(aa, label = TRUE, repel = TRUE, group.by = 'orig.ident', raster=FALSE)
-  
-  DimPlot(aa, label = TRUE, repel = TRUE, group.by = 'FineID', raster=FALSE)
+ 
   
   aa[["percent.mt"]] <- PercentageFeatureSet(aa, pattern = "^mt-")
   #plot1 <- FeatureScatter(aa, feature1 = "nCount_RNA", feature2 = "percent.mt")
