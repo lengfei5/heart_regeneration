@@ -162,7 +162,6 @@ if(Process.Cardiomyocyte.Cui.et.al.2020){
   
   aa = subset(aa, subset = nFeature_RNA > 200  & nCount_RNA < 20000 &  percent.mt < 25)
   
-  
   if(SCT.normalization){
     aa <- SCTransform(aa, assay = "RNA", verbose = FALSE, variable.features.n = 3000, return.only.var.genes = FALSE, 
                       min_cells=5) 
@@ -212,8 +211,8 @@ if(Process.Cardiomyocyte.Cui.et.al.2020){
 ########################################################
 dataDir = "/groups/tanaka/Collaborations/Jingkui-Elad/Mouse_data_shoval/"
 
-double_check_two_seuratObjects = FALSE
-if(double_check_two_seuratObjects){
+double_check_two_seuratObjects_Wang2020 = FALSE
+if(double_check_two_seuratObjects_Wang2020){
   xx = readRDS(file = paste0(dataDir, '/ZW_regeneration_scRNAseq.rds'))
   aa = readRDS(file = paste0(dataDir, '/Wang_DevCell_2020_scRNAseq.rds'))
   
@@ -231,28 +230,117 @@ if(double_check_two_seuratObjects){
   
   saveRDS(aa, file = paste0(RdataDir, 'Wang_DevCell_2020_scRNAseq.rds'))
   
-  ## CM cells
+}
+
+##########################################
+# futher processing of CM data 
+##########################################
+Further_cleaning_CM = FALSE
+if(Further_cleaning_CM){
   aa = readRDS(file =  paste0(RdataDir, 'Seurat.obj_neonatalMice_Normalization_umap_CM_Cui2020.rds'))
-  xx = readRDS(file = paste0(dataDir, '/seurObj_CM_norm_PCA_UMAP_jan21.rds')) # with 18818 cells
-  #xx = readRDS(file = paste0(dataDir, '/CMs.rds')) # with 16934 cells
-  identical(aa, xx)
   
-  p1 = DimPlot(aa, label = TRUE, repel = TRUE, group.by = 'condition', raster=FALSE)
-  p2 = DimPlot(xx, label = TRUE, repel = TRUE, group.by = 'orig.ident', raster=FALSE)
+  aa$condition = gsub('P11Sham', 'P8_Sham_d3', aa$condition)
+  aa$condition = gsub('P1MID1', 'P1_MI_d1', aa$condition)
+  aa$condition = gsub('P1MID3', 'P1_MI_d3', aa$condition)
+  aa$condition = gsub('P2Sham', 'P1_Sham_d1', aa$condition)
+  aa$condition = gsub('P4Sham', 'P1_Sham_d3', aa$condition)
+  aa$condition = gsub('P8MID1', 'P8_MI_d1', aa$condition)
+  aa$condition = gsub('P8MID3', 'P8_MI_d3', aa$condition)
+  aa$condition = gsub('P9Sham', 'P8_Sham_d1', aa$condition)
   
-  p1 + p2
+  Idents(aa) = factor(aa$condition)
+  p1 = VlnPlot(aa, features = 'nFeature_RNA', y.max = 5000) +
+    geom_hline(yintercept = c(200, 500, 1000)) + NoLegend()
+  p2 = VlnPlot(aa, features = 'nCount_RNA', y.max = 50000) + NoLegend()
+  p3 = VlnPlot(aa, features = 'percent.mt', y.max = 100) + NoLegend()
   
-  mm = match(colnames(xx), colnames(aa))
+  p1 | p2 | p3
   
-  p1 = DimPlot(aa, label = TRUE, repel = TRUE, group.by = 'seurat_clusters', raster=FALSE)
-  p2 = DimPlot(xx, label = TRUE, repel = TRUE, group.by = 'seurat_clusters', raster=FALSE)
+  ## try to remove the doublets
+  DimPlot(aa, label = TRUE, repel = TRUE, group.by = 'condition', raster=FALSE)
   
-  p1 + p2
+  sels = c()
+  cc = unique(aa$condition)
+  for(n in 1:length(cc))
+  {
+    jj = which(aa$condition == cc[n])
+    sels = c(sels, jj[which(aa$nFeature_RNA[jj] < quantile(aa$nFeature_RNA[jj], 0.99) & 
+                              aa$nFeature_RNA[jj] > quantile(aa$nFeature_RNA[jj], 0.01) & 
+                              aa$nFeature_RNA[jj] > 500 & 
+                           aa$nCount_RNA[jj] < quantile(aa$nCount_RNA[jj], 0.99) &
+                             aa$percent.mt[jj] < 25)]) 
+  }
+  
+  xx = subset(aa, cells = colnames(aa)[sels])
+  p1 = VlnPlot(xx, features = 'nFeature_RNA', y.max = 5000) +
+    geom_hline(yintercept = c(200, 500, 1000)) + NoLegend()
+  p2 = VlnPlot(xx, features = 'nCount_RNA', y.max = 10000) + NoLegend()
+  p3 = VlnPlot(xx, features = 'percent.mt', y.max = 30) + NoLegend()
+  p1 | p2 | p3
+  
+  ggsave(filename = paste0(RdataDir, 'CM_Cui2020_futher_cleaning.pdf'), 
+         width = 16, height = 6)
+  
+  #aa = subset(aa, subset = nFeature_RNA > 200  & nCount_RNA < 20000 &  percent.mt < 25)
+  aa = xx
+  rm(xx)
+  
+  saveRDS(aa, file = paste0(RdataDir, 'Seurat.obj_neonatalMice_CM_Cui2020_furtherCleaning.rds'))
+  
+  aa <- NormalizeData(aa, normalization.method = "LogNormalize", scale.factor = 10000)
+  aa <- FindVariableFeatures(aa, selection.method = "vst", nfeatures = 3000)
+  
+  plot1 <- VariableFeaturePlot(aa)
+  
+  top10 <- head(VariableFeatures(aa), 10)
+  plot2 <- LabelPoints(plot = plot1, points = top10, repel = TRUE)
+  plot1 + plot2
+  
+  all.genes <- rownames(aa)
+  aa <- ScaleData(aa, features = all.genes)
+  
+  aa <- RunPCA(aa, verbose = FALSE, weight.by.var = TRUE)
+  ElbowPlot(aa, ndims = 30)
+  
+  aa <- RunUMAP(aa, dims = 1:30, n.neighbors = 50, min.dist = 0.3)
+  
+  DimPlot(aa, label = TRUE, repel = TRUE, group.by = 'condition', raster=FALSE)
+  
+  ## doublet identification with Doublets
+  Removal_Doublets = FALSE
+  library(DoubletFinder)
+  require(Seurat)
+  
+  aa = readRDS(file = paste0(RdataDir, 'Seurat.obj_neonatalMice_CM_Cui2020_furtherCleaning.rds'))
+  
+  source('functions_scRNAseq.R')
+  xx = detect_doubletCell_scRNAseq(aa)
   
   
+  saveRDS(aa, file = paste0(RdataDir, 'Seurat.obj_neonatalMice_CM_Cui2020_furtherCleaning_rmDoublets.rds'))
+
   
 }
 
+
+
+
+
+xx = readRDS(file = paste0(dataDir, '/seurObj_CM_norm_PCA_UMAP_jan21.rds')) # with 18818 cells
+#xx = readRDS(file = paste0(dataDir, '/CMs.rds')) # with 16934 cells
+identical(aa, xx)
+
+p1 = DimPlot(aa, label = TRUE, repel = TRUE, group.by = 'condition', raster=FALSE)
+p2 = DimPlot(xx, label = TRUE, repel = TRUE, group.by = 'orig.ident', raster=FALSE)
+
+p1 + p2
+
+mm = match(colnames(xx), colnames(aa))
+
+p1 = DimPlot(aa, label = TRUE, repel = TRUE, group.by = 'seurat_clusters', raster=FALSE)
+p2 = DimPlot(xx, label = TRUE, repel = TRUE, group.by = 'seurat_clusters', raster=FALSE)
+
+p1 + p2
 
 
 ##########################################
