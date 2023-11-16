@@ -204,9 +204,8 @@ if(Process.Cardiomyocyte.Cui.et.al.2020){
 
 ########################################################
 ########################################################
-# Section II : process the data shared by Shoval
-# Wang et al., 2020 Cell Reports and 
-# Cui et al., Dev Cell 2020
+# Section II : process the data shared by Shoval for Wang et al., 2020 Cell Reports and 
+# Cui et al., Dev Cell 2020 processed myself
 ########################################################
 ########################################################
 dataDir = "/groups/tanaka/Collaborations/Jingkui-Elad/Mouse_data_shoval/"
@@ -315,109 +314,59 @@ if(Further_cleaning_CM){
   
   source('functions_scRNAseq.R')
   xx = detect_doubletCell_scRNAseq(aa)
+  aa = xx
+  rm(xx)
   
+  saveRDS(aa, file = paste0(RdataDir, 'Seurat.obj_neonatalMice_CM_Cui2020_furtherCleaning_identDoublets.rds'))
   
-  saveRDS(aa, file = paste0(RdataDir, 'Seurat.obj_neonatalMice_CM_Cui2020_furtherCleaning_rmDoublets.rds'))
-
+  aa = readRDS(file = paste0(RdataDir, 'Seurat.obj_neonatalMice_CM_Cui2020_furtherCleaning_identDoublets.rds'))
   
-}
-
-
-
-
-
-xx = readRDS(file = paste0(dataDir, '/seurObj_CM_norm_PCA_UMAP_jan21.rds')) # with 18818 cells
-#xx = readRDS(file = paste0(dataDir, '/CMs.rds')) # with 16934 cells
-identical(aa, xx)
-
-p1 = DimPlot(aa, label = TRUE, repel = TRUE, group.by = 'condition', raster=FALSE)
-p2 = DimPlot(xx, label = TRUE, repel = TRUE, group.by = 'orig.ident', raster=FALSE)
-
-p1 + p2
-
-mm = match(colnames(xx), colnames(aa))
-
-p1 = DimPlot(aa, label = TRUE, repel = TRUE, group.by = 'seurat_clusters', raster=FALSE)
-p2 = DimPlot(xx, label = TRUE, repel = TRUE, group.by = 'seurat_clusters', raster=FALSE)
-
-p1 + p2
-
-
-##########################################
-# Import the scRNA-seq from shoval
-# original data from 
-##########################################
-process_otherCelltypes_Wang.et.al.2020 = FALSE
-if(process_otherCelltypes_Wang.et.al.2020){
+  p1 = DimPlot(aa, label = TRUE, repel = TRUE, group.by = 'condition', raster=FALSE)
+  p2 = DimPlot(aa, label = TRUE, repel = TRUE, group.by = 'DF_out', raster=FALSE)
   
- 
+  p1 + p2  
   
-  aa[["percent.mt"]] <- PercentageFeatureSet(aa, pattern = "^mt-")
-  #plot1 <- FeatureScatter(aa, feature1 = "nCount_RNA", feature2 = "percent.mt")
-  #plot2 <- FeatureScatter(aa, feature1 = "nCount_RNA", feature2 = "nFeature_RNA")
-  #plot1 + plot2
+  aa = subset(aa, cells = colnames(aa)[which(aa$DF_out == 'Singlet')])
   
-  DefaultAssay(aa) = 'RNA'
   Idents(aa) = factor(aa$condition)
-  
-  p1 = VlnPlot(aa, features = 'nFeature_RNA', y.max = 10000) +
+  p1 = VlnPlot(aa, features = 'nFeature_RNA', y.max = 5000) +
     geom_hline(yintercept = c(200, 500, 1000)) + NoLegend()
-  p2 = VlnPlot(aa, features = 'nCount_RNA', y.max = 100000) + NoLegend()
-  #p3 = VlnPlot(aa, features = 'percent.mt', y.max = 100) + NoLegend()
+  p2 = VlnPlot(aa, features = 'nCount_RNA', y.max = 20000) + NoLegend()
+  p3 = VlnPlot(aa, features = 'percent.mt', y.max = 100) + NoLegend()
   
   p1 | p2 | p3
   
-  aa = subset(aa, subset = nFeature_RNA > 200  & nCount_RNA < 25000 &  percent.mt < 25)
+  aa <- NormalizeData(aa, normalization.method = "LogNormalize", scale.factor = 10000)
+  aa <- FindVariableFeatures(aa, selection.method = "vst", nfeatures = 2000)
   
+  plot1 <- VariableFeaturePlot(aa)
   
-  if(SCT.normalization){
-    aa <- SCTransform(aa, assay = "RNA", verbose = FALSE, variable.features.n = 3000, return.only.var.genes = FALSE, 
-                      min_cells=5) 
-    
-  }else{
-    aa <- NormalizeData(aa, normalization.method = "LogNormalize", scale.factor = 10000)
-    aa <- FindVariableFeatures(aa, selection.method = "vst", nfeatures = 3000)
-    
-    plot1 <- VariableFeaturePlot(aa)
-    
-    top10 <- head(VariableFeatures(aa), 10)
-    plot2 <- LabelPoints(plot = plot1, points = top10, repel = TRUE)
-    plot1 + plot2
-    
-    all.genes <- rownames(aa)
-    aa <- ScaleData(aa, features = all.genes)
-    
-  }
+  top10 <- head(VariableFeatures(aa), 10)
+  plot2 <- LabelPoints(plot = plot1, points = top10, repel = TRUE)
+  plot1 + plot2
+  
+  all.genes <- rownames(aa)
+  aa <- ScaleData(aa, features = all.genes)
   
   aa <- RunPCA(aa, verbose = FALSE, weight.by.var = TRUE)
   ElbowPlot(aa, ndims = 30)
   
-  aa <- FindNeighbors(aa, dims = 1:20)
-  aa <- FindClusters(aa, verbose = FALSE, algorithm = 3, resolution = 0.5)
+  aa <- RunUMAP(aa, dims = 1:10, n.neighbors = 50, min.dist = 0.3)
   
-  if(Normalization == 'SCT'){
-    aa = RunUMAP(aa, dims = 1:20, n.neighbors = 30, min.dist = 0.1)
-    #saveRDS(aa, file =  paste0(RdataDir, 'Seurat.obj_adultMiceHeart_week0.week2_Ren2020_SCT_umap.rds'))
-  }else{
-    
-    aa <- RunUMAP(aa, dims = 1:20, n.neighbors = 50, min.dist = 0.3)
-    
-    DimPlot(aa, label = TRUE, repel = TRUE, group.by = 'condition', raster=FALSE)
-    
-    DimPlot(aa, label = TRUE, repel = TRUE, group.by = 'FineID', raster=FALSE)
-    
-    saveRDS(aa, file =  paste0(RdataDir, 'Seurat.obj_neonatalMice_Normalization_umap_CM_Cui2020.rds'))
-    
-  }
+  DimPlot(aa, label = TRUE, repel = TRUE, group.by = 'condition', raster=FALSE)
+  
+  saveRDS(aa, file = paste0(RdataDir, 'Seurat.obj_neonatalMice_CM_Cui2020_furtherCleaning_rmDoublets.rds'))
+  
   
 }
 
 
 ########################################################
 ########################################################
-# Section II : 
+# Section II : batch correction and data integration of CMs and noCMs
 # 
 ########################################################
 ########################################################
+
 
 
