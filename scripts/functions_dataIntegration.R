@@ -7,11 +7,14 @@
 # Date of creation: Mon Sep 18 11:17:50 2023
 ##########################################################################
 ##########################################################################
-IntegrateData_Seurat_CCA = function()
+IntegrateData_Seurat_CCA = function(seuratObj, group.by = 'dataset', nfeatures = 2000,
+                                    ndims = c(1:30),
+                                    merge.order = NULL,
+                                    correct.all = FALSE,
+                                    reference = NULL)
 {
-  ref.list <- SplitObject(refs.merged, split.by = "dataset")
-  
-  rm(list = c('refs.merged', 'aa', 'srat')) # remove big seurat objects to clear memory
+  # seuratObj = aa; group.by = "condition"; ndims = c(1:30);reference = NULL;nfeatures = 2000
+  ref.list <- SplitObject(seuratObj, split.by = group.by)
   
   # normalize and identify variable features for each dataset independently
   ref.list <- lapply(X = ref.list, FUN = function(x) {
@@ -22,239 +25,206 @@ IntegrateData_Seurat_CCA = function()
   
   # select features that are repeatedly variable across datasets for integration run PCA on each
   # dataset using these features
-  features <- SelectIntegrationFeatures(object.list = ref.list)
+  features <- SelectIntegrationFeatures(object.list = ref.list, nfeatures = nfeatures)
   
   ref.list <- lapply(X = ref.list, FUN = function(x) {
-    x <- ScaleData(x, features = features.common, verbose = TRUE)
+    x <- ScaleData(x, features = features, verbose = TRUE)
     x <- RunPCA(x, features = features, verbose = FALSE)
     
   })
   
   ref.anchors <- FindIntegrationAnchors(object.list = ref.list, 
                                         anchor.features = features, 
-                                        #reference = c(2),
-                                        #reduction = "cca", 
-                                        reduction = 'rpca',
+                                        reference = reference,
+                                        reduction = "cca",
                                         #k.anchor = 5,
-                                        dims = 1:50)
-  
-  rm(ref.list)
+                                        dims = ndims)
   
   # this command creates an 'integrated' data assay
-  ref.combined <- IntegrateData(anchorset = ref.anchors, features.to.integrate = features.common, 
-                                dims = 1:50) ## take ~100G memory
+  if(correct.all){
+    feature2integrate = rownames(seuratObj)
+  }else{
+    feature2integrate = features
+  }
   
+  if(is.null(merge.order)){
+    ref.combined <- IntegrateData(anchorset = ref.anchors, 
+                                  features.to.integrate = feature2integrate, 
+                                  dims = ndims) 
+  }else{
+    ref.combined <- IntegrateData(anchorset = ref.anchors, 
+                                  features.to.integrate = feature2integrate,
+                                  sample.tree = merge.order,
+                                  dims = ndims)
+  }
+  
+  
+  rm(ref.list)
   rm(ref.anchors)
   
   # specify that we will perform downstream analysis on the corrected data note that the
   # original unmodified data still resides in the 'RNA' assay
   DefaultAssay(ref.combined) <- "integrated"
   
-  #xx = DietSeurat(ref.combined, counts = TRUE, data = TRUE, scale.data = TRUE, assays = 'integrated')
-  #xx@assays$integrated@counts = ref.combined@assays$RNA@counts
-  #saveRDS(xx, file = paste0(outDir, 
-  #                          '/Seurat.obj_mouseGastrulation_mNT_integrated.rds'))
-  
-  # Run the standard workflow for visualization and clustering
-  #ref.combined = readRDS(file =paste0(outDir, 
-  #                                    '/Seurat.obj_mouseGastrulation_mNT_integrated.rds'))
-  
-  
   ref.combined <- ScaleData(ref.combined, verbose = FALSE)
   ref.combined <- RunPCA(ref.combined, npcs = 50, verbose = FALSE)
   
   ElbowPlot(ref.combined, ndims = 50)
   
-  kk = which(ref.combined$dataset == 'mNT') 
-  ref.combined$celltype[kk] = paste0('mNT_', ref.combined$condition[kk])
-  
+  ref.combined <- RunUMAP(ref.combined, reduction = "pca", dims = 1:30, n.neighbors = 30, 
+                          min.dist = 0.3) 
+  DimPlot(ref.combined, reduction = "umap", group.by = group.by, label = TRUE,
+          repel = TRUE, raster=FALSE)
   
   #ref.combined <- FindNeighbors(ref.combined, reduction = "pca", dims = 1:20)
   #ref.combined <- FindClusters(ref.combined, resolution = 0.2)
-  ref.combined <- RunUMAP(ref.combined, reduction = "pca", dims = 1:50, n.neighbors = 50, 
-                          min.dist = 0.2) 
-  
   #DimPlot(ref.combined, reduction = "umap")
   
-  # Visualization
-  names(cols_sel) = paste0('mNT_', names(cols_sel))
-  
-  DimPlot(ref.combined, reduction = "umap", group.by = "celltype", label = TRUE,
-          repel = TRUE, raster=FALSE, cols = c(cols_mouse, cols_sel))
-  
-  ggsave(paste0(outDir, '/Integration_dataset_celltypes.pdf'), 
-         width = 14, height = 8)
-  
-  DimPlot(ref.combined, reduction = "umap", group.by = "dataset", raster=FALSE)
-  ggsave(paste0(outDir, '/Integration_dataset.pdf'), 
-         width = 10, height = 8)
-  
-  pdf(paste0(outDir, '/FeaturePlot_Markers.pdf'),
-      width =10, height = 8, useDingbats = FALSE)
-  
-  ggs = c('Pax6', 'Foxa2', 'Pou5f1', 'Sox17', 'Sox1', 'Sox2')
-  for(n in 1:length(ggs))
-  {
-    p1 = FeaturePlot(ref.combined, features = ggs[n], min.cutoff = 'q5')
-    #FeaturePlot(ref.combined, features = 'Foxa2', min.cutoff = 'q5')
-    #FeaturePlot(ref.combined, features = 'Sox17', min.cutoff = 'q5')
-    plot(p1)
-  }
-  
-  dev.off()
-  
-  DimPlot(ref.combined, reduction = "umap", group.by = "celltype", label = TRUE, split.by = 'dataset',
-          repel = TRUE, raster=FALSE) + NoLegend()
-  
-  ggsave(paste0(outDir, '/Integration_celltypes_split.dataset.pdf'), 
-         width = 24, height = 8)
-  
-  DimPlot(ref.combined, reduction = "umap", group.by = "stage", label = TRUE,
-          repel = TRUE, raster=FALSE)
-  
-  ggsave(paste0(outDir, '/Integration_stage.pdf'), 
-         width = 16, height = 8)
+  return(ref.combined)
   
 }
 
-IntegrateData_Seurat_RPCA = function()
+IntegrateData_Seurat_RPCA = function(seuratObj, group.by = 'dataset', nfeatures = 2000,
+                                     ndims = c(1:30), 
+                                     merge.order = NULL,
+                                     correct.all = FALSE,
+                                     reference = NULL)
 {
-  ref.list <- SplitObject(refs.merged, split.by = "dataset")
-  
-  rm(list = c('refs.merged', 'aa', 'srat')) # remove big seurat objects to clear memory
+  # seuratObj = aa; group.by = "condition"; ndims = c(1:30); reference = NULL;nfeatures = 2000
+  ref.list <- SplitObject(seuratObj, split.by = group.by)
   
   # normalize and identify variable features for each dataset independently
   ref.list <- lapply(X = ref.list, FUN = function(x) {
     x <- NormalizeData(x, normalization.method = "LogNormalize")
     x <- FindVariableFeatures(x, selection.method = "vst")
-    
   })
   
   # select features that are repeatedly variable across datasets for integration run PCA on each
   # dataset using these features
-  features <- SelectIntegrationFeatures(object.list = ref.list)
+  features <- SelectIntegrationFeatures(object.list = ref.list, nfeatures = nfeatures)
   
   ref.list <- lapply(X = ref.list, FUN = function(x) {
-    x <- ScaleData(x, features = features.common, verbose = TRUE)
+    x <- ScaleData(x, features = features, verbose = TRUE)
     x <- RunPCA(x, features = features, verbose = FALSE)
     
   })
   
   ref.anchors <- FindIntegrationAnchors(object.list = ref.list, 
                                         anchor.features = features, 
-                                        #reference = c(2),
-                                        #reduction = "cca", 
-                                        reduction = 'rpca',
-                                        k.anchor = 5,
-                                        dims = 1:50)
-  
-  rm(ref.list)
+                                        reference = reference,
+                                        reduction = "rpca",
+                                        #k.anchor = 5,
+                                        dims = ndims)
   
   # this command creates an 'integrated' data assay
-  ref.combined <- IntegrateData(anchorset = ref.anchors, features.to.integrate = features.common, 
-                                dims = 1:50) ## take ~100G memory
+  # this command creates an 'integrated' data assay
+  if(correct.all){
+    feature2integrate = rownames(seuratObj)
+  }else{
+    feature2integrate = features
+  }
   
+  if(is.null(merge.order)){
+    ref.combined <- IntegrateData(anchorset = ref.anchors, 
+                                  features.to.integrate = feature2integrate, 
+                                  dims = ndims) 
+  }else{
+    ref.combined <- IntegrateData(anchorset = ref.anchors, 
+                                  features.to.integrate = feature2integrate,
+                                  sample.tree = merge.order,
+                                  dims = ndims)
+  }
+  
+  rm(ref.list)
   rm(ref.anchors)
   
-  # specify that we will perform downstream analysis on the corrected data note that the
-  # original unmodified data still resides in the 'RNA' assay
   DefaultAssay(ref.combined) <- "integrated"
-  
-  #xx = DietSeurat(ref.combined, counts = TRUE, data = TRUE, scale.data = TRUE, assays = 'integrated')
-  #xx@assays$integrated@counts = ref.combined@assays$RNA@counts
-  #saveRDS(xx, file = paste0(outDir, 
-  #                          '/Seurat.obj_mouseGastrulation_mNT_integrated.rds'))
-  
-  # Run the standard workflow for visualization and clustering
-  #ref.combined = readRDS(file =paste0(outDir, 
-  #                                    '/Seurat.obj_mouseGastrulation_mNT_integrated.rds'))
-  
   
   ref.combined <- ScaleData(ref.combined, verbose = FALSE)
   ref.combined <- RunPCA(ref.combined, npcs = 50, verbose = FALSE)
   
   ElbowPlot(ref.combined, ndims = 50)
   
-  kk = which(ref.combined$dataset == 'mNT') 
-  ref.combined$celltype[kk] = paste0('mNT_', ref.combined$condition[kk])
-  names(cols_sel) = paste0('mNT_', names(cols_sel))
-  
+  ref.combined <- RunUMAP(ref.combined, reduction = "pca", dims = 1:30, n.neighbors = 30, 
+                          min.dist = 0.3) 
+  DimPlot(ref.combined, reduction = "umap", group.by = group.by, label = TRUE,
+          repel = TRUE, raster=FALSE)
   
   #ref.combined <- FindNeighbors(ref.combined, reduction = "pca", dims = 1:20)
   #ref.combined <- FindClusters(ref.combined, resolution = 0.2)
-  ref.combined <- RunUMAP(ref.combined, reduction = "pca", dims = 1:50, n.neighbors = 50, 
-                          min.dist = 0.2) 
-  
   #DimPlot(ref.combined, reduction = "umap")
   
-  saveRDS(ref.combined, file = paste0(outDir, '/integrated_mNT_mouseGastrulation_SeuratRPCA.rds'))
+  return(ref.combined)
   
-  cols_used = c(cols_mouse, cols_sel)
-  saveRDS(cols_used, file = paste0(outDir, '/integrated_mNT_mouseGastrulation_colorsUsed.rds'))
-  
-  # Visualization
-  DimPlot(ref.combined, reduction = "umap", group.by = "celltype", label = TRUE,
-          repel = TRUE, raster=FALSE, cols = c(cols_mouse, cols_sel))
-  
-  ggsave(paste0(outDir, '/Integration_dataset_celltypes.pdf'), 
-         width = 14, height = 8)
-  
-  DimPlot(ref.combined, reduction = "umap", group.by = "dataset", raster=FALSE)
-  ggsave(paste0(outDir, '/Integration_dataset.pdf'), 
-         width = 10, height = 8)
-  
-  pdf(paste0(outDir, '/FeaturePlot_Markers.pdf'),
-      width =10, height = 8, useDingbats = FALSE)
-  
-  ggs = c('Pax6', 'Foxa2', 'Pou5f1', 'Sox17', 'Sox1', 'Sox2')
-  for(n in 1:length(ggs))
-  {
-    p1 = FeaturePlot(ref.combined, features = ggs[n], min.cutoff = 'q5')
-    #FeaturePlot(ref.combined, features = 'Foxa2', min.cutoff = 'q5')
-    #FeaturePlot(ref.combined, features = 'Sox17', min.cutoff = 'q5')
-    plot(p1)
-  }
-  
-  dev.off()
-  
-  DimPlot(ref.combined, reduction = "umap", group.by = "celltype", label = TRUE, split.by = 'dataset',
-          repel = TRUE, raster=FALSE) + NoLegend()
-  
-  ggsave(paste0(outDir, '/Integration_celltypes_split.dataset.pdf'), 
-         width = 24, height = 8)
-  
-  DimPlot(ref.combined, reduction = "umap", group.by = "stage", label = TRUE,
-          repel = TRUE, raster=FALSE)
-  
-  ggsave(paste0(outDir, '/Integration_stage.pdf'), 
-         width = 16, height = 8)
   
 }
 
-IntegrateData_runHarmony = function(aa, ref)
+IntegrateData_runFastMNN = function(seuratObj, group.by = 'dataset', nfeatures = 2000,
+                                    ndims = c(1:30),
+                                    merge.order = NULL,
+                                    correct.all = FALSE,
+                                    reference = NULL)
+{
+  # # seuratObj = aa; group.by = "condition"; ndims = c(1:30); reference = NULL;nfeatures = 2000
+  library(Seurat)
+  library(SeuratData)
+  library(SeuratWrappers)
+  
+  #DefaultAssay(seuratObj) = 'RNA'
+  ## one error solved (see https://github.com/satijalab/seurat-wrappers/issues/126)
+  seuratObj = DietSeurat(object = seuratObj, counts = TRUE, data = TRUE, assays = 'RNA', 
+                         dimreducs = c('pca'))
+  
+  ## By default, batches are merged in the user-supplied order in ..., i.e., 
+  ## the first batch is merged with the second batch, the third batch is merged with the combined 
+  ## first-second batch, the fourth batch is merged with the combined first-second-third batch and so on. 
+  ## We refer to this approach as a progressive merge. When batch is supplied for a single object in ..., 
+  ## the ordering of batches in a progressive merge is determined by the ordering of factor levels in batch.
+  if(is.null(merge.order)){
+    refs.merged <- RunFastMNN(SplitObject(object = seuratObj, split.by = group.by), 
+                              features = nfeatures,
+                              correct.all = correct.all)
+  }else{
+    refs.merged <- RunFastMNN(SplitObject(object = seuratObj, split.by = group.by), 
+                              features = nfeatures,
+                              merge.order = merge.order,
+                              correct.all = correct.all)
+    
+  }
+  
+  refs.merged <- RunUMAP(refs.merged, reduction = "mnn", dims = 1:30)
+  
+  p1 = DimPlot(refs.merged, group.by = group.by, label = TRUE, repel = TRUE, raster=FALSE)
+  plot(p1)
+  
+  return(refs.merged)
+  
+  
+}
+
+IntegrateData_runHarmony = function(seuratObj, group.by = 'dataset', nfeatures = 2000, 
+                                    dims.use = c(1:50), 
+                                    nclust = NULL,
+                                    reference_values = NULL, 
+                                    max.iter.harmony = 20)
 {
   library(harmony)
   library(Seurat)
   library(SeuratData)
-  
+  library(SeuratWrappers)
   # ref = srat;
   # refs.merged = merge(aa, y = ref, add.cell.ids = c("mNT", "mouseGastrulation"), project = "RA_competence")
   
-  refs.merged <- NormalizeData(refs.merged) %>% FindVariableFeatures() %>% ScaleData() %>% 
+  refs.merged <- NormalizeData(seuratObj) %>% FindVariableFeatures() %>% ScaleData() %>% 
     RunPCA(verbose = FALSE)
   
-  kk = which(refs.merged$dataset == 'mNT') 
-  refs.merged$celltype[kk] = paste0('mNT_', refs.merged$condition[kk])
-  names(cols_sel) = paste0('mNT_', names(cols_sel))
-  
   refs.merged <- RunHarmony(refs.merged, 
-                            group.by.vars = "dataset",
+                            group.by.vars = group.by,
                             reduction = 'pca',
-                            dims.use = c(1:50), 
-                            nclust = 20,
-                            reference_values = 'ref',
-                            epsilon.harmony = -Inf,
-                            max.iter.harmony = 20, 
+                            dims.use = dims.use, 
+                            nclust = nclust,
+                            reference_values = reference_values,
+                            max.iter.harmony = max.iter.harmony, 
                             verbose = TRUE,
                             plot_convergence = TRUE
                             )
@@ -262,30 +232,9 @@ IntegrateData_runHarmony = function(aa, ref)
   refs.merged <- RunUMAP(refs.merged, reduction = "harmony", dims = 1:30)
   #refs.merged <- FindNeighbors(refs.merged, reduction = "harmony", dims = 1:30) %>% FindClusters()
   
-  DimPlot(refs.merged, group.by = c("celltype"), label = TRUE, repel = TRUE,
-          raster=FALSE, cols = c(cols_mouse, cols_sel))
+  DimPlot(refs.merged, group.by = group.by, label = TRUE, repel = TRUE, raster=FALSE)
   
-  ggsave(paste0(outDir, '/Integration_dataset_celltypes.pdf'), 
-         width = 14, height = 8)
-  
-  DimPlot(refs.merged, group.by = c("dataset"), label = TRUE)
-  ggsave(paste0(outDir, '/Integration_dataset.pdf'), 
-         width = 10, height = 8)
-  
-  
-  pdf(paste0(outDir, '/FeaturePlot_Markers.pdf'),
-      width =10, height = 8, useDingbats = FALSE)
-  
-  ggs = c('Pax6', 'Foxa2', 'Pou5f1', 'Sox17', 'Sox1', 'Sox2')
-  for(n in 1:length(ggs))
-  {
-    p1 = FeaturePlot(refs.merged, features = ggs[n], min.cutoff = 'q5')
-    #FeaturePlot(ref.combined, features = 'Foxa2', min.cutoff = 'q5')
-    #FeaturePlot(ref.combined, features = 'Sox17', min.cutoff = 'q5')
-    plot(p1)
-  }
-  
-  dev.off()
+  return(refs.merged)
   
   ## a quick test
   Test_if_RunHarmony_works = FALSLE
@@ -363,54 +312,146 @@ IntegrateData_runHarmony = function(aa, ref)
     
   }
   
+  
+  
 }
 
-IntegrateData_runFastMNN = function()
+
+runScanorama <- function(object, batch,  do.umap = F,  
+                         nfeatures = 2000, vars2regress = "percent.mt", dim = 50L, verbose = T)
 {
-  library(Seurat)
-  library(SeuratData)
-  library(SeuratWrappers)
- 
-  # ref = srat;
-  refs.merged = merge(aa, y = ref, add.cell.ids = c("mNT", "mouseGastrulation"), project = "RA_competence")
+  cat("Checking python modules...\n")
   
-  refs.merged <- NormalizeData(refs.merged)
-  refs.merged <- FindVariableFeatures(refs.merged)
-  refs.merged <- RunFastMNN(object.list = SplitObject(refs.merged, split.by = "dataset"))
+  library(reticulate, quietly = T)
   
-  refs.merged <- RunUMAP(refs.merged, reduction = "mnn", dims = 1:30)
-  
-  kk = which(refs.merged$dataset == 'mNT')
-  refs.merged$celltype[kk] = paste0('mNT_', refs.merged$condition[kk])
-  #cat(cols_sel)
-  #names(cols_sel) = paste0('mNT_', names(cols_sel))
-  
-  
-  DimPlot(refs.merged, group.by = c("celltype"), label = TRUE, repel = TRUE,
-          raster=FALSE, cols = c(cols_mouse, cols_sel))
-  ggsave(paste0(outDir, '/Integration_dataset_celltypes.pdf'), 
-         width = 14, height = 8)
-  
-  DimPlot(refs.merged, group.by = c("dataset"), label = TRUE)
-  ggsave(paste0(outDir, '/Integration_dataset.pdf'), 
-         width = 10, height = 8)
-  
-  
-  pdf(paste0(outDir, '/FeaturePlot_Markers.pdf'),
-      width =10, height = 8, useDingbats = FALSE)
-  
-  ggs = c('Pax6', 'Foxa2', 'Pou5f1', 'Sox17', 'Sox1', 'Sox2')
-  for(n in 1:length(ggs))
-  {
-    p1 = FeaturePlot(refs.merged, features = ggs[n], min.cutoff = 'q5')
-    #FeaturePlot(ref.combined, features = 'Foxa2', min.cutoff = 'q5')
-    #FeaturePlot(ref.combined, features = 'Sox17', min.cutoff = 'q5')
-    plot(p1)
+  if (!(py_module_available("scanorama"))){
+    cat("Installing 'Scanorama' python module...\n")
+    py_install("scanorama", pip = T)
+    
   }
   
-  dev.off()
+  scanorama <- import('scanorama')
+  
+  if (!("SCT" %in% names(object@assays))){
+    object <- getMitoContent(object)
+    object <- SCTransform(object, vars.to.regress = vars2regress, assay = "RNA", method = "glmGamPoi", verbose = F, vst.flavor = "v2")
+  }
+  
+  merge.exists <- F
+  if ("Seurat" %in% class(object)){
+    
+    object <- getMitoContent(object)
+    so <- object;
+    
+    merge.exists <- T
+    
+    if (!("SCT" %in% names(so@assays))){
+      miko_message("Running SCTransform...", verbose = verbose)
+      so <- SCTransform(so, vars.to.regress = vars2regress, assay = "RNA", method = "glmGamPoi", verbose = F, vst.flavor = "v2")
+    }
+    
+    
+    object <- Seurat::SplitObject(so, split.by = batch)
+    
+  } else if ("list" %in% class(object)){
+    
+    object <- pbapply::pblapply(X = object, FUN = function(x){
+      x <- getMitoContent(x)
+      return(x)
+    })
+    
+    for (i in 1:length(object)){
+      if (!("SCT" %in% names(object[[i]]@assays))){
+        miko_message(paste0("Running SCTransform for '", names(object)[i], "'..."), verbose = verbose)
+        object[[i]] <- SCTransform(object[[i]], vars.to.regress = vars2regress, assay = "RNA", method = "glmGamPoi", verbose = F, vst.flavor = "v2")
+      }
+    }
+    
+  }
+  
+  miko_message("Selecting integration features...", verbose = verbose)
+  so.features <- SelectIntegrationFeatures(object.list = object,
+                                           assay = rep("SCT", length(object)),
+                                           nfeatures = nfeatures,
+                                           fvf.nfeatures = nfeatures)
+  
+  
+  miko_message("Computing residuals for integration features...", verbose = verbose)
+  for (i in 1:length(object)){
+    object[[i]] <- GetResidual(object = object[[i]],features =  so.features, assay = "SCT", replace.value = F, verbose = F)
+  }
+  
+  
+  if (!merge.exists){
+    miko_message("Merging seurat objects...", verbose = verbose)
+    so <- tryCatch({
+      merge(object[[1]], y = object[-1]) # 2-3x faster than alternative method
+    }, error = function(e){
+      return(mergeSeuratList(object))     # slower but robust
+    }, silent = T)
+  }
+  
+  datasets <- list()
+  genes_list <- list()
+  for (i in 1:length(object)) {
+    datasets[[i]] <- as.matrix( Matrix::t((
+      object[[i]]@assays$SCT@scale.data[so.features , ]
+    )))
+    genes_list[[i]] <- colnames(datasets[[i]])
+  }
+  
+  # Integration.
+  miko_message("Running Scanorama Integration...", verbose = verbose)
+  suppressMessages({
+    suppressWarnings({
+      integrated.data <- scanorama$integrate(datasets, genes_list, dimred= dim)
+    })
+  })
+  
+  # df.embed <- rbind(integrated.data[[1]])
+  df.embed <- NULL
+  for (i in 1:length(integrated.data[[1]])){
+    
+    current_embed <- (integrated.data[[1]][[i]])
+    
+    if ("list" %in% class(object)){
+      rownames(current_embed) <- colnames(object[[i]])
+    }
+    # rownames(current_embed) <- colnames(so.list[[i]])
+    colnames(current_embed) <- paste0("PC_", seq(1, ncol(current_embed)))
+    
+    df.embed <- rbind(df.embed, current_embed)
+    
+  }
+  
+  if ("Seurat" %in% class(object)){
+    rownames(current_embed) <- colnames(object)
+  }
+  
+  so@assays[["integrated"]] <- CreateAssayObject(counts = so@assays[["SCT"]]@counts, min.cells = 0, min.features = 0)
+  so@assays[["integrated"]]@key <- "integrated_"
+  
+  
+  # set default assay
+  DefaultAssay(so) <- "integrated"
+  
+  so[["pca"]]  <- CreateDimReducObject(embeddings = df.embed,
+                                       key = "PC_",
+                                       global  = F,
+                                       loading = new(Class = "matrix"),
+                                       assay = "integrated")
+  # cluster.UMAP(so)
+  
+  if (do.umap){
+    so <- RunUMAP(object = so, dims = 1:dim, verbose = verbose)
+  }
+  
+  return(so)
+  
   
 }
+
+
 
 IntegrateData_runSCVI = function()
 {
@@ -449,6 +490,69 @@ IntegrateData_runSCVI = function()
           dest = "h5ad", overwrite = TRUE)
   
 }
+
+##########################################
+# calculate the similarity of query and reference (without integration) 
+# inspired by https://github.com/quadbio/simspec
+# and https://pubmed.ncbi.nlm.nih.gov/33711282/
+##########################################
+calculate_similarity_query_ref = function(query, ref, nHVGs = 1000, method = c("spearman", "pearson"),
+                                          group.by = 'celltype')
+{
+  # query = subset(aa, cells = colnames(aa)[which(aa$condition == 'day3_noRA')]); method = 'pearson'
+  library(simspec)
+  library(ggplot2)
+  library(data.table)
+  
+  if(length(VariableFeatures(ref)) != nHVGs){
+    ref = FindVariableFeatures(ref, selection.method = 'vst', nfeatures = nHVGs)
+  }
+  query = FindVariableFeatures(query, selection.method = 'vst', nfeatures = nHVGs)
+  
+  candidats = unique(c(VariableFeatures(query), VariableFeatures(ref)))
+  candidats = candidats[which(!is.na(match(candidats, intersect(rownames(query), rownames(ref)))))]
+  cat(length(candidats), ' HVGs selected for similarity calculation \n ')
+  
+  ref_avg = AverageExpression(object = ref, features = candidats, group.by = group.by, 
+                              slot = "data")$RNA
+  
+  query_mat = query@assays$RNA@data
+  query_mat = query_mat[match(rownames(ref_avg), rownames(query_mat)), ]
+  
+  if(method == 'pearson'){
+    corr <- qlcMatrix::corSparse(query_mat, ref_avg)
+  }else if(method == 'spearman'){
+    ranked_query <- presto::rank_matrix(query_mat)$X_ranked
+    ranked_ref <- presto::rank_matrix(ref_avg)$X_ranked
+    corr <- qlcMatrix::corSparse(ranked_query, t(ranked_ref))
+  }
+  
+  colnames(corr) = colnames(ref_avg)
+  
+  xx = reshape2::melt(corr, value.name = "value")
+  
+  p <- ggplot(xx, aes(x=Var2, y=value)) + 
+    geom_violin(trim=FALSE)
+  p1 = p + stat_summary(fun.data=mean_sdl, mult= 0.5, 
+                   geom="pointrange", color="red") + 
+    #theme_classic() +
+    labs(x = 'cell types (ref)', y = 'correlation') + 
+    #scale_y_continuous(breaks = c(1:nb_chromStates)) +
+    theme(axis.text.x = element_text(angle = 90, size = 10), 
+          axis.text.y = element_text(angle = 0, size = 10), 
+          axis.title =  element_text(size = 12),
+          legend.text = element_text(size=12),
+          legend.title = element_text(size = 14)
+    ) + 
+    #guides(fill=guide_legend(title="emission")) +
+    ggtitle(method)
+  
+  #plot(p1)
+  
+  return(p1)
+  
+}
+
 
 ##########################################
 # two test functions

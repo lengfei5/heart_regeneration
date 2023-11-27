@@ -35,6 +35,8 @@ library(pryr) # monitor the memory usage
 mem_used()
 
 Normalization = 'lognormal' # ('lognormal or SCT')
+dataDir = "/groups/tanaka/Collaborations/Jingkui-Elad/Mouse_data_shoval/"
+
 
 ########################################################
 ########################################################
@@ -134,6 +136,7 @@ if(Process.Cardiomyocyte.Cui.et.al.2020){
     }
   }
   
+  
   mnt[["percent.mt"]] <- PercentageFeatureSet(mnt, pattern = "^mt-")
   
   save(design, mnt, 
@@ -208,8 +211,6 @@ if(Process.Cardiomyocyte.Cui.et.al.2020){
 # Cui et al., Dev Cell 2020 processed myself
 ########################################################
 ########################################################
-dataDir = "/groups/tanaka/Collaborations/Jingkui-Elad/Mouse_data_shoval/"
-
 double_check_two_seuratObjects_Wang2020 = FALSE
 if(double_check_two_seuratObjects_Wang2020){
   xx = readRDS(file = paste0(dataDir, '/ZW_regeneration_scRNAseq.rds'))
@@ -360,13 +361,340 @@ if(Further_cleaning_CM){
   
 }
 
+Compare_shoval.version_vs.my.version = FALSE
+if(Compare_shoval.version_vs.my.version)
+{
+  aa = readRDS(file = paste0(RdataDir, 'Seurat.obj_neonatalMice_CM_Cui2020_furtherCleaning_rmDoublets.rds'))
+  
+  source('functions_dataIntegration.R')
+  ## test batch correction as in the original paper
+  ref.combined = IntegrateData_Seurat_CCA(aa, group.by = 'condition')
+  aa = ref.combined
+  
+  aa <- RunUMAP(aa, reduction = "pca", dims = 1:30, n.neighbors = 30, 
+                min.dist = 0.3)
+  DimPlot(aa, reduction = "umap", group.by = group.by, label = TRUE,
+          repel = TRUE, raster=FALSE)
+  
+  aa <- FindNeighbors(aa, reduction = "pca", dims = 1:30)
+  aa <- FindClusters(aa, resolution = 1.0)
+  p1 = DimPlot(aa, reduction = "umap", label = TRUE, repel = TRUE, raster=FALSE)
+  
+  ## use those two markers to clean CMs from contamination
+  FeaturePlot(aa, features = c('Myh6', 'Tnnt2'))
+  p2 = VlnPlot(aa, features = c('Myh6', 'Tnnt2'))
+  
+  p1 / p2
+  
+  
+  xx = readRDS(paste0(dataDir, 'CMs.rds'))
+  DimPlot(xx, reduction = "umap", label = TRUE, repel = TRUE, raster=FALSE)
+  
+  xx <- NormalizeData(xx, normalization.method = "LogNormalize", scale.factor = 10000)
+  xx <- FindVariableFeatures(xx, selection.method = "vst", nfeatures = 2000)
+  xx <- ScaleData(xx)
+  
+  xx <- RunPCA(xx, verbose = FALSE, weight.by.var = TRUE)
+  ElbowPlot(xx, ndims = 30)
+  
+  xx <- RunUMAP(xx, dims = 1:30, n.neighbors = 30, min.dist = 0.3)
+  
+  DimPlot(xx, label = TRUE, repel = TRUE, raster=FALSE)
+  
+  xx$cell.ids = colnames(xx)
+  xx$cell.ids = sapply(xx$cell.ids, function(x){unlist(strsplit(as.character(x), '_'))[1]})
+  xx$cell.ids = paste0(xx$cell.ids, '_', xx$orig.ident)
+  
+  aa$cell.id = gsub('_filtered_gene_bc_matrices_matrix.mtx.gz', '', aa$cell.id)
+  aa$cell.id = sapply(aa$cell.id, 
+                      function(x){ 
+                        x = unlist(strsplit(as.character(x), '_'));
+                        x = x[c(1, length(x))];
+                        x = paste0(x, collapse = '_')
+                        x = gsub('-1', '', x)
+                        x
+                      })
+  
+  mm = match(xx$cell.ids, aa$cell.id)
+  kk = which(!is.na(mm))
+  jj = mm[kk]
+  
+  xx = subset(xx, cells = colnames(xx)[kk])
+  yy = subset(aa, cells = colnames(aa)[jj])
+  
+  xx <- NormalizeData(xx, normalization.method = "LogNormalize", scale.factor = 10000)
+  xx <- FindVariableFeatures(xx, selection.method = "vst", nfeatures = 2000)
+  xx <- ScaleData(xx)
+  xx <- RunPCA(xx, verbose = FALSE, weight.by.var = TRUE)
+  ElbowPlot(xx, ndims = 30)
+  xx <- RunUMAP(xx, dims = 1:30, n.neighbors = 30, min.dist = 0.3)
+  DimPlot(xx, label = TRUE, repel = TRUE, raster=FALSE)
+  
+  DefaultAssay(aa) = 'RNA'
+  xx = subset(aa, cells = colnames(aa)[jj])
+  xx <- NormalizeData(xx, normalization.method = "LogNormalize", scale.factor = 10000)
+  xx <- FindVariableFeatures(xx, selection.method = "vst", nfeatures = 2000)
+  xx <- ScaleData(xx)
+  xx <- RunPCA(xx, verbose = FALSE, weight.by.var = TRUE)
+  ElbowPlot(xx, ndims = 30)
+  xx <- RunUMAP(xx, dims = 1:30, n.neighbors = 30, min.dist = 0.3)
+  DimPlot(xx, label = TRUE, repel = TRUE, raster=FALSE, group.by = 'condition')
+  
+}
+
+## the conclusion is that they are the same data; but the cell filtering by Shoval was more stringent
+## the gene features are more than my version
+## decide to use Shoval's version due to the manual CM cleaning based on Myh6 and Tnnt2 
+Process.CM.Cui.et.al.2020_Shoval.version = FALSE
+if(Process.CM.Cui.et.al.2020_Shoval.version){
+  aa = readRDS(paste0(dataDir, 'CMs.rds'))
+  
+  aa[["pca_old"]] = aa[["pca"]]
+  aa[["umap_old"]] = aa[["umap"]]
+  
+  aa$condition = aa$orig.ident
+  aa$condition = gsub('P11Sham', 'P8_Sham_d3', aa$condition)
+  aa$condition = gsub('P1MID1', 'P1_MI_d1', aa$condition)
+  aa$condition = gsub('P1MID3', 'P1_MI_d3', aa$condition)
+  aa$condition = gsub('P2Sham', 'P1_Sham_d1', aa$condition)
+  aa$condition = gsub('P4Sham', 'P1_Sham_d3', aa$condition)
+  aa$condition = gsub('P8MID1', 'P8_MI_d1', aa$condition)
+  aa$condition = gsub('P8MID3', 'P8_MI_d3', aa$condition)
+  aa$condition = gsub('P9Sham', 'P8_Sham_d1', aa$condition)
+  
+  Idents(aa) = factor(aa$condition)
+  p1 = VlnPlot(aa, features = 'nFeature_RNA', y.max = 5000) +
+    geom_hline(yintercept = c(200, 500, 1000)) + NoLegend()
+  p2 = VlnPlot(aa, features = 'nCount_RNA', y.max = 50000) + NoLegend()
+  p3 = VlnPlot(aa, features = 'percent.mt', y.max = 100) + NoLegend()
+  p1 | p2 | p3
+  
+  
+  DimPlot(aa, reduction = "umap", label = TRUE, repel = TRUE, raster=FALSE)
+  
+  aa <- NormalizeData(aa, normalization.method = "LogNormalize", scale.factor = 10000)
+  aa <- FindVariableFeatures(aa, selection.method = "vst", nfeatures = 2000)
+  aa <- ScaleData(aa)
+  
+  aa <- RunPCA(aa, verbose = FALSE, weight.by.var = TRUE)
+  ElbowPlot(aa, ndims = 30)
+  
+  aa <- RunUMAP(aa, dims = 1:30, n.neighbors = 30, min.dist = 0.3)
+  
+  DimPlot(aa, label = TRUE, repel = TRUE, raster=FALSE)
+  
+  ggsave(filename = paste0(resDir, '/CM_Cui2020_futher_beforeBatchCorrection.pdf'), 
+         width = 10, height = 6)
+  
+  ## run batch correction
+  source('functions_dataIntegration.R')
+  ref.combined = IntegrateData_Seurat_CCA(aa, group.by = 'condition')
+  aa = ref.combined
+  
+  aa <- RunUMAP(aa, reduction = "pca", dims = 1:30, n.neighbors = 30, 
+                min.dist = 0.3)
+  DimPlot(aa, reduction = "umap", group.by = group.by, label = TRUE,
+          repel = TRUE, raster=FALSE)
+  
+  saveRDS(aa, file = paste0(RdataDir, 
+                            'Seurat.obj_neonatalMice_CM_Cui2020_shoval.version_integrated.rds'))
+  
+  
+}
 
 ########################################################
 ########################################################
-# Section II : batch correction and data integration of CMs and noCMs
-# 
+# Section III : batch correction and data integration of CMs and noCMs 
+#  
 ########################################################
 ########################################################
+
+##########################################
+# test the batch correction for CM across time points and treatment 
+##########################################
+process_CM_P1 = FALSE
+if(process_CM_P1){
+  aa = readRDS(file = paste0(RdataDir, 
+                             'Seurat.obj_neonatalMice_CM_Cui2020_shoval.version_integrated.rds'))
+  
+  DefaultAssay(aa) = 'RNA'
+  aa$age = sapply(aa$condition, function(x){unlist(strsplit(x, '_'))[1]})
+  aa$injury = sapply(aa$condition, function(x){unlist(strsplit(x, '_'))[2]})
+  aa$time = sapply(aa$condition, function(x){unlist(strsplit(x, '_'))[3]})
+  
+  aa = subset(aa, cells = colnames(aa)[which(aa$age == 'P1')])
+  
+  DimPlot(aa)
+  
+  aa <- NormalizeData(aa, normalization.method = "LogNormalize", scale.factor = 10000)
+  aa <- FindVariableFeatures(aa, selection.method = "vst", nfeatures = 2000)
+  aa <- ScaleData(aa)
+  
+  aa <- RunPCA(aa, verbose = FALSE, weight.by.var = TRUE)
+  ElbowPlot(aa, ndims = 30)
+  
+  aa <- RunUMAP(aa, dims = 1:20, n.neighbors = 30, min.dist = 0.3)
+  DimPlot(aa, label = TRUE, repel = TRUE, raster=FALSE)
+  
+  ggsave(filename = paste0(resDir, '/CM_Cui2020_P1_noDataIntegration.pdf'), 
+         width = 10, height = 6)
+  
+  
+  p1 = DimPlot(aa, label = TRUE, repel = TRUE, raster=FALSE, group.by = 'condition')
+  aa <- FindNeighbors(aa, reduction = "pca", dims = 1:10)
+  aa <- FindClusters(aa, resolution = 0.4)
+  
+  p2 = DimPlot(aa, label = TRUE, repel = TRUE, raster=FALSE)
+  
+  p1 + p2
+  
+  aa$celltypes = paste0('CM', aa$seurat_clusters)
+  
+  saveRDS(aa, file = paste0(RdataDir, 'Seurat.obj_neonatalMice_CM_Cui2020_shoval.version_P1_clusterd.rds'))
+  
+  
+  ##########################################
+  # test batch correction with different integration methods
+  # ideally 
+  ##########################################
+  aa = readRDS(file = paste0(RdataDir, 'Seurat.obj_neonatalMice_CM_Cui2020_shoval.version_P1_clusterd.rds'))
+  
+  DimPlot(aa, label = TRUE, repel = TRUE, raster=FALSE, group.by = 'condition')
+  DimPlot(aa, label = TRUE, repel = TRUE, raster=FALSE, group.by = 'condition', split.by = 'condition')
+  
+  aa$condition = factor(aa$condition, levels = c('P1_Sham_d3', 'P1_Sham_d1', 'P1_MI_d1', 'P1_MI_d3'))
+  
+  Test_DataIntegration = FALSE
+  if(Test_DataIntegration){
+    
+    source('functions_dataIntegration.R')
+    ref.combined = IntegrateData_Seurat_CCA(aa, 
+                                            group.by = 'condition', 
+                                            merge.order = matrix(c(-2, -3, 1, -1, -4, 2), ncol = 2),
+                                            correct.all = TRUE)
+    DimPlot(ref.combined, group.by = 'condition') + ggtitle('Seurat_CCA')
+    
+    ggsave(filename = paste0(resDir, '/CM_Cui2020_P1_dataIntegration_CCA.pdf'), 
+           width = 10, height = 6)
+    
+    DimPlot(ref.combined, group.by = 'condition', split.by = 'condition')
+    ggsave(filename = paste0(resDir, '/CM_Cui2020_P1_dataIntegration_CCA_perCondition.pdf'), 
+           width = 10, height = 6)
+    
+    
+    source('functions_dataIntegration.R')
+    ref.combined = IntegrateData_Seurat_RPCA(aa, 
+                                            group.by = 'condition', 
+                                            #merge.order = matrix(c(-1, -3, 1, -2, -4, 2), ncol = 2),
+                                            correct.all = TRUE)
+    DimPlot(ref.combined, group.by = 'condition') + ggtitle('Seurat_RPCA')
+    
+    ggsave(filename = paste0(resDir, '/CM_Cui2020_P1_dataIntegration_RPCA.pdf'), 
+           width = 10, height = 6)
+    
+    DimPlot(ref.combined, group.by = 'condition', split.by = 'condition')
+    ggsave(filename = paste0(resDir, '/CM_Cui2020_P1_dataIntegration_RPCA_perCondition.pdf'), 
+           width = 10, height = 6)
+    
+    source('functions_dataIntegration.R')
+    refs.merged = IntegrateData_runHarmony(aa, group.by = 'condition', max.iter.harmony = 10)
+    
+    DimPlot(refs.merged, group.by = 'condition')
+    
+    DimPlot(refs.merged, group.by = 'condition', split.by = 'condition') + ggtitle('Harmony')
+    ggsave(filename = paste0(resDir, '/CM_Cui2020_P1_dataIntegration_Harmony.pdf'), 
+           width = 10, height = 6)
+    
+    DimPlot(refs.merged, group.by = 'condition', split.by = 'condition')
+    
+    p1 = DimPlot(aa, label = TRUE, repel = TRUE, raster=FALSE, group.by = 'condition')
+    p2 = DimPlot(refs.merged, group.by = 'condition') + ggtitle('Harmony')
+    
+    p1 /p2
+    
+    ggsave(filename = paste0(resDir, '/CM_Cui2020_P1_dataIntegration_noIntegratoin.vs.Harmony.pdf'), 
+           width = 10, height = 12)
+    
+    
+    ### fastMNN is the most satisfying of integration 
+    source('functions_dataIntegration.R')
+    refs.merged = IntegrateData_runFastMNN(aa, group.by = 'condition',
+                                           merge.order = c('P1_Sham_d3', 'P1_Sham_d1', 'P1_MI_d1', 'P1_MI_d3'), 
+                                           correct.all = TRUE)
+    
+    DimPlot(refs.merged, group.by = 'condition') + ggtitle('fastMNN')
+    ggsave(filename = paste0(resDir, '/CM_Cui2020_P1_dataIntegration_fastMNN.pdf'), 
+           width = 10, height = 6)
+    
+    DimPlot(refs.merged, group.by = 'condition', split.by = 'condition')
+    
+    p1 = DimPlot(aa, label = TRUE, repel = TRUE, raster=FALSE)
+    p2 = DimPlot(refs.merged) + ggtitle('fastMNN')
+    
+    p1 /p2
+    
+    ggsave(filename = paste0(resDir, '/CM_Cui2020_P1_dataIntegration_noIntegration.vs.fastMNN.pdf'), 
+           width = 10, height = 12)
+    
+    refs.merged <- FindNeighbors(refs.merged, reduction = "mnn", dims = 1:20)
+    refs.merged <- FindClusters(refs.merged, resolution = 0.4)
+    
+    DimPlot(refs.merged, split.by = 'condition') + ggtitle('fastMNN')
+    ggsave(filename = paste0(resDir, '/CM_Cui2020_P1_dataIntegration_fastMNN_clusters.pdf'), 
+           width = 16, height = 6)
+    
+    saveRDS(refs.merged, 
+            file = paste0(RdataDir, 'Seurat.obj_neonatalMice_CM_Cui2020_shoval.version_P1_clusterd_fastMNN.rds'))
+    
+    FeaturePlot(refs.merged, features = c('Nppa', 'Ankrd1'))
+    ggsave(filename = paste0(resDir, '/CM_Cui2020_P1_dataIntegration_fastMNN_Nppa.ANkrd1.pdf'), 
+           width = 10, height = 6)
+    
+  }
+  
+}
+
+##########################################
+# batch correction test for noCM  
+##########################################
+process_and_batchCorrection_noCM = FALSE
+if(process_and_batchCorrection_noCM){
+  
+  aa = readRDS(file = paste0(RdataDir, 'Wang_DevCell_2020_scRNAseq.rds'))
+  aa$treatment = aa$condition
+  aa$condition = paste0(aa$stage, '_', aa$condition, '_', aa$time)
+  
+  DimPlot(aa, group.by = 'FineID', label = TRUE, repel = TRUE, raster=FALSE)
+  DimPlot(aa, group.by = 'condition', label = TRUE, repel = TRUE, raster=FALSE)
+  
+  ## subset cells only from P1
+  aa = subset(aa, cells = colnames(aa)[which(aa$stage == 'P1')])
+  
+  aa = DietSeurat(aa, counts = TRUE, data = TRUE, scale.data = TRUE, assays = 'RNA')
+  aa <- NormalizeData(aa, normalization.method = "LogNormalize", scale.factor = 10000)
+  aa <- FindVariableFeatures(aa, selection.method = "vst", nfeatures = 2000)
+  aa <- ScaleData(aa, vars.to.regress = c('nUMI', 'percent.mito'), features = rownames(aa))
+  
+  aa <- RunPCA(aa, verbose = FALSE, weight.by.var = TRUE)
+  ElbowPlot(aa, ndims = 30)
+  
+  aa <- RunUMAP(aa, dims = 1:20, n.neighbors = 30, min.dist = 0.3)
+  DimPlot(aa, label = TRUE, repel = TRUE, raster=FALSE)
+  
+  ggsave(filename = paste0(resDir, '/Wang2020_P1_noDataIntegration.pdf'), 
+         width = 10, height = 6)
+  
+  
+  p1 = DimPlot(aa, label = TRUE, repel = TRUE, raster=FALSE, group.by = 'condition')
+  aa <- FindNeighbors(aa, reduction = "pca", dims = 1:10)
+  aa <- FindClusters(aa, resolution = 0.4)
+  
+  saveRDS(aa, file = paste0(RdataDir, 'Wang_DevCell_2020_scRNAseq_P1_regressedout.rds'))
+  
+}
+
+
+
 
 
 
