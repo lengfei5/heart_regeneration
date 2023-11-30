@@ -10,6 +10,7 @@
 IntegrateData_Seurat_CCA = function(seuratObj, group.by = 'dataset', nfeatures = 2000,
                                     ndims = c(1:30),
                                     merge.order = NULL,
+                                    redo.normalization.scaling = TRUE,
                                     correct.all = FALSE,
                                     reference = NULL)
 {
@@ -17,21 +18,38 @@ IntegrateData_Seurat_CCA = function(seuratObj, group.by = 'dataset', nfeatures =
   ref.list <- SplitObject(seuratObj, split.by = group.by)
   
   # normalize and identify variable features for each dataset independently
-  ref.list <- lapply(X = ref.list, FUN = function(x) {
-    x <- NormalizeData(x, normalization.method = "LogNormalize")
-    x <- FindVariableFeatures(x, selection.method = "vst")
+  if(redo.normalization.scaling){
+    ref.list <- lapply(X = ref.list, FUN = function(x) {
+      x <- NormalizeData(x, normalization.method = "LogNormalize")
+      x <- FindVariableFeatures(x, selection.method = "vst")
+    })
     
-  })
-  
-  # select features that are repeatedly variable across datasets for integration run PCA on each
-  # dataset using these features
-  features <- SelectIntegrationFeatures(object.list = ref.list, nfeatures = nfeatures)
-  
-  ref.list <- lapply(X = ref.list, FUN = function(x) {
-    x <- ScaleData(x, features = features, verbose = TRUE)
-    x <- RunPCA(x, features = features, verbose = FALSE)
+    # select features that are repeatedly variable across datasets for integration run PCA on each
+    # dataset using these features
+    features <- SelectIntegrationFeatures(object.list = ref.list, nfeatures = nfeatures)
     
-  })
+    ref.list <- lapply(X = ref.list, FUN = function(x) {
+      x <- ScaleData(x, features = features, verbose = TRUE)
+      x <- RunPCA(x, features = features, verbose = FALSE)
+      
+    })
+    
+  }else{
+    ref.list <- lapply(X = ref.list, FUN = function(x) {
+      x <- FindVariableFeatures(x, selection.method = "vst")
+    })
+    
+    # select features that are repeatedly variable across datasets for integration run PCA on each
+    # dataset using these features
+    features <- SelectIntegrationFeatures(object.list = ref.list, nfeatures = nfeatures)
+    
+    ref.list <- lapply(X = ref.list, FUN = function(x) {
+      x <- RunPCA(x, features = features, verbose = FALSE)
+      
+    })
+    
+  }
+  
   
   ref.anchors <- FindIntegrationAnchors(object.list = ref.list, 
                                         anchor.features = features, 
@@ -87,6 +105,7 @@ IntegrateData_Seurat_CCA = function(seuratObj, group.by = 'dataset', nfeatures =
 IntegrateData_Seurat_RPCA = function(seuratObj, group.by = 'dataset', nfeatures = 2000,
                                      ndims = c(1:30), 
                                      merge.order = NULL,
+                                     redo.normalization.scaling = TRUE,
                                      correct.all = FALSE,
                                      reference = NULL)
 {
@@ -94,20 +113,37 @@ IntegrateData_Seurat_RPCA = function(seuratObj, group.by = 'dataset', nfeatures 
   ref.list <- SplitObject(seuratObj, split.by = group.by)
   
   # normalize and identify variable features for each dataset independently
-  ref.list <- lapply(X = ref.list, FUN = function(x) {
-    x <- NormalizeData(x, normalization.method = "LogNormalize")
-    x <- FindVariableFeatures(x, selection.method = "vst")
-  })
-  
-  # select features that are repeatedly variable across datasets for integration run PCA on each
-  # dataset using these features
-  features <- SelectIntegrationFeatures(object.list = ref.list, nfeatures = nfeatures)
-  
-  ref.list <- lapply(X = ref.list, FUN = function(x) {
-    x <- ScaleData(x, features = features, verbose = TRUE)
-    x <- RunPCA(x, features = features, verbose = FALSE)
+  if(redo.normalization.scaling){
+    ref.list <- lapply(X = ref.list, FUN = function(x) {
+      x <- NormalizeData(x, normalization.method = "LogNormalize")
+      x <- FindVariableFeatures(x, selection.method = "vst")
+    })
     
-  })
+    # select features that are repeatedly variable across datasets for integration run PCA on each
+    # dataset using these features
+    features <- SelectIntegrationFeatures(object.list = ref.list, nfeatures = nfeatures)
+    
+    ref.list <- lapply(X = ref.list, FUN = function(x) {
+      x <- ScaleData(x, features = features, verbose = TRUE)
+      x <- RunPCA(x, features = features, verbose = FALSE)
+      
+    })
+  }else{
+    ref.list <- lapply(X = ref.list, FUN = function(x) {
+      x <- FindVariableFeatures(x, selection.method = "vst")
+    })
+    
+    # select features that are repeatedly variable across datasets for integration run PCA on each
+    # dataset using these features
+    features <- SelectIntegrationFeatures(object.list = ref.list, nfeatures = nfeatures)
+    
+    ref.list <- lapply(X = ref.list, FUN = function(x) {
+      #x <- ScaleData(x, features = features, verbose = TRUE)
+      x <- RunPCA(x, features = features, verbose = FALSE)
+      
+    })
+  }
+ 
   
   ref.anchors <- FindIntegrationAnchors(object.list = ref.list, 
                                         anchor.features = features, 
@@ -205,6 +241,7 @@ IntegrateData_runFastMNN = function(seuratObj, group.by = 'dataset', nfeatures =
 IntegrateData_runHarmony = function(seuratObj, group.by = 'dataset', nfeatures = 2000, 
                                     dims.use = c(1:50), 
                                     nclust = NULL,
+                                    redo.normalization.hvg.scale.pca = TRUE,
                                     reference_values = NULL, 
                                     max.iter.harmony = 20)
 {
@@ -214,9 +251,13 @@ IntegrateData_runHarmony = function(seuratObj, group.by = 'dataset', nfeatures =
   library(SeuratWrappers)
   # ref = srat;
   # refs.merged = merge(aa, y = ref, add.cell.ids = c("mNT", "mouseGastrulation"), project = "RA_competence")
-  
-  refs.merged <- NormalizeData(seuratObj) %>% FindVariableFeatures() %>% ScaleData() %>% 
-    RunPCA(verbose = FALSE)
+  if(redo.normalization.hvg.scale.pca){
+    refs.merged <- NormalizeData(seuratObj) %>% FindVariableFeatures() %>% ScaleData() %>% 
+      RunPCA(verbose = FALSE)
+  }else{
+    refs.merged = seuratObj
+  }
+  rm(seuratObj)
   
   refs.merged <- RunHarmony(refs.merged, 
                             group.by.vars = group.by,

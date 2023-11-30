@@ -849,43 +849,43 @@ if(Test_DataIntegration){
   
   aa = readRDS(file = paste0(RdataDir, 'Seurat.obj_neonatalMice_CM.Cui2020_noCM.Wang2020_P1_regress.nUMI.rds'))
   
+  aa$dataset = factor(aa$dataset, levels = c('Wang2020', 'Cui2020'))
+    
   integration_methods = c('noDataIntegration', 'Seurat_CCA', 'Seurat_RPCA', 'runHarmony', 'fastMNN')
   
   for(method in integration_methods)
   {
     source('functions_dataIntegration.R')
     
-    method = "noDataIntegration"
+    method = "Seurat_CCA"
     
     ## no data integration 
     if(method == 'noDataIntegration'){ref.combined = aa}
     
     if(method == 'Seurat_CCA'){
-      ref.combined = IntegrateData_Seurat_CCA(aa, 
-                                              group.by = 'condition', 
-                                              merge.order = matrix(c(-1, -3, 1, -2, -4, 2), ncol = 2),
+      ref.combined = IntegrateData_Seurat_CCA(aa, group.by = 'dataset', redo.normalization.scaling = FALSE,
                                               correct.all = TRUE)
     }
+    
     if(method == 'Seurat_RPCA'){
-      ref.combined = IntegrateData_Seurat_RPCA(aa, 
-                                               group.by = 'condition', 
-                                               #merge.order = matrix(c(-1, -3, 1, -2, -4, 2), ncol = 2),
-                                               correct.all = TRUE)
+      ref.combined = IntegrateData_Seurat_RPCA(aa, group.by = 'dataset', correct.all = TRUE)
     }
+    
     if(method == 'runHarmony'){
-      ref.combined = IntegrateData_runHarmony(aa, group.by = 'condition', max.iter.harmony = 10)
+      ref.combined = IntegrateData_runHarmony(aa, group.by = 'dataset', max.iter.harmony = 10)
     }
+    
     if(method == 'fastMNN'){
-      ref.combined = IntegrateData_runFastMNN(aa, group.by = 'condition',
+      ref.combined = IntegrateData_runFastMNN(aa, group.by = 'dataset',
                                              merge.order = c('P1_Sham_D1', 'P1_Sham_D3',  'P1_MI_D1', 'P1_MI_D3'), 
                                              correct.all = TRUE)
       
     }
     
     p1 = DimPlot(ref.combined, group.by = 'FineID', label = TRUE, repel = TRUE, raster=FALSE) + 
-      ggtitle('Seurat_CCA')
+      ggtitle(method)
     p2 = DimPlot(ref.combined, group.by = 'condition', label = TRUE, repel = TRUE) +
-      ggtitle('Seurat_CCA')
+      ggtitle(method)
     p1 + p2
     
     ggsave(filename = paste0(resDir, '/CM_Cui2020_noCM_Wang2020_P1_merged_dataIntegration_', method, '.pdf'), 
@@ -898,7 +898,7 @@ if(Test_DataIntegration){
     
     DimPlot(ref.combined, group.by = 'FineID', split.by = 'condition', label = TRUE, repel = TRUE, ncol = 2)
     ggsave(filename = paste0(resDir, '/CM_Cui2020_noCM_Wang2020_P1_merged_celltypes.by.conditions', 
-                             '_dataIntegration_', method, '.pdf'), 
+                             '_dataIntegration_', method, '.pdf'),  width = 16, height = 12)
     
     if(method != 'noDataIntegration'){
       saveRDS(ref.combined, 
