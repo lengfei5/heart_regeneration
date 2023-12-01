@@ -354,7 +354,6 @@ IntegrateData_runHarmony = function(seuratObj, group.by = 'dataset', nfeatures =
   }
   
   
-  
 }
 
 

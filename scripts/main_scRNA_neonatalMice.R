@@ -855,10 +855,10 @@ if(Test_DataIntegration){
   
   for(method in integration_methods)
   {
+    
+    method = "Seurat_RPCA"
+    
     source('functions_dataIntegration.R')
-    
-    method = "Seurat_CCA"
-    
     ## no data integration 
     if(method == 'noDataIntegration'){ref.combined = aa}
     
@@ -868,7 +868,9 @@ if(Test_DataIntegration){
     }
     
     if(method == 'Seurat_RPCA'){
-      ref.combined = IntegrateData_Seurat_RPCA(aa, group.by = 'dataset', correct.all = TRUE)
+      ref.combined = IntegrateData_Seurat_RPCA(aa, group.by = 'dataset', 
+                                               redo.normalization.scaling = FALSE,
+                                               correct.all = TRUE)
     }
     
     if(method == 'runHarmony'){
@@ -876,9 +878,7 @@ if(Test_DataIntegration){
     }
     
     if(method == 'fastMNN'){
-      ref.combined = IntegrateData_runFastMNN(aa, group.by = 'dataset',
-                                             merge.order = c('P1_Sham_D1', 'P1_Sham_D3',  'P1_MI_D1', 'P1_MI_D3'), 
-                                             correct.all = TRUE)
+      ref.combined = IntegrateData_runFastMNN(aa, group.by = 'dataset', correct.all = TRUE)
       
     }
     
