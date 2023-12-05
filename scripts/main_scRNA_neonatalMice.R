@@ -851,14 +851,15 @@ if(Test_DataIntegration){
   
   aa$dataset = factor(aa$dataset, levels = c('Wang2020', 'Cui2020'))
     
-  integration_methods = c('noDataIntegration', 'Seurat_CCA', 'Seurat_RPCA', 'runHarmony', 'fastMNN')
+  integration_methods = c('noDataIntegration', 'Seurat_CCA', 'Seurat_RPCA', 'fastMNN')
   
   for(method in integration_methods)
   {
     
-    method = "Seurat_RPCA"
+    method = "Seurat_CCA"
     
     source('functions_dataIntegration.R')
+    
     ## no data integration 
     if(method == 'noDataIntegration'){ref.combined = aa}
     
@@ -873,13 +874,12 @@ if(Test_DataIntegration){
                                                correct.all = TRUE)
     }
     
-    if(method == 'runHarmony'){
-      ref.combined = IntegrateData_runHarmony(aa, group.by = 'dataset', max.iter.harmony = 10)
-    }
+    #if(method == 'runHarmony'){
+    #  ref.combined = IntegrateData_runHarmony(aa, group.by = 'dataset', max.iter.harmony = 10)
+    #}
     
     if(method == 'fastMNN'){
       ref.combined = IntegrateData_runFastMNN(aa, group.by = 'dataset', correct.all = TRUE)
-      
     }
     
     p1 = DimPlot(ref.combined, group.by = 'FineID', label = TRUE, repel = TRUE, raster=FALSE) + 
@@ -902,7 +902,8 @@ if(Test_DataIntegration){
     
     if(method != 'noDataIntegration'){
       saveRDS(ref.combined, 
-              file = paste0(RdataDir, 'Seurat.obj_neonatalMice_noCM_Wang2020_P1_SeuratCCA.rds'))
+              file = paste0(RdataDir, 'Seurat.obj_neonatalMice_noCM_Wang2020_P1_dataIntegration_', 
+                            method, '.rds'))
     }
     
   }
