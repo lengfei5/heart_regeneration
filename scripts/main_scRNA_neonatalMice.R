@@ -649,7 +649,7 @@ if(process_CM_P1){
       
       if(method != 'noDataIntegration'){
         saveRDS(ref.combined, 
-                file = paste0(RdataDir, 'Seurat.obj_neonatalMice_noCM_Wang2020_P1_dataIntegration_', 
+                file = paste0(RdataDir, 'Seurat.obj_neonatalMice_CM_Cui2020_P1_dataIntegration_', 
                               method, '.rds'))
       }
     }
@@ -697,41 +697,22 @@ if(process_and_batchCorrection_noCM){
   ##########################################
   # test batch correction within the dataset
   ##########################################
-  aa = readRDS(file = paste0(RdataDir, 'Wang_DevCell_2020_scRNAseq_P1_regressedout.rds'))
-  
-  aa$condition = factor(aa$condition, levels = c('P1_Sham_D1', 'P1_Sham_D3',  'P1_MI_D1', 'P1_MI_D3'))
-  
   Test_DataIntegration = FALSE
   if(Test_DataIntegration){
-    
-    ## no data integration 
-    p1 = DimPlot(aa, group.by = 'FineID', label = TRUE, repel = TRUE, raster=FALSE)
-    p2 = DimPlot(aa, group.by = 'condition', label = TRUE, repel = TRUE)
-    
-    p1 + p2
-    
-    ggsave(filename = paste0(resDir, '/Wang2020_P1_celltypes_conditions_noDataIntegration.pdf'), 
-           width = 14, height = 6)
-    
-    DimPlot(aa, group.by = 'FineID', split.by = 'condition')
-    ggsave(filename = paste0(resDir, '/noCM_Wang2020_P1_celltypes_noDataIntegration_perCondition.pdf'), 
-           width = 16, height = 6)
-    
-    
     require(dplyr)
     require(tibble)
     require(ggplot2)
     library(viridis)
     library(hrbrthemes)
     
-    aa = readRDS(file = paste0(RdataDir, 'Seurat.obj_neonatalMice_CM_Cui2020_shoval.version_P1_clusterd.rds'))
-    aa$condition = factor(aa$condition, levels = c('P1_Sham_d3', 'P1_Sham_d1', 'P1_MI_d1', 'P1_MI_d3'))
+    aa = readRDS(file = paste0(RdataDir, 'Wang_DevCell_2020_scRNAseq_P1_regressedout.rds'))
+    aa$condition = factor(aa$condition, levels = c('P1_Sham_D1', 'P1_Sham_D3',  'P1_MI_D1', 'P1_MI_D3'))
     
-    outDir = paste0(resDir, '/CM_Cui2020_P1/')
+    outDir = paste0(resDir, '/noCM_Wang2020_P1/')
     if(!dir.exists(outDir)) dir.create(outDir)
     
     DimPlot(aa, label = TRUE, repel = TRUE, raster=FALSE, group.by = 'condition')
-    DimPlot(aa, label = TRUE, repel = TRUE, raster=FALSE, group.by = 'condition', split.by = 'condition')
+    DimPlot(aa, label = TRUE, repel = TRUE, raster=FALSE, group.by = 'FineID', split.by = 'condition')
     
     group.by = 'condition'
     feature_sels = c('Nppa', 'Nppb', 'Ankrd1', 'Foxp1', 'Myh7', 'Des', 'Uchl1')
@@ -739,7 +720,8 @@ if(process_and_batchCorrection_noCM){
     
     for(method in integration_methods)
     {
-      #method = "fastMNN"
+      # method = "Seurat_CCA"
+      
       cat('------------------------\n')
       cat('method -- ', method, '\n')
       cat('------------------------\n')
@@ -751,7 +733,7 @@ if(process_and_batchCorrection_noCM){
       if(method == 'Seurat_CCA'){
         ref.combined = IntegrateData_Seurat_CCA(aa, 
                                                 group.by = group.by, 
-                                                merge.order = matrix(c(-2, -3, 1, -1, -4, 2), ncol = 2),
+                                                merge.order = matrix(c(-1, -3, 1, -2, -4, 2), ncol = 2),
                                                 redo.normalization.scaling = FALSE,
                                                 correct.all = TRUE)
       }
@@ -764,36 +746,37 @@ if(process_and_batchCorrection_noCM){
       
       if(method == 'fastMNN'){
         ref.combined = IntegrateData_runFastMNN(aa, group.by = group.by,
-                                                merge.order = c('P1_Sham_d3', 'P1_Sham_d1',
-                                                                'P1_MI_d1', 'P1_MI_d3'),
+                                                merge.order = c('P1_Sham_D3', 'P1_Sham_D1',
+                                                                'P1_MI_D1', 'P1_MI_D3'),
                                                 correct.all = TRUE)
       }
       
-      p1 = DimPlot(ref.combined, group.by = 'celltypes', label = TRUE, repel = TRUE, raster=FALSE) + 
+      
+      p1 = DimPlot(ref.combined, group.by = 'FineID', label = TRUE, repel = TRUE, raster=FALSE) + 
         ggtitle(method)
       p2 = DimPlot(ref.combined, group.by = 'condition', label = TRUE, repel = TRUE) +
         ggtitle(method)
       p1 + p2
-      ggsave(filename = paste0(outDir, '/CM_Cui2020_P1_merged_dataIntegration_', method, '.pdf'), 
+      ggsave(filename = paste0(outDir, '/noCM_Wang2020_P1_merged_dataIntegration_', method, '.pdf'), 
              width = 16, height = 6)
       
-      FeaturePlot(ref.combined, features = feature_sels)
-      ggsave(filename = paste0(outDir, '/CM_Cui2020_P1_merged_borderMarkers_dataIntegration_', method, '.pdf'), 
-             width = 16, height = 12)
+      #FeaturePlot(ref.combined, features = feature_sels)
+      #ggsave(filename = paste0(outDir, '/CM_Cui2020_P1_merged_borderMarkers_dataIntegration_', method, '.pdf'), 
+      #       width = 16, height = 12)
       
       if(method == 'fastMNN'){
         ref.combined <- FindNeighbors(ref.combined, reduction = "mnn", dims = 1:10)
-        ref.combined <- FindClusters(ref.combined, resolution = 0.4)
+        ref.combined <- FindClusters(ref.combined, resolution = 1.0)
       }else{
-        ref.combined <- FindNeighbors(ref.combined, reduction = "pca", dims = 1:10)
-        ref.combined <- FindClusters(ref.combined, resolution = 0.4)
+        ref.combined <- FindNeighbors(ref.combined, reduction = "pca", dims = 1:20)
+        ref.combined <- FindClusters(ref.combined, resolution = 1.0)
       }
       
       p1 = DimPlot(ref.combined, group.by = 'seurat_clusters', label = TRUE, repel = TRUE)
       p2 = DimPlot(ref.combined, group.by = 'seurat_clusters', split.by = group.by, label = TRUE, 
                    repel = TRUE)
       p1 / p2
-      ggsave(filename = paste0(outDir, '/CM_Cui2020_P1_merged_clusters.by.dataset', 
+      ggsave(filename = paste0(outDir, '/noCM_Wang2020_P1_merged_clusters.by.dataset', 
                                '_dataIntegration_', method, '.pdf'), 
              width = 16, height = 12)
       
@@ -804,7 +787,7 @@ if(process_and_batchCorrection_noCM){
         geom_bar(position="fill", stat="identity")
       #scale_fill_viridis(discrete = T)
       
-      ggsave(filename = paste0(outDir, '/CM_Cui2020_P1_merged_cluster_fractions', 
+      ggsave(filename = paste0(outDir, '/noCM_Wang2020_P1_merged_cluster_fractions', 
                                '_dataIntegration_', method, '.pdf'), 
              width = 12, height = 6)
       
@@ -815,103 +798,8 @@ if(process_and_batchCorrection_noCM){
       }
     }
     
-    ## Seurat CCA
-    source('functions_dataIntegration.R')
-    ref.combined = IntegrateData_Seurat_CCA(aa, 
-                                            group.by = 'condition', 
-                                            merge.order = matrix(c(-1, -3, 1, -2, -4, 2), ncol = 2),
-                                            correct.all = TRUE)
-    
-    p1 = DimPlot(ref.combined, group.by = 'FineID', label = TRUE, repel = TRUE, raster=FALSE) + 
-      ggtitle('Seurat_CCA')
-    p2 = DimPlot(ref.combined, group.by = 'condition', label = TRUE, repel = TRUE) +
-      ggtitle('Seurat_CCA')
-    p1 + p2
-    
-    ggsave(filename = paste0(resDir, '/noCM_Wang2020_P1_dataIntegration_CCA.pdf'), 
-           width = 16, height = 6)
-    
-    DimPlot(ref.combined, group.by = 'FineID', split.by = 'condition')
-    ggsave(filename = paste0(resDir, '/noCM_Wang2020_P1_dataIntegration_CCA_perCondition.pdf'), 
-           width = 16, height = 6)
-    
-    saveRDS(ref.combined, 
-            file = paste0(RdataDir, 'Seurat.obj_neonatalMice_noCM_Wang2020_P1_SeuratCCA.rds'))
-    
-    #ref.combined = readRDS(file = paste0(RdataDir, 'Seurat.obj_neonatalMice_noCM_Wang2020_P1_SeuratCCA.rds'))
-    
-    ## Seurat RPCA
-    source('functions_dataIntegration.R')
-    ref.combined = IntegrateData_Seurat_RPCA(aa, 
-                                             group.by = 'condition', 
-                                             #merge.order = matrix(c(-1, -3, 1, -2, -4, 2), ncol = 2),
-                                             correct.all = TRUE)
-    
-    p1 = DimPlot(ref.combined, group.by = 'FineID', label = TRUE, repel = TRUE, raster=FALSE) + 
-      ggtitle('Seurat_RPCA')
-    p2 = DimPlot(ref.combined, group.by = 'condition', label = TRUE, repel = TRUE) + 
-      ggtitle('Seurat_RPCA')
-    
-    p1 + p2
-    
-    ggsave(filename = paste0(resDir, '/noCM_Wang2020_P1_dataIntegration_RPCA.pdf'), 
-           width = 16, height = 6)
-    
-    DimPlot(ref.combined, group.by = 'FineID', split.by = 'condition')
-    ggsave(filename = paste0(resDir, '/noCM_Wang2020_P1_dataIntegration_RPCA_perCondition.pdf'), 
-           width = 16, height = 6)
-    
-    saveRDS(ref.combined,
-            file = paste0(RdataDir, 'Seurat.obj_neonatalMice_noCM_Wang2020_P1_SeuratRPCA.rds'))
-    
-    ## Harmony
-    source('functions_dataIntegration.R')
-    refs.merged = IntegrateData_runHarmony(aa, group.by = 'condition', max.iter.harmony = 10)
-    
-    p1 = DimPlot(refs.merged, group.by = 'FineID', label = TRUE, repel = TRUE, raster=FALSE) + 
-      ggtitle('Harmony')
-    p2 = DimPlot(refs.merged, group.by = 'condition', label = TRUE, repel = TRUE) + 
-      ggtitle('Harmony')
-    
-    p1 + p2
-    
-    ggsave(filename = paste0(resDir, '/noCM_Wang2020_P1_dataIntegration_Harmony.pdf'), 
-           width = 16, height = 6)
-    
-    DimPlot(ref.combined, group.by = 'FineID', split.by = 'condition')
-    ggsave(filename = paste0(resDir, '/noCM_Wang2020_P1_dataIntegration_Harmony_perCondition.pdf'), 
-           width = 16, height = 6)
-    
-    saveRDS(ref.combined,
-            file = paste0(RdataDir, 'Seurat.obj_neonatalMice_noCM_Wang2020_P1_Harmony.rds'))
-    
-    
-    ### fastMNN is the most satisfying of integration 
-    source('functions_dataIntegration.R')
-    refs.merged = IntegrateData_runFastMNN(aa, group.by = 'condition',
-                                           merge.order = c('P1_Sham_D1', 'P1_Sham_D3',  'P1_MI_D1', 'P1_MI_D3'), 
-                                           correct.all = TRUE)
-    
-    p1 = DimPlot(refs.merged, group.by = 'FineID', label = TRUE, repel = TRUE, raster=FALSE) + 
-      ggtitle('fastMNN')
-    p2 = DimPlot(refs.merged, group.by = 'condition', label = TRUE, repel = TRUE) + 
-      ggtitle('fastMNN')
-    
-    p1 + p2
-    
-    ggsave(filename = paste0(resDir, '/noCM_Wang2020_P1_dataIntegration_fastMNN.pdf'), 
-           width = 16, height = 6)
-    
-    DimPlot(ref.combined, group.by = 'FineID', split.by = 'condition')
-    ggsave(filename = paste0(resDir, '/noCM_Wang2020_P1_dataIntegration_fastMNN_perCondition.pdf'), 
-           width = 16, height = 6)
-    
-    saveRDS(ref.combined,
-            file = paste0(RdataDir, 'Seurat.obj_neonatalMice_noCM_Wang2020_P1_fastMNN.rds'))
-    
     
   }
-  
 }
 
 ##########################################
@@ -952,13 +840,18 @@ if(Test_DataIntegration){
   aa = readRDS(file = paste0(RdataDir, 'Seurat.obj_neonatalMice_CM.Cui2020_noCM.Wang2020_P1_regress.nUMI.rds'))
   
   aa$dataset = factor(aa$dataset, levels = c('Wang2020', 'Cui2020'))
-    
-  integration_methods = c('noDataIntegration', 'Seurat_CCA', 'Seurat_RPCA', 'fastMNN')
+  aa$batch = paste0(aa$dataset, '_', aa$condition)
+  aa$batch = factor(aa$batch)
+  
+  outDir = paste0(resDir, '/CM_Cui2020_noCM_Wang2020_P1_merged/')
+  if(!dir.exists(outDir)) dir.create(outDir)
+  
+  integration_methods = c('noDataIntegration',  'fastMNN')
   
   for(method in integration_methods)
   {
     
-    method = "Seurat_CCA"
+    method = "fastMNN"
     
     source('functions_dataIntegration.R')
     
@@ -970,41 +863,45 @@ if(Test_DataIntegration){
                                               correct.all = TRUE)
     }
     
-    if(method == 'Seurat_RPCA'){
-      ref.combined = IntegrateData_Seurat_RPCA(aa, group.by = 'dataset', 
-                                               redo.normalization.scaling = FALSE,
-                                               correct.all = TRUE)
-    }
-    
-    #if(method == 'runHarmony'){
-    #  ref.combined = IntegrateData_runHarmony(aa, group.by = 'dataset', max.iter.harmony = 10)
-    #}
-    
     if(method == 'fastMNN'){
-      ref.combined = IntegrateData_runFastMNN(aa, group.by = 'dataset', correct.all = TRUE)
+      ref.combined = IntegrateData_runFastMNN(aa, group.by = 'batch',
+                                              merge.order = list(list(4,3,1,2), list(8,7,5,6)),
+                                              correct.all = TRUE)
     }
     
     p1 = DimPlot(ref.combined, group.by = 'FineID', label = TRUE, repel = TRUE, raster=FALSE) + 
       ggtitle(method)
     p2 = DimPlot(ref.combined, group.by = 'condition', label = TRUE, repel = TRUE) +
       ggtitle(method)
-    p1 + p2
+    p3 = DimPlot(ref.combined, group.by = 'BroadID', label = TRUE, repel = TRUE, raster=FALSE) + 
+      ggtitle(method)
     
-    ggsave(filename = paste0(resDir, '/CM_Cui2020_noCM_Wang2020_P1_merged_dataIntegration_', method, '.pdf'), 
-           width = 16, height = 6)
+    p1 /(p3 + p2)
+    
+    ggsave(filename = paste0(outDir, '/CM_Cui2020_noCM_Wang2020_P1_merged_dataIntegration_', method, '.pdf'), 
+           width = 16, height = 12)
     
     DimPlot(ref.combined, group.by = 'FineID', split.by = 'dataset', label = TRUE, repel = TRUE)
-    ggsave(filename = paste0(resDir, '/CM_Cui2020_noCM_Wang2020_P1_merged_celltypes.by.dataset', 
+    ggsave(filename = paste0(outDir, '/CM_Cui2020_noCM_Wang2020_P1_merged_subtypes.by.dataset', 
+                             '_dataIntegration_', method, '.pdf'), 
+           width = 16, height = 6)
+    
+    DimPlot(ref.combined, group.by = 'BroadID', split.by = 'dataset', label = TRUE, repel = TRUE)
+    ggsave(filename = paste0(outDir, '/CM_Cui2020_noCM_Wang2020_P1_merged_celltypes.by.dataset', 
                              '_dataIntegration_', method, '.pdf'), 
            width = 16, height = 6)
     
     DimPlot(ref.combined, group.by = 'FineID', split.by = 'condition', label = TRUE, repel = TRUE, ncol = 2)
-    ggsave(filename = paste0(resDir, '/CM_Cui2020_noCM_Wang2020_P1_merged_celltypes.by.conditions', 
+    ggsave(filename = paste0(outDir, '/CM_Cui2020_noCM_Wang2020_P1_merged_subtypes.by.conditions', 
+                             '_dataIntegration_', method, '.pdf'),  width = 16, height = 12)
+    
+    DimPlot(ref.combined, group.by = 'BroadID', split.by = 'condition', label = TRUE, repel = TRUE, ncol = 2)
+    ggsave(filename = paste0(outDir, '/CM_Cui2020_noCM_Wang2020_P1_merged_celltypes.by.conditions', 
                              '_dataIntegration_', method, '.pdf'),  width = 16, height = 12)
     
     if(method != 'noDataIntegration'){
       saveRDS(ref.combined, 
-              file = paste0(RdataDir, 'Seurat.obj_neonatalMice_noCM_Wang2020_P1_dataIntegration_', 
+              file = paste0(RdataDir, 'Seurat.obj_neonatalMice_CM.Cui2020_noCM.Wang2020_P1_dataIntegration_', 
                             method, '.rds'))
     }
     
