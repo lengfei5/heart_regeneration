@@ -40,13 +40,16 @@ mem_used()
 
 species = 'mouse_adult'
 
+
 ########################################################
 ########################################################
 # Section I: import the processed visium data by spaceranger
 # first processing and QCs 
 ########################################################
 ########################################################
-design = data.frame(seq(166907, 166904), c(paste0("adult.day", c(1, 4, 7, 14))), stringsAsFactors = FALSE)
+design = data.frame(seq(166907, 166904), 
+                    c(paste0("adult.day", c(1, 4, 7, 14))), 
+                    stringsAsFactors = FALSE)
 
 colnames(design) = c('sampleID', 'condition')
 

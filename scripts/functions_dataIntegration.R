@@ -275,10 +275,8 @@ IntegrateData_runHarmony = function(seuratObj, group.by = 'dataset', nfeatures =
   
   DimPlot(refs.merged, group.by = group.by, label = TRUE, repel = TRUE, raster=FALSE)
   
-  return(refs.merged)
-  
   ## a quick test
-  Test_if_RunHarmony_works = FALSLE
+  Test_if_RunHarmony_works = FALSE
   if(Test_if_RunHarmony_works){
     InstallData("pbmcsca")
     data("pbmcsca")
@@ -353,6 +351,7 @@ IntegrateData_runHarmony = function(seuratObj, group.by = 'dataset', nfeatures =
     
   }
   
+  return(refs.merged)
   
 }
 
@@ -536,7 +535,13 @@ IntegrateData_runSCVI = function()
 # inspired by https://github.com/quadbio/simspec
 # and https://pubmed.ncbi.nlm.nih.gov/33711282/
 ##########################################
-calculate_similarity_query_ref = function(query, ref, nHVGs = 1000, method = c("spearman", "pearson"),
+calculate_similarity_query_ref = function(query,
+                                          ref,
+                                          assay_use = 'RNA',
+                                          find_hvg = TRUE,
+                                          nHVGs = 500,
+                                          features_use = NULL,
+                                          method = c("spearman", "pearson"),  
                                           group.by = 'celltype')
 {
   # query = subset(aa, cells = colnames(aa)[which(aa$condition == 'day3_noRA')]); method = 'pearson'
@@ -544,19 +549,38 @@ calculate_similarity_query_ref = function(query, ref, nHVGs = 1000, method = c("
   library(ggplot2)
   library(data.table)
   
-  if(length(VariableFeatures(ref)) != nHVGs){
-    ref = FindVariableFeatures(ref, selection.method = 'vst', nfeatures = nHVGs)
+  if(find_hvg){
+    #if(length(VariableFeatures(ref)) != nHVGs){
+    #  ref = FindVariableFeatures(ref, selection.method = 'vst', nfeatures = nHVGs)
+    #}
+    if(length(VariableFeatures(query)) != nHVGs) 
+    {
+      query = FindVariableFeatures(query, selection.method = 'vst', nfeatures = nHVGs)
+    }
+    
   }
-  query = FindVariableFeatures(query, selection.method = 'vst', nfeatures = nHVGs)
   
-  candidats = unique(c(VariableFeatures(query), VariableFeatures(ref)))
+  if(is.null(features_use)){
+    candidats = unique(c(VariableFeatures(query)))
+  }else{
+    candidats = features_use
+  }
+  
   candidats = candidats[which(!is.na(match(candidats, intersect(rownames(query), rownames(ref)))))]
   cat(length(candidats), ' HVGs selected for similarity calculation \n ')
   
-  ref_avg = AverageExpression(object = ref, features = candidats, group.by = group.by, 
-                              slot = "data")$RNA
+  if(assay_use  == 'RNA'){
+    ref_avg = AverageExpression(object = ref, features = candidats, group.by = group.by, 
+                                slot = "data")$RNA
+    query_mat = query@assays$RNA@data
+  }else{
+    ref_avg = eval(parse(text = 
+    paste0("AverageExpression(object = ref, features = candidats, group.by = group.by, slot = 'data')$", 
+           assay_use)))
+    query_mat = eval(parse(text = paste0("query@assays$", assay_use, "@data")))
+  }
   
-  query_mat = query@assays$RNA@data
+  
   query_mat = query_mat[match(rownames(ref_avg), rownames(query_mat)), ]
   
   if(method == 'pearson'){
@@ -573,7 +597,8 @@ calculate_similarity_query_ref = function(query, ref, nHVGs = 1000, method = c("
   
   p <- ggplot(xx, aes(x=Var2, y=value)) + 
     geom_violin(trim=FALSE)
-  p1 = p + stat_summary(fun.data=mean_sdl, mult= 0.5, 
+  p1 = p + stat_summary(fun.data=mean_sdl, 
+                        #mult= 0.5, 
                    geom="pointrange", color="red") + 
     #theme_classic() +
     labs(x = 'cell types (ref)', y = 'correlation') + 
@@ -588,7 +613,6 @@ calculate_similarity_query_ref = function(query, ref, nHVGs = 1000, method = c("
     ggtitle(method)
   
   #plot(p1)
-  
   return(p1)
   
 }
