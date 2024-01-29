@@ -400,12 +400,14 @@ if(Merge.adult.mice.cardiomyocyte.noncardiomyocyte){
     xx = DietSeurat(ref.combined, counts = TRUE, data = TRUE, scale.data = FALSE, assays = 'integrated')
     xx@assays$integrated@counts = ref.combined@assays$RNA@counts
     
-    saveRDS(xx, file = paste0(RdataDir, 'Seurat.obj_adultMiceHeart_Forte2020_Ren2020_refCombined_logNormalize_counts_v3.rds'))
+    saveRDS(xx, file = paste0(RdataDir, 
+                  'Seurat.obj_adultMiceHeart_Forte2020_Ren2020_refCombined_logNormalize_counts_v3.rds'))
     
     
     # Run the standard workflow for visualization and clustering
-    ref.combined = readRDS(file =paste0(RdataDir, 
-                                        'Seurat.obj_adultMiceHeart_Forte2020_Ren2020_refCombined_logNormalize_counts_v3.rds'))
+    ref.combined = readRDS(file = 
+                             paste0(RdataDir, 
+                          'Seurat.obj_adultMiceHeart_Forte2020_Ren2020_refCombined_logNormalize_counts_v3.rds'))
     
     ref.combined <- ScaleData(ref.combined, verbose = FALSE)
     ref.combined <- RunPCA(ref.combined, npcs = 30, verbose = FALSE)
@@ -436,7 +438,8 @@ if(Merge.adult.mice.cardiomyocyte.noncardiomyocyte){
     # clean the reference, i.e. remove the non-cardiomyocyte from Ren2020
     # change the confusing annotation names from Shoval
     ##########################################
-    kk = which(ref.combined$dataset == 'Forte2020'| (ref.combined$dataset == 'Ren2020' & ref.combined$celltype == 'CM'))
+    kk = which(ref.combined$dataset == 'Forte2020'| 
+                 (ref.combined$dataset == 'Ren2020' & ref.combined$celltype == 'CM'))
     refs = ref.combined[,kk]
     
     p1 <- DimPlot(refs, reduction = "umap", group.by = "dataset")
@@ -765,7 +768,7 @@ if(Double.check.adult.cardiomyocyte.major.celltypes.subtypes){
 
 
 ##########################################
-# actually used the reference 
+# save the reference to use in ST analysis 
 ##########################################
 refs = readRDS(file = paste0('../results/Rdata/', 
                              'Seurat.obj_adultMiceHeart_Forte2020.nonCM_Ren2020CM_refCombined_cleanAnnot_',
@@ -778,4 +781,6 @@ DimPlot(refs, reduction = 'umap', group.by = 'celltype')
 DimPlot(refs, reduction = 'umap', group.by = 'subtype')
 
 saveRDS(refs, file = paste0('../data/data_examples/ref_scRNAseq.rds'))
+
+
 
