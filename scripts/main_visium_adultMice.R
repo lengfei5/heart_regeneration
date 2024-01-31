@@ -23,7 +23,7 @@ source('functions_scRNAseq.R')
 source('functions_Visium.R')
 dataPath_nichenet = '../data/NicheNet/'
 
-version.analysis = '_R11934_20210827'
+version.analysis = '_R11934_20240131'
 
 resDir = paste0("../results/visium_adultMice", version.analysis)
 RdataDir = paste0(resDir, '/Rdata/')
@@ -39,7 +39,6 @@ require(ggplot2)
 mem_used()
 
 species = 'mouse_adult'
-
 
 ########################################################
 ########################################################
@@ -275,21 +274,22 @@ source('functions_Visium.R')
 
 load(file = paste0(RdataDir, 'seuratObject_design_variableGenes_', species, 
                    '_umap.clustered.Rdata'))
-refs = readRDS(file = paste0('../data/data_examples/ref_scRNAseq.rds'))
 
-jj = which(refs$dataset == 'Ren2020')
-refs$timepoints[jj] = refs$condition[jj]
-refs$condition = refs$timepoints
+refs = readRDS(file = paste0('../data/data_examples/ref_scRNAseq_adultMice_clean.v1.rds'))
 
-p1 = DimPlot(refs, reduction = 'umap', group.by = 'dataset')
-p2 = DimPlot(refs, reduction = 'umap', group.by = 'celltype')
-p3 = DimPlot(refs, reduction = 'umap', group.by = 'subtype')
-p4 = DimPlot(refs, reduction = 'umap', group.by = 'timepoints')
+#jj = which(refs$dataset == 'Ren2020')
+#refs$timepoints[jj] = refs$condition[jj]
+#refs$condition = refs$timepoints
+
+p1 = DimPlot(refs, reduction = 'umap', group.by = 'dataset',  label = TRUE, repel = TRUE)
+p2 = DimPlot(refs, reduction = 'umap', group.by = 'celltype',  label = TRUE, repel = TRUE)
+p3 = DimPlot(refs, reduction = 'umap', group.by = 'subtype',  label = TRUE, repel = TRUE)
+p4 = DimPlot(refs, reduction = 'umap', group.by = 'timepoints',  label = TRUE, repel = TRUE)
 
 (p1 + p2)/(p3 + p4)
 
 ggsave(filename = paste0(resDir, '/UMAP_scRNAseq_refrence_dataset_timepoints_celltypes.pdf'), 
-       width = 32, height = 16)
+       width = 24, height = 12)
 
 ##########################################
 # cell type deconvolution for cell types
@@ -370,8 +370,8 @@ if(Use_fineGrained_subtypes){
   condition.specific.ref = FALSE
   
   outDir = paste0(resDir, '/celltype_deconvolution')
-  RCTD_out = paste0(outDir, '/RCTD_', length(table(refs$celltype_toUse)), 'Subtype_ref_v0.1')
-  max_cores = 32
+  RCTD_out = paste0(outDir, '/RCTD_', length(table(refs$celltype_toUse)), 'Subtype_ref_v1.0')
+  max_cores = 16
   
   # st = subset(st, condition == 'adult.day7'); st$condition = droplevels(st$condition)
   
@@ -411,6 +411,7 @@ if(Spatial_variableGenes_analysis){
   st = Find.SpatialDE(st)
   
 }
+
 
 ########################################################
 ########################################################
