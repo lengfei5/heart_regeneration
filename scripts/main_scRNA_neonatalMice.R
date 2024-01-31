@@ -798,9 +798,15 @@ if(process_and_batchCorrection_noCM){
       }
     }
     
-    
   }
 }
+
+########################################################
+########################################################
+## Section III : merge CMs and noCMs
+## also test how to correct the batches and data integration 
+########################################################
+########################################################
 
 ##########################################
 # merge CMs and noCMs 
@@ -834,6 +840,9 @@ DimPlot(aa, label = TRUE, repel = TRUE, raster=FALSE)
 saveRDS(aa, file = paste0(RdataDir, 'Seurat.obj_neonatalMice_CM.Cui2020_noCM.Wang2020_P1_regress.nUMI.rds'))
 
 
+##########################################
+# test Data integration after data merging 
+##########################################
 Test_DataIntegration = FALSE
 if(Test_DataIntegration){
   
@@ -857,6 +866,7 @@ if(Test_DataIntegration){
     
     ## no data integration 
     if(method == 'noDataIntegration'){ref.combined = aa}
+    
     
     if(method == 'Seurat_CCA'){
       ref.combined = IntegrateData_Seurat_CCA(aa, group.by = 'dataset', redo.normalization.scaling = FALSE,
@@ -908,4 +918,7 @@ if(Test_DataIntegration){
   }
 
 }
+
+
+
 
