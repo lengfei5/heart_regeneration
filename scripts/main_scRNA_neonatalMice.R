@@ -801,10 +801,13 @@ if(process_and_batchCorrection_noCM){
   }
 }
 
+
 ########################################################
 ########################################################
-## Section III : merge CMs and noCMs
+## Section IV : merge CMs and noCMs
 ## also test how to correct the batches and data integration 
+## 1) batch corrected separately for CM and noCM and merged 
+## 2) merge CM and noCM first and correct the batch in data integration
 ########################################################
 ########################################################
 
@@ -860,7 +863,7 @@ if(Test_DataIntegration){
   for(method in integration_methods)
   {
     
-    method = "fastMNN"
+    method = "noDataIntegration"
     
     source('functions_dataIntegration.R')
     
@@ -913,10 +916,11 @@ if(Test_DataIntegration){
       saveRDS(ref.combined, 
               file = paste0(RdataDir, 'Seurat.obj_neonatalMice_CM.Cui2020_noCM.Wang2020_P1_dataIntegration_', 
                             method, '.rds'))
+      
     }
     
   }
-
+  
 }
 
 
