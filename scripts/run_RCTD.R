@@ -42,9 +42,8 @@ if(Run_RCTD_adultMice){
   mem_used()
   species = 'mouse_adult'
   
-  
-  load(file = paste0(RdataDir, 'seuratObject_design_variableGenes_', species, 
-                     '_umap.clustered.Rdata'))
+  load(file = paste0("../results/visium_adultMice_R11934_20210827/Rdata/", 
+                     'seuratObject_design_variableGenes_mouse_adult_umap.clustered.Rdata'))
   
   refs = readRDS(file = paste0('../data/data_examples/ref_scRNAseq_adultMice_clean.v1.rds'))
   

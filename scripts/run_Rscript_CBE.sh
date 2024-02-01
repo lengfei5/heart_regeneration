@@ -1,14 +1,14 @@
 #!/bin/bash
 
-#SBATCH --time=4-00:00:00
+#SBATCH --time=1-00:00:00
 #SBATCH --nodes=1
-#SBATCH --cpus-per-task=32
-#SBATCH --mem=500G
+#SBATCH --cpus-per-task=16
+#SBATCH --mem=48G
 #SBATCH --job-name="sc_Rscript"
 #SBATCH --output="logs/slurm_%x_%j.out"
 #SBATCH --error="logs/slurm_%x_%j.err"
-#SBATCH --qos=long
-#SBATCH --partition=m
+#SBATCH --qos=medium
+#SBATCH --partition=c
 
 mkdir -p logs/
 
@@ -22,4 +22,5 @@ ml load r-bundle-bioconductor/3.14-foss-2021b-r-4.1.2
 #Rscript script_snRNAseq_batchCorrection_animals.R
 #Rscript script_scATAC_cisTopic_downsample.R
 #Rscript script_scATAC_cisTopic.R
-Rscript run_LDA.R
+#Rscript run_LDA.R
+Rscript run_RCTD.R
