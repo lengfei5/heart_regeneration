@@ -201,7 +201,8 @@ IntegrateData_runFastMNN = function(seuratObj, group.by = 'dataset', nfeatures =
                                     correct.all = TRUE,
                                     reference = NULL)
 {
-  # # seuratObj = aa; group.by = "condition"; ndims = c(1:30); reference = NULL;nfeatures = 2000
+  # seuratObj = aa; group.by = "dataset"; nfeatures = 3000;  merge.order = NULL; correct.all = TRUE
+  
   library(Seurat)
   library(SeuratData)
   library(SeuratWrappers)
