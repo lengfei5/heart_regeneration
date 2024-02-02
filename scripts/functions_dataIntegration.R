@@ -195,6 +195,80 @@ IntegrateData_Seurat_RPCA = function(seuratObj, group.by = 'dataset', nfeatures 
   
 }
 
+##########################################
+# customized RunFastMNN 
+# original code from https://github.com/satijalab/seurat-wrappers/issues/83
+# fix the issue of not returning corrected gene expression for all genes
+##########################################
+RunFastMNN_fixed <- function (object.list, 
+                              assay = NULL, 
+                              features = 2000, 
+                              reduction.name = "mnn", 
+                              reduction.key = "mnn_", 
+                              reconstructed.assay = "mnn.reconstructed",
+                              verbose = TRUE, ...) 
+{
+  
+  if (!all(sapply(X = object.list, FUN = inherits, what = "Seurat"))) {
+    stop("'object.list' must be a list of Seurat objects", 
+         call. = FALSE)
+  }
+  
+  if (length(x = object.list) < 2) {
+    stop("'object.list' must contain multiple Seurat objects for integration", 
+         call. = FALSE)
+  }
+  
+  assay <- assay %||% DefaultAssay(object = object.list[[1]])
+  features_common = rownames(object.list[[1]])
+  
+  for (i in 1:length(x = object.list)) {
+    DefaultAssay(object = object.list[[i]]) <- assay
+    if(i >1) {features_common = intersect(features_common, rownames(object.list[[i]]))}
+  }
+  message(paste(length(features_common),  "common features for batch correction "))
+  
+  
+  if (is.numeric(x = features)) {
+    if (verbose) {
+      message(paste("Computing", features, "integration features"))
+    }
+    
+    ## select features for each batch
+    features <- SelectIntegrationFeatures(object.list = object.list, 
+                                          nfeatures = features, 
+                                          assay = rep(assay, length(object.list)))
+  }
+  
+  objects.sce <- lapply(X = object.list, 
+                        FUN = function(x, f) {return(as.SingleCellExperiment(x = subset(x = x, features = f)))},
+                        f = features_common)
+  
+  integrated <- merge(x = object.list[[1]], y = object.list[2:length(x = object.list)])
+  out <- do.call(what = batchelor::fastMNN, args = c(objects.sce, 
+                                                     list(subset.row = features, 
+                                                          ...)
+  ))
+  
+  rownames(x = SingleCellExperiment::reducedDim(x = out)) <- colnames(x = integrated)
+  colnames(x = SingleCellExperiment::reducedDim(x = out)) <- paste0(reduction.key, 
+                                                    1:ncol(x = SingleCellExperiment::reducedDim(x = out)))
+  integrated[[reduction.name]] <- CreateDimReducObject(embeddings = SingleCellExperiment::reducedDim(x = out), 
+                                                       assay = DefaultAssay(object = integrated), key = reduction.key)
+  
+  
+  # Add reconstructed matrix (gene x cell)
+  integrated[[reconstructed.assay]] <- CreateAssayObject(
+    data = as(object = SummarizedExperiment::assay(x = out), Class = "sparseMatrix"),
+  )
+  # Add variable features
+  VariableFeatures(object = integrated[[reconstructed.assay]]) <- features
+  Tool(object = integrated) <- S4Vectors::metadata(x = out)
+  integrated <- LogSeuratCommand(object = integrated)
+  return(integrated)
+  
+}
+
 IntegrateData_runFastMNN = function(seuratObj, group.by = 'dataset', nfeatures = 2000,
                                     ndims = c(1:30),
                                     merge.order = NULL,
@@ -202,6 +276,8 @@ IntegrateData_runFastMNN = function(seuratObj, group.by = 'dataset', nfeatures =
                                     reference = NULL)
 {
   # seuratObj = aa; group.by = "dataset"; nfeatures = 3000;  merge.order = NULL; correct.all = TRUE
+  # seuratObj[['integrated']] = NULL
+  #seuratObj = ScaleData(seuratObj, )
   
   library(Seurat)
   library(SeuratData)
@@ -209,8 +285,8 @@ IntegrateData_runFastMNN = function(seuratObj, group.by = 'dataset', nfeatures =
   
   #DefaultAssay(seuratObj) = 'RNA'
   ## one error solved (see https://github.com/satijalab/seurat-wrappers/issues/126)
-  #seuratObj = DietSeurat(object = seuratObj, counts = TRUE, data = TRUE, assays = 'RNA', 
-  #                       dimreducs = c('pca'))
+  seuratObj = DietSeurat(object = seuratObj, counts = TRUE, data = TRUE, assays = 'RNA', 
+                         dimreducs = c('pca'))
   
   ## By default, batches are merged in the user-supplied order in ..., i.e., 
   ## the first batch is merged with the second batch, the third batch is merged with the combined 
@@ -218,18 +294,19 @@ IntegrateData_runFastMNN = function(seuratObj, group.by = 'dataset', nfeatures =
   ## We refer to this approach as a progressive merge. When batch is supplied for a single object in ..., 
   ## the ordering of batches in a progressive merge is determined by the ordering of factor levels in batch.
   if(is.null(merge.order)){
-    refs.merged <- RunFastMNN(SplitObject(object = seuratObj, split.by = group.by), 
+    refs.merged <- RunFastMNN_fixed(SplitObject(object = seuratObj, split.by = group.by), 
                               features = nfeatures,
-                              subset.row = NULL,
                               correct.all = correct.all)
+    #DefaultAssay(refs.merged) = 'mnn.reconstructed'
+    
   }else{
-    refs.merged <- RunFastMNN(SplitObject(object = seuratObj, split.by = group.by), 
+    refs.merged <- RunFastMNN_fixed(SplitObject(object = seuratObj, split.by = group.by), 
                               features = nfeatures,
                               merge.order = merge.order,
-                              subset.row = NULL,
-                              correct.all = TRUE)
+                              correct.all = correct.all)
     
   }
+  
   
   refs.merged <- RunUMAP(refs.merged, reduction = "mnn", dims = 1:30)
   

@@ -931,7 +931,7 @@ if(Test_DataIntegration){
     if(method != 'noDataIntegration'){
       saveRDS(ref.combined, 
               file = paste0(RdataDir, 'Seurat.obj_neonatalMice_CM.Cui2020_noCM.Wang2020_P1_dataIntegration_', 
-                            method, '.rds'))
+                            method, '_allgeneCorrected.rds'))
       
     }
     
