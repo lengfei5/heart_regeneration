@@ -1466,65 +1466,8 @@ if(Test_dataIntegration_fastMNN){
                 repel = TRUE)
   p1 + p2 
   
-  ggsave(paste0(resDir, '/Forte2020_Ren2020_Integration_fastMNN.pdf'), 
+  ggsave(paste0(outDir, '/Forte2020_Ren2020_Integration_fastMNN.pdf'), 
          width = 24, height = 10)
-  
-  
-  ##########################################
-  # clean the reference, i.e. remove the non-cardiomyocyte from Ren2020
-  # change the confusing annotation names from Shoval
-  ##########################################
-  kk = which(ref.combined$dataset == 'Forte2020'| (ref.combined$dataset == 'Ren2020' & ref.combined$celltype == 'CM'))
-  refs = ref.combined[,kk]
-  
-  p1 <- DimPlot(refs, reduction = "umap", group.by = "dataset")
-  p2 <- DimPlot(refs, reduction = "umap", group.by = "celltype", label = TRUE,
-                repel = TRUE)
-  p1 + p2 
-  
-  ggsave(paste0(resDir, '/Forte2020_Ren2020onlyCM_IntegrationRPCA_', Normalization, '.pdf'), 
-         width = 24, height = 10)
-  
-  p2 
-  ggsave(paste0(resDir, '/Forte2020_Ren2020onlyCM_IntegrationRPCA_celltypes.in.Refs_', Normalization, '.pdf'), 
-         width = 12, height = 10)
-  
-  DimPlot(refs, reduction = "umap", group.by = "subtype", label = TRUE,
-          repel = TRUE)
-  
-  ggsave(paste0(resDir, '/Forte2020_Ren2020onlyCM_IntegrationRPCA_subtypes.in.Refs_', Normalization, '.pdf'), 
-         width = 12, height = 10)
-  
-  # xx = subset(refs, cells = colnames(refs)[which(refs$dataset == 'Ren2020')])
-  # 
-  # xx <- ScaleData(xx, verbose = FALSE)
-  # xx <- RunPCA(xx, npcs = 30, verbose = FALSE)
-  # 
-  # ElbowPlot(xx, ndims = 30)
-  # 
-  # xx <- FindNeighbors(xx, reduction = "pca", dims = 1:20)
-  # xx <- FindClusters(xx, resolution = 0.2)
-  # 
-  # xx <- RunUMAP(xx, reduction = "pca", dims = 1:10, n.neighbors = 10, min.dist = 0.05) 
-  # 
-  # DimPlot(xx, reduction = "umap")
-  # 
-  
-  DimPlot(refs, reduction = "umap", group.by = "celltype", split.by = 'dataset',  label = TRUE, repel = TRUE)
-  # DimPlot(refs, reduction = 'umap', group.by = 'integrated_snn_res.0.5')
-  
-  
-  
-  rm(ref.combined)
-  
-  saveRDS(refs, file = paste0(RdataDir, 
-                              'Seurat.obj_adultMiceHeart_Forte2020.nonCM_Ren2020CM_refCombined_',
-                              'cleanAnnot_logNormalize_v4.rds'))
-  saveRDS(refs, file = paste0(RdataDir, 
-                              'SeuratObj_adultMiceHeart_refCombine_Forte2020.nonCM_Ren2020CM_',
-                              'cleanAnnot_logNormalize_v4.rds'))
   
 }
-
-
 
