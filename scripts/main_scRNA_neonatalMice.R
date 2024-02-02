@@ -947,7 +947,8 @@ if(Test_DataIntegration){
 ########################################################
 ########################################################
 aa = readRDS(file = paste0(RdataDir, 
-                           'Seurat.obj_neonatalMice_CM.Cui2020_noCM.Wang2020_P1_dataIntegration_fastMNN.rds'))
+                           'Seurat.obj_neonatalMice_CM.Cui2020_noCM.Wang2020_P1_dataIntegration_',
+                           'fastMNN_allgeneCorrected.rds'))
 
 
 ## overview of fastMNN integerated data
@@ -986,7 +987,7 @@ aa$percent.mt[jj] = aa$percent.mito[jj] * 100
 aa$percent.mito = NULL
 
 DefaultAssay(aa) = 'mnn.reconstructed'
-
+#aa@assays$mnn.reconstructed@counts = aa@assays$RNA@counts
 
 ##########################################
 # double check and refine subtypes CM
@@ -1004,6 +1005,8 @@ if(refine.subtypes_adultMice_CM){
   
   DefaultAssay(ax) = 'mnn.reconstructed'
   
+  ax$condition = factor(ax$condition, levels = c("Sham_d1", "MI_d1", "Sham_d3", "MI_d3"))
+  
   ax <- FindVariableFeatures(ax, selection.method = "vst", nfeatures = 2000)
   ax <- ScaleData(ax)
   
@@ -1011,7 +1014,7 @@ if(refine.subtypes_adultMice_CM){
   ElbowPlot(ax, ndims = 30)
   
   # UMAP to visualize subtypes
-  ax <- RunUMAP(ax, dims = 1:20, n.neighbors = 20, min.dist = 0.1)
+  ax <- RunUMAP(ax, dims = 1:10, n.neighbors = 20, min.dist = 0.1)
   
   DimPlot(ax, reduction = 'umap', group.by = 'subtype_old')
   
@@ -1039,7 +1042,7 @@ if(refine.subtypes_adultMice_CM){
   DimPlot(object = ax, reduction = 'umap', raster = T, pt.size = 4, shuffle= T,label = T)
   
   DimPlot(object = ax, reduction = 'umap', raster = T,shuffle= T, pt.size = 4,group.by = "condition")
-  DimPlot(object = ax, reduction = 'umap',raster = T, shuffle= T, pt.size = 4,group.by = "group")
+  DimPlot(object = ax, reduction = 'umap',raster = T, shuffle= T, pt.size = 4,group.by = "dataset")
   #DimPlot(object = xx, reduction = 'umap',raster = T, shuffle= T, pt.size = 3,group.by = "time",
   #        cols = c("grey50",rev(viridis_pal(option = "plasma")(length(unique(xx@meta.data$time))-1))))
   FeaturePlot(ax, raster = T,pt.size = 2, features = c("nFeature_RNA","nCount_RNA","percent.mt"),
@@ -1062,23 +1065,19 @@ if(refine.subtypes_adultMice_CM){
     
     p1 + p2 + p3
     
-    ax = subset(ax, cells = colnames(ax)[which(ax$percent.mt < 60)])
+    ax = subset(ax, cells = colnames(ax)[which(ax$nFeature_RNA > 500 & ax$seurat_clusters != '5')])
     
-    ax <- FindVariableFeatures(ax, selection.method = "vst", nfeatures = 5000)
+    ax <- FindVariableFeatures(ax, selection.method = "vst", nfeatures = 2000)
     ax <- ScaleData(ax)
     
     ax <- RunPCA(ax, verbose = FALSE, weight.by.var = TRUE)
     ElbowPlot(ax, ndims = 30)
     
-    ## add cell cycle scores
-    s.genes <- firstup(cc.genes$s.genes)
-    g2m.genes <- firstup(cc.genes$g2m.genes)
-    ax <- CellCycleScoring(ax, s.features = s.genes, g2m.features = g2m.genes, set.ident = FALSE)
     
     # UMAP to visualize subtypes
     ax <- RunUMAP(ax, dims = 1:10, n.neighbors = 20, min.dist = 0.1)
     
-    DimPlot(ax, reduction = 'umap', group.by = 'subtype')
+    DimPlot(ax, reduction = 'umap', group.by = 'subtype_old')
     
     ggsave(paste0(outDir, '/Ref_neonatalMice_CM.Cui2020_noCM.Wang2020_P1_UMAP_', mcells, '_subcelltypes.pdf'), 
            width = 10, height = 8)
@@ -1088,15 +1087,16 @@ if(refine.subtypes_adultMice_CM){
            width = 10, height = 8)
     
     ax <- FindNeighbors(ax, dims = 1:10)
-    
     ax <- FindClusters(ax, verbose = FALSE, algorithm = 3, resolution = 0.3)
-    p1 = DimPlot(ax, reduction = 'umap', group.by = 'seurat_clusters')
-    p0 = DimPlot(ax, reduction = 'umap', group.by = 'subtype')
+    
+    p1 = DimPlot(ax, reduction = 'umap', group.by = 'seurat_clusters', label = TRUE, repel = TRUE)
+    p0 = DimPlot(ax, reduction = 'umap', group.by = 'subtype_old', label = TRUE, repel = TRUE)
     p2 = DimPlot(ax, reduction = 'umap', group.by = 'Phase')
     p0 + p1 + p2
     
-    ggsave(paste0(outDir, '/Ref_neonatalMice_CM.Cui2020_noCM.Wang2020_P1_UMAP_', mcells, '_afterFiltering.highMt.pdf'), 
-           width = 10, height = 8)
+    ggsave(paste0(outDir, '/Ref_neonatalMice_CM.Cui2020_noCM.Wang2020_P1_UMAP_', mcells, 
+                  '_afterFiltering.highMt.pdf'), 
+           width = 12, height = 6)
     
     
     VlnPlot(ax, features = 'Nppa')
@@ -1110,34 +1110,38 @@ if(refine.subtypes_adultMice_CM){
     
   }
   
-  ## save the processing
-  ax$subtype = paste0('CM_', ax$seurat_clusters)
+  ## re-annotate
+  ax$subtype[which(!is.na(match(ax$seurat_clusters, c(0))))] = 'CM1'
+  ax$subtype[which(!is.na(match(ax$seurat_clusters, c(1))))] = 'CM2_injurySpec_proliferating'
+  ax$subtype[which(!is.na(match(ax$seurat_clusters, c(2))))] = 'CM3_injurySpec'
+  ax$subtype[which(!is.na(match(ax$seurat_clusters, c(3))))] = 'CM4_injurySpec_d1'
+  ax$subtype[which(!is.na(match(ax$seurat_clusters, c(4))))] = 'CM5_proliferating'
+  
+  DimPlot(object = ax, reduction = 'umap', raster = T,shuffle= T, pt.size = 4, group.by = "subtype",
+          label = TRUE, repel = TRUE)
+  
+  ggsave(paste0(outDir, '/Ref_neonatalMice_CM.Cui2020_noCM.Wang2020_P1_UMAP_', mcells, 
+                '_afterFiltering_reAnnot.pdf'), 
+         width = 12, height = 8)
+  
+  # save the annotation and processing 
   mm = match(colnames(ax), colnames(aa))
   cat(length(which(is.na(mm))), 'cells missing \n')
   aa$subtype[mm] = ax$subtype
   aa$strigentFiltered[mm] = 'keep'
   
-  saveRDS(aa, file = paste0(RdataDir, 
-                            'Ref_neonatalMice_CM.Cui2020_noCM.Wang2020_P1_refineSubtypes_CM_20240129.rds'))
-  
-  # label the injury specific population
-  aa = readRDS(file = paste0(RdataDir, 
-                             'Ref_neonatalMice_CM.Cui2020_noCM.Wang2020_P1_refineSubtypes_CM_20240129.rds'))
-  
-  aa$subtype[which(aa$subtype == 'CM_3')] = 'CM_3_injurySpec'
-  aa$subtype[which(aa$subtype == 'CM_5')] = 'CM_5_injurySpec'
-  aa$subtype[which(aa$subtype == 'CM_0')] = 'CM_0_injurySpec'
+  saveRDS(ax, file = paste0(RdataDir, 
+                            'Ref_neonatalMice_CM.Cui2020_noCM.Wang2020_P1_', mcells, 'refinedCelltypes_20240130.rds'))
   
   saveRDS(aa, file = paste0(RdataDir, 
-                            'Ref_neonatalMice_CM.Cui2020_noCM.Wang2020_P1_refineSubtypes_CM_20240130.rds'))
-  
+                            'Ref_neonatalMice_CM.Cui2020_noCM.Wang2020_P1_refineSubtypes_', mcells, '_20240130.rds'))
   
 }
 
 ##########################################
 # EC 
 ##########################################
-DimPlot(aa, reduction = 'umap', group.by = 'celltype')
+DimPlot(aa, reduction = 'umap', group.by = 'celltype', label = TRUE, repel = TRUE)
 
 refine.subtypes_adultMice_EC = FALSE
 if(refine.subtypes_adultMice_EC){
@@ -1150,11 +1154,11 @@ if(refine.subtypes_adultMice_EC){
   table(ax$celltype)
   table(ax$subtype_old)
   
-  ax$condition = factor(ax$condition, levels = c('d0', 'd1', 'd3', 'd5', 'd7', 'd14', 'd28'))
+  ax$condition = factor(ax$condition, levels = c("Sham_d1", "MI_d1", "Sham_d3", "MI_d3"))
   
   DimPlot(ax, group.by = 'subtype_old')
   
-  ax <- FindVariableFeatures(ax, selection.method = "vst", nfeatures = 5000)
+  ax <- FindVariableFeatures(ax, selection.method = "vst", nfeatures = 2000)
   ax <- ScaleData(ax)
   
   ax <- RunPCA(ax, verbose = FALSE, weight.by.var = TRUE)
@@ -1172,9 +1176,9 @@ if(refine.subtypes_adultMice_EC){
   #ggsave(paste0(outDir, '/Ref_neonatalMice_CM.Cui2020_noCM.Wang2020_P1_UMAP_', mcells, '_MarkerGenes.pdf'), 
   #       width = 10, height = 8)
   
-  ax <- FindNeighbors(ax, dims = 1:20)
+  ax <- FindNeighbors(ax, dims = 1:10)
   
-  ax <- FindClusters(ax, verbose = FALSE, algorithm = 3, resolution = 0.3)
+  ax <- FindClusters(ax, verbose = FALSE, algorithm = 3, resolution = 0.4)
   p0 = DimPlot(ax, reduction = 'umap', group.by = 'subtype_old')
   p1 = DimPlot(ax, reduction = 'umap', group.by = 'seurat_clusters')
   
@@ -1192,9 +1196,9 @@ if(refine.subtypes_adultMice_EC){
   
   DimPlot(ax, reduction = 'umap', group.by = 'subtype_old')
   DimPlot(object = ax, reduction = 'umap', raster = T, pt.size = 4, shuffle= T,label = T)
-  DimPlot(ax, reduction = 'umap', group.by = 'Phase')
+  #DimPlot(ax, reduction = 'umap', group.by = 'Phase')
   DimPlot(object = ax, reduction = 'umap', raster = T,shuffle= T, pt.size = 4,group.by = "condition")
-  #DimPlot(object = ax, reduction = 'umap',raster = T, shuffle= T, pt.size = 4,group.by = "group")
+  DimPlot(object = ax, reduction = 'umap',raster = T, shuffle= T, pt.size = 4,group.by = "Phase")
   #DimPlot(object = xx, reduction = 'umap',raster = T, shuffle= T, pt.size = 3,group.by = "time",
   #        cols = c("grey50",rev(viridis_pal(option = "plasma")(length(unique(xx@meta.data$time))-1))))
   FeaturePlot(ax, raster = T,pt.size = 2, features = c("nFeature_RNA","nCount_RNA","percent.mt"),
@@ -1219,11 +1223,10 @@ if(refine.subtypes_adultMice_EC){
     
     p1 + p2 + p3
     
-    # stringent filtering for EC and discard cluster 1
-    ax = subset(ax, cells = colnames(ax)[which(ax$nCount_RNA >1000 & ax$nFeature_RNA > 500 & 
-                                                 ax$seurat_clusters != '1')])
+    # stringent filtering for EC 
+    ax = subset(ax, cells = colnames(ax)[which(ax$nCount_RNA >1000 & ax$nFeature_RNA > 500)])
     
-    ax <- FindVariableFeatures(ax, selection.method = "vst", nfeatures = 5000)
+    ax <- FindVariableFeatures(ax, selection.method = "vst", nfeatures = 2000)
     ax <- ScaleData(ax)
     
     ax <- RunPCA(ax, verbose = FALSE, weight.by.var = TRUE)
@@ -1244,8 +1247,8 @@ if(refine.subtypes_adultMice_EC){
     ax <- FindNeighbors(ax, dims = 1:20)
     ax <- FindClusters(ax, verbose = FALSE, algorithm = 3, resolution = 0.3)
     
-    p1 = DimPlot(ax, reduction = 'umap', group.by = 'seurat_clusters')
-    p0 = DimPlot(ax, reduction = 'umap', group.by = 'subtype_old')
+    p1 = DimPlot(ax, reduction = 'umap', group.by = 'seurat_clusters',  label = TRUE, repel = TRUE)
+    p0 = DimPlot(ax, reduction = 'umap', group.by = 'subtype_old',  label = TRUE, repel = TRUE)
     p2 = DimPlot(ax, reduction = 'umap', group.by = 'Phase')
     p0 + p1 + p2
     
@@ -1254,10 +1257,8 @@ if(refine.subtypes_adultMice_EC){
            width = 20, height = 8)
     
     
-    #VlnPlot(ax, features = 'Nppa')
-    
     DimPlot(object = ax, reduction = 'umap', raster = T,shuffle= T, pt.size = 4, group.by = "seurat_clusters",
-            split.by = 'condition', label = TRUE, repel = TRUE, ncol = 4)
+            split.by = 'condition', label = TRUE, repel = TRUE, ncol = 2)
     
     ggsave(paste0(outDir, '/Ref_neonatalMice_CM.Cui2020_noCM.Wang2020_P1_UMAP_', mcells, 
                   '_afterFiltering_clusterPerCondition.pdf'), 
@@ -1265,14 +1266,8 @@ if(refine.subtypes_adultMice_EC){
     
   }
   
-  ## re-annotate
-  ax$subtype[which(!is.na(match(ax$seurat_clusters, c(0, 2, 7))))] = 'EC1'
-  ax$subtype[which(!is.na(match(ax$seurat_clusters, c(1))))] = 'EC2_injurySpec'
-  ax$subtype[which(!is.na(match(ax$seurat_clusters, c(3))))] = 'EC3'
-  ax$subtype[which(!is.na(match(ax$seurat_clusters, c(4))))] = 'Lymph.EC_1'
-  ax$subtype[which(!is.na(match(ax$seurat_clusters, c(5))))] = 'Lymph.EC_2'
-  ax$subtype[which(!is.na(match(ax$seurat_clusters, c(6))))] = 'EC4_proliferating'
-  ax$subtype[which(!is.na(match(ax$seurat_clusters, c(8,9))))] = 'EC5'
+  ## won't change the previous annotations
+  ax$subtype = ax$subtype_old
   
   DimPlot(object = ax, reduction = 'umap', raster = T,shuffle= T, pt.size = 4, group.by = "subtype",
           label = TRUE, repel = TRUE)
@@ -1293,16 +1288,14 @@ if(refine.subtypes_adultMice_EC){
   saveRDS(aa, file = paste0(RdataDir, 
                             'Ref_neonatalMice_CM.Cui2020_noCM.Wang2020_P1_refineSubtypes_', mcells, '_20240130.rds'))
   
+  
 }
-
-
-
 
 
 ##########################################
 # FB
 ##########################################
-DimPlot(aa, reduction = 'umap', group.by = 'celltype')
+DimPlot(aa, reduction = 'umap', group.by = 'celltype', label = TRUE, repel = TRUE)
 
 refine.subtypes_adultMice_FB = FALSE
 if(refine.subtypes_adultMice_FB){
@@ -1315,11 +1308,11 @@ if(refine.subtypes_adultMice_FB){
   table(ax$celltype)
   table(ax$subtype_old)
   
-  ax$condition = factor(ax$condition, levels = c('d0', 'd1', 'd3', 'd5', 'd7', 'd14', 'd28'))
+  ax$condition = factor(ax$condition, levels = c("Sham_d1", "MI_d1", "Sham_d3", "MI_d3"))
   
   DimPlot(ax, group.by = 'subtype_old')
   
-  ax <- FindVariableFeatures(ax, selection.method = "vst", nfeatures = 5000)
+  ax <- FindVariableFeatures(ax, selection.method = "vst", nfeatures = 2000)
   ax <- ScaleData(ax)
   
   ax <- RunPCA(ax, verbose = FALSE, weight.by.var = TRUE)
@@ -1339,7 +1332,7 @@ if(refine.subtypes_adultMice_FB){
   
   ax <- FindNeighbors(ax, dims = 1:20)
   
-  ax <- FindClusters(ax, verbose = FALSE, algorithm = 3, resolution = 0.2)
+  ax <- FindClusters(ax, verbose = FALSE, algorithm = 3, resolution = 0.3)
   p0 = DimPlot(ax, reduction = 'umap', group.by = 'subtype_old', label = TRUE, repel = FALSE)
   p1 = DimPlot(ax, reduction = 'umap', group.by = 'seurat_clusters', label = TRUE, repel = FALSE)
   
@@ -1351,17 +1344,19 @@ if(refine.subtypes_adultMice_FB){
   ###### Filtering the cluster 8, 9
   Quick_Filtering = FALSE
   if(Quick_Filtering){
-    ax = subset(ax, idents = c("8", "9"), invert = TRUE)
+    ax = subset(ax, idents = c("5"), invert = TRUE)
     
-    ax <- FindVariableFeatures(ax, selection.method = "vst", nfeatures = 5000)
+    ax <- FindVariableFeatures(ax, selection.method = "vst", nfeatures = 3000)
     ax <- ScaleData(ax)
     ax <- RunPCA(ax, verbose = FALSE, weight.by.var = TRUE)
     ElbowPlot(ax, ndims = 30)
+    
     ax <- RunUMAP(ax, dims = 1:20, n.neighbors = 30, min.dist = 0.1)
     
     DimPlot(ax, reduction = 'umap', group.by = 'subtype_old')
     
-    ggsave(paste0(outDir, '/Ref_neonatalMice_CM.Cui2020_noCM.Wang2020_P1_UMAP_', mcells, '_subcelltype_old_1stFiltering.pdf'), 
+    ggsave(paste0(outDir, '/Ref_neonatalMice_CM.Cui2020_noCM.Wang2020_P1_UMAP_', mcells, 
+                  '_subcelltype_old_1stFiltering.pdf'), 
            width = 10, height = 8)
     
     ax <- FindNeighbors(ax, dims = 1:20)
@@ -1414,11 +1409,10 @@ if(refine.subtypes_adultMice_FB){
     p1 + p2 + p3
     
     # stringent filtering for EC and discard cluster 1
-    ax = subset(ax, cells = colnames(ax)[which(ax$nCount_RNA >1000 & ax$nFeature_RNA > 500 & 
-                                                 ax$seurat_clusters != '4' & ax$seurat_clusters != '7' &
-                                                 ax$seurat_clusters != '8')])
+    ax = subset(ax, cells = colnames(ax)[which(ax$nCount_RNA >1000 & ax$nFeature_RNA > 500
+                                                 )])
     
-    ax <- FindVariableFeatures(ax, selection.method = "vst", nfeatures = 5000)
+    ax <- FindVariableFeatures(ax, selection.method = "vst", nfeatures = 2000)
     ax <- ScaleData(ax)
     
     ax <- RunPCA(ax, verbose = FALSE, weight.by.var = TRUE)
@@ -1429,7 +1423,8 @@ if(refine.subtypes_adultMice_FB){
     
     DimPlot(ax, reduction = 'umap', group.by = 'subtype_old')
     
-    ggsave(paste0(outDir, '/Ref_neonatalMice_CM.Cui2020_noCM.Wang2020_P1_UMAP_', mcells, '_afterFiltering_subcelltypes.pdf'), 
+    ggsave(paste0(outDir, '/Ref_neonatalMice_CM.Cui2020_noCM.Wang2020_P1_UMAP_', mcells, 
+                  '_afterFiltering_subcelltypes.pdf'), 
            width = 10, height = 8)
     
     #FeaturePlot(ax, features = c("Myh6", 'Nppa', 'Agrn'))
@@ -1437,7 +1432,7 @@ if(refine.subtypes_adultMice_FB){
     #       width = 10, height = 8)
     
     ax <- FindNeighbors(ax, dims = 1:20)
-    ax <- FindClusters(ax, verbose = FALSE, algorithm = 3, resolution = 0.3)
+    ax <- FindClusters(ax, verbose = FALSE, algorithm = 3, resolution = 1.0)
     
     p1 = DimPlot(ax, reduction = 'umap', group.by = 'seurat_clusters',  label = T, repel = TRUE)
     p0 = DimPlot(ax, reduction = 'umap', group.by = 'subtype_old',  label = T, repel = TRUE)
@@ -1450,7 +1445,7 @@ if(refine.subtypes_adultMice_FB){
     
     
     DimPlot(object = ax, reduction = 'umap', raster = T,shuffle= T, pt.size = 4, group.by = "seurat_clusters",
-            split.by = 'condition', label = TRUE, repel = TRUE, ncol = 4)
+            split.by = 'condition', label = TRUE, repel = TRUE, ncol = 2)
     
     ggsave(paste0(outDir, '/Ref_neonatalMice_CM.Cui2020_noCM.Wang2020_P1_UMAP_', mcells, 
                   '_afterFiltering_clusterPerCondition.pdf'), 
@@ -1463,17 +1458,14 @@ if(refine.subtypes_adultMice_FB){
   p0 + p1
   
   ## re-annotate
-  ax$subtype[which(!is.na(match(ax$seurat_clusters, c(7))))] = 'myoFB_injurySpec.proliferating'
-  ax$subtype[which(!is.na(match(ax$seurat_clusters, c(4))))] = 'myoFB_injurySpec.late'
-  ax$subtype[which(!is.na(match(ax$seurat_clusters, c(3))))] = 'myoFB_injurySpec'
-  ax$subtype[which(!is.na(match(ax$seurat_clusters, c(8))))] = 'myoFB_injurySpec.and.late'
+  ax$subtype[which(!is.na(match(ax$seurat_clusters, c(0))))] = 'FB4'
+  ax$subtype[which(!is.na(match(ax$seurat_clusters, c(1))))] = 'FB3'
+  ax$subtype[which(!is.na(match(ax$seurat_clusters, c(2, 6))))] = 'FB2'
+  ax$subtype[which(!is.na(match(ax$seurat_clusters, c(3, 4))))] = 'FB1'
   
-  ax$subtype[which(!is.na(match(ax$seurat_clusters, c(5))))] = 'FB2'
-  ax$subtype[which(!is.na(match(ax$seurat_clusters, c(6))))] = 'FB4_injurySpec.early'
-  #ax$subtype[which(!is.na(match(ax$seurat_clusters, c(4))))] = 'FB4_injurySpec.late'
-  ax$subtype[which(!is.na(match(ax$seurat_clusters, c(0))))] = 'FB0'
-  ax$subtype[which(!is.na(match(ax$seurat_clusters, c(1))))] = 'FB1'
-  ax$subtype[which(!is.na(match(ax$seurat_clusters, c(2))))] = 'FB2_injurySpec'
+  ax$subtype[which(!is.na(match(ax$seurat_clusters, c(5))))] = 'FB5_pro'
+  ax$subtype[which(!is.na(match(ax$seurat_clusters, c(7))))] = 'FB6_injurySpec'
+  ax$subtype[which(!is.na(match(ax$seurat_clusters, c(8))))] = 'FB7_injurySpec_pro'
   
   DimPlot(object = ax, reduction = 'umap', raster = T,shuffle= T, pt.size = 4, group.by = "subtype",
           label = TRUE, repel = TRUE)
@@ -1489,10 +1481,10 @@ if(refine.subtypes_adultMice_FB){
   aa$strigentFiltered[mm] = 'keep'
   
   saveRDS(ax, file = paste0(RdataDir, 
-                            'Ref_neonatalMice_CM.Cui2020_noCM.Wang2020_P1_', mcells, 'refinedCelltypes_20240130.rds'))
+                            'Ref_neonatalMice_CM.Cui2020_noCM.Wang2020_P1_', mcells, 'refinedCelltypes_20240202.rds'))
   
   saveRDS(aa, file = paste0(RdataDir, 
-                            'Ref_neonatalMice_CM.Cui2020_noCM.Wang2020_P1_refineSubtypes_', mcells, '_20240130.rds'))
+                            'Ref_neonatalMice_CM.Cui2020_noCM.Wang2020_P1_refineSubtypes_', mcells, '_20240202.rds'))
   
 }
 
@@ -1500,9 +1492,6 @@ if(refine.subtypes_adultMice_FB){
 ##########################################
 # immune cells
 ##########################################
-aa = readRDS(file = paste0(RdataDir, 
-                           'Ref_neonatalMice_CM.Cui2020_noCM.Wang2020_P1_refineSubtypes_', 'FB', '_20240130.rds'))
-
 DimPlot(aa, reduction = 'umap', group.by = 'celltype', label = TRUE, repel = TRUE)
 
 refine.subtypes_adultMice_immuneCells = FALSE
