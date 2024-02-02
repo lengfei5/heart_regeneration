@@ -362,9 +362,6 @@ if(Merge.adult.mice.cardiomyocyte.noncardiomyocyte){
                                 'SeuratObj_adultMiceHeart_refCombine_Forte2020.nonCM_Ren2020CM_',
                                 'cleanAnnot_logNormalize_v4.rds'))
     
-    
-    
-    
   }
   
   if(dataIntegration_method == 'Seurat_RPCA'){
@@ -498,7 +495,6 @@ if(Merge.adult.mice.cardiomyocyte.noncardiomyocyte){
 }
 
 
-
 ########################################################
 ########################################################
 # Section III: post-integration: double check the celltypes  
@@ -607,7 +603,8 @@ if(Double.check.adult.cardiomyocyte.major.celltypes.subtypes){
   ggsave(paste0(resDir, '/heatmap_markerGenes_', mcells, '_subtypes.pdf'), width = 12, height = 26)
   
   aa$subtype[match(colnames(ax), colnames(aa))] = ax$subtype
-  saveRDS(aa, file =  paste0(RdataDir, 'Seurat.obj_adultMiceHeart_week0.week2_Ren2020_seuratNormalization_umap_subtypes.rds'))
+  saveRDS(aa, file =  paste0(RdataDir,
+                             'Seurat.obj_adultMiceHeart_week0.week2_Ren2020_seuratNormalization_umap_subtypes.rds'))
   
   rm(aa)
   rm(ax)
@@ -1527,4 +1524,6 @@ DimPlot(refs, reduction = 'umap', group.by = 'subtype',raster = T,shuffle= T, pt
         label = TRUE, repel = TRUE)
 
 saveRDS(refs, file = paste0('../data/data_examples/ref_scRNAseq_adultMice_clean.v1.rds'))
+
+refs = readRDS(file = paste0('../data/data_examples/ref_scRNAseq_adultMice_clean.v1.rds'))
 

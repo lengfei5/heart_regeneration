@@ -198,7 +198,7 @@ IntegrateData_Seurat_RPCA = function(seuratObj, group.by = 'dataset', nfeatures 
 IntegrateData_runFastMNN = function(seuratObj, group.by = 'dataset', nfeatures = 2000,
                                     ndims = c(1:30),
                                     merge.order = NULL,
-                                    correct.all = FALSE,
+                                    correct.all = TRUE,
                                     reference = NULL)
 {
   # # seuratObj = aa; group.by = "condition"; ndims = c(1:30); reference = NULL;nfeatures = 2000
@@ -208,8 +208,8 @@ IntegrateData_runFastMNN = function(seuratObj, group.by = 'dataset', nfeatures =
   
   #DefaultAssay(seuratObj) = 'RNA'
   ## one error solved (see https://github.com/satijalab/seurat-wrappers/issues/126)
-  seuratObj = DietSeurat(object = seuratObj, counts = TRUE, data = TRUE, assays = 'RNA', 
-                         dimreducs = c('pca'))
+  #seuratObj = DietSeurat(object = seuratObj, counts = TRUE, data = TRUE, assays = 'RNA', 
+  #                       dimreducs = c('pca'))
   
   ## By default, batches are merged in the user-supplied order in ..., i.e., 
   ## the first batch is merged with the second batch, the third batch is merged with the combined 
@@ -219,12 +219,14 @@ IntegrateData_runFastMNN = function(seuratObj, group.by = 'dataset', nfeatures =
   if(is.null(merge.order)){
     refs.merged <- RunFastMNN(SplitObject(object = seuratObj, split.by = group.by), 
                               features = nfeatures,
+                              subset.row = NULL,
                               correct.all = correct.all)
   }else{
     refs.merged <- RunFastMNN(SplitObject(object = seuratObj, split.by = group.by), 
                               features = nfeatures,
                               merge.order = merge.order,
-                              correct.all = correct.all)
+                              subset.row = NULL,
+                              correct.all = TRUE)
     
   }
   
