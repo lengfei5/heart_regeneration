@@ -1490,46 +1490,51 @@ if(refine.subtypes_adultMice_FB){
 
 
 ##########################################
-# immune cells
+# immune cells, here mainly for macrophage
 ##########################################
 DimPlot(aa, reduction = 'umap', group.by = 'celltype', label = TRUE, repel = TRUE)
+
+mm = which(aa$subtype_old == 'SMC' | aa$subtype_old == 'Pericyte'|
+             aa$subtype_old == 'Gra' | aa$subtype_old == 'EPI'|
+             aa$subtype_old == 'T cells' | aa$subtype_old == 'B cells'| aa$subtype_old == 'DC-like')
+
+aa$subtype[mm] = aa$subtype_old[mm]
+aa$strigentFiltered[mm] = 'keep'
 
 refine.subtypes_adultMice_immuneCells = FALSE
 if(refine.subtypes_adultMice_immuneCells){
   
   mcells = 'ImmuneCells'
+  
   outDir = paste0(resDir, '/', mcells)
   if(!dir.exists(outDir)) dir.create(outDir)
   
-  ax = subset(aa, cells = colnames(aa)[which(aa$celltype == 'B'|
-                                               aa$celltype == 'GN'|
-                                               aa$celltype == 'MHCII.Mphage'|
-                                               aa$celltype == 'Mphage.MCT'|
-                                               aa$celltype == 'NK.T'|
-                                               aa$celltype == 'prolife.Mphage')])
+  ax = subset(aa, cells = colnames(aa)[which(aa$subtype_old == 'Macrophage' | aa$subtype_old == 'Monocyte')])
+  
   table(ax$celltype)
   table(ax$subtype_old)
   
-  ax$condition = factor(ax$condition, levels = c('d0', 'd1', 'd3', 'd5', 'd7', 'd14', 'd28'))
+  ax$condition = factor(ax$condition, levels = c("Sham_d1", "MI_d1", "Sham_d3", "MI_d3"))
   
   DimPlot(ax, group.by = 'subtype_old', label = TRUE, repel = TRUE, pt.size = 3)
   
-  ax <- FindVariableFeatures(ax, selection.method = "vst", nfeatures = 5000)
+  ax <- FindVariableFeatures(ax, selection.method = "vst", nfeatures = 2000)
   ax <- ScaleData(ax)
   
   ax <- RunPCA(ax, verbose = FALSE, weight.by.var = TRUE)
   ElbowPlot(ax, ndims = 30)
   
   # UMAP to visualize subtypes
-  ax <- RunUMAP(ax, dims = 1:20, n.neighbors = 30, min.dist = 0.1)
+  ax <- RunUMAP(ax, dims = 1:10, n.neighbors = 30, min.dist = 0.1)
   
   DimPlot(ax, reduction = 'umap', group.by = 'subtype_old',label = TRUE, repel = TRUE, pt.size = 1)
   
-  ggsave(paste0(outDir, '/Ref_neonatalMice_CM.Cui2020_noCM.Wang2020_P1_UMAP_', mcells, '_subcelltype_old.pdf'), 
-         width = 10, height = 8)
+  ggsave(paste0(outDir, '/Ref_neonatalMice_CM.Cui2020_noCM.Wang2020_P1_UMAP_', mcells, 
+                '_subcelltype_old.pdf'), width = 10, height = 8)
+  
   
   ax <- FindNeighbors(ax, dims = 1:20)
-  ax <- FindClusters(ax, verbose = FALSE, algorithm = 3, resolution = 0.5)
+  ax <- FindClusters(ax, verbose = FALSE, algorithm = 3, resolution = 0.3)
   
   p0 = DimPlot(ax, reduction = 'umap', group.by = 'subtype_old', label = TRUE, repel = FALSE)
   p1 = DimPlot(ax, reduction = 'umap', group.by = 'seurat_clusters', label = TRUE, repel = FALSE)
@@ -1577,18 +1582,19 @@ if(refine.subtypes_adultMice_immuneCells){
     # stringent filtering for EC and discard cluster 1
     ax = subset(ax, cells = colnames(ax)[which(ax$nCount_RNA >1000 & ax$nFeature_RNA > 500)])
     
-    ax <- FindVariableFeatures(ax, selection.method = "vst", nfeatures = 5000)
+    ax <- FindVariableFeatures(ax, selection.method = "vst", nfeatures = 2000)
     ax <- ScaleData(ax)
     
     ax <- RunPCA(ax, verbose = FALSE, weight.by.var = TRUE)
     ElbowPlot(ax, ndims = 30)
     
     # UMAP to visualize subtypes
-    ax <- RunUMAP(ax, dims = 1:20, n.neighbors = 20, min.dist = 0.1)
+    ax <- RunUMAP(ax, dims = 1:20, n.neighbors = 30, min.dist = 0.1)
     
     DimPlot(ax, reduction = 'umap', group.by = 'subtype_old', label = TRUE, repel = TRUE)
     
-    ggsave(paste0(outDir, '/Ref_neonatalMice_CM.Cui2020_noCM.Wang2020_P1_UMAP_', mcells, '_afterFiltering_subcelltypes.pdf'), 
+    ggsave(paste0(outDir, '/Ref_neonatalMice_CM.Cui2020_noCM.Wang2020_P1_UMAP_', mcells, 
+                  '_afterFiltering_subcelltypes.pdf'), 
            width = 10, height = 8)
     
     
@@ -1606,7 +1612,7 @@ if(refine.subtypes_adultMice_immuneCells){
     
     
     DimPlot(object = ax, reduction = 'umap', raster = T,shuffle= T, pt.size = 4, group.by = "seurat_clusters",
-            split.by = 'condition', label = TRUE, repel = TRUE, ncol = 4)
+            split.by = 'condition', label = TRUE, repel = TRUE, ncol = 2)
     
     ggsave(paste0(outDir, '/Ref_neonatalMice_CM.Cui2020_noCM.Wang2020_P1_UMAP_', mcells, 
                   '_afterFiltering_clusterPerCondition.pdf'), 
@@ -1619,17 +1625,11 @@ if(refine.subtypes_adultMice_immuneCells){
   p0 + p1
   
   ## re-annotate
-  ax$subtype[which(!is.na(match(ax$seurat_clusters, c(8))))] = 'NK.T'
-  ax$subtype[which(!is.na(match(ax$seurat_clusters, c(10, 11))))] = NA
-  ax$subtype[which(!is.na(match(ax$seurat_clusters, c(3))))] = 'B'
-  
-  ax$subtype[which(!is.na(match(ax$seurat_clusters, c(6))))] = 'GN_injurySpec.early'
-  ax$subtype[which(!is.na(match(ax$seurat_clusters, c(9))))] = 'Mphage.Argl_injurySpec'
-  ax$subtype[which(!is.na(match(ax$seurat_clusters, c(0, 12))))] = 'MCT.Chil3_injurySpec'
-  ax$subtype[which(!is.na(match(ax$seurat_clusters, c(7, 13))))] = 'MCT.DC'
-  ax$subtype[which(!is.na(match(ax$seurat_clusters, c(5))))] = 'Mphage_proliferating'
-  ax$subtype[which(!is.na(match(ax$seurat_clusters, c(4))))] = 'Mphage.Trem2_resident'
-  ax$subtype[which(!is.na(match(ax$seurat_clusters, c(1, 2))))] = 'Mphage.Trem2_injurySpec'
+  ax$subtype[which(!is.na(match(ax$seurat_clusters, c(2))))] = 'Monocyte'
+  ax$subtype[which(!is.na(match(ax$seurat_clusters, c(0))))] = "Macrophage_injurySpec"
+  ax$subtype[which(!is.na(match(ax$seurat_clusters, c(1))))] = 'Macrophage_d3'
+  ax$subtype[which(!is.na(match(ax$seurat_clusters, c(3))))] = 'Macrophage_pro'
+  ax$subtype[which(!is.na(match(ax$seurat_clusters, c(4))))] = 'Macrophage_injurySpec_d3'
   
   DimPlot(object = ax, reduction = 'umap', raster = T,shuffle= T, pt.size = 4, group.by = "subtype",
           label = TRUE, repel = TRUE)
@@ -1646,37 +1646,45 @@ if(refine.subtypes_adultMice_immuneCells){
   aa$subtype[mm] = ax$subtype
   aa$strigentFiltered[mm] = 'keep'
   
+  mm = which(aa$subtype_old == 'Pericyte')
+  aa$subtype[mm] = aa$subtype_old[mm]
+  aa$strigentFiltered[mm] = 'keep'
+  
   saveRDS(ax, file = paste0(RdataDir, 
-                            'Ref_neonatalMice_CM.Cui2020_noCM.Wang2020_P1_', mcells, 'refinedCelltypes_20240130.rds'))
+                            'Ref_neonatalMice_CM.Cui2020_noCM.Wang2020_P1_', mcells, 
+                            'refinedCelltypes_20240202.rds'))
   
   saveRDS(aa, file = paste0(RdataDir, 
-                            'Ref_neonatalMice_CM.Cui2020_noCM.Wang2020_P1_refineSubtypes_', mcells, '_20240130.rds'))
+                            'Ref_neonatalMice_CM.Cui2020_noCM.Wang2020_P1_refineSubtypes_', mcells, 
+                            '_20240202.rds'))
   
 }
+
 
 ##########################################
 # update the reference 
 ##########################################
 refs = readRDS(file = paste0(RdataDir, 
                              'Ref_neonatalMice_CM.Cui2020_noCM.Wang2020_P1_refineSubtypes_', "ImmuneCells",
-                             '_20240130.rds'))
+                             '_20240202.rds'))
 
 DimPlot(refs, reduction = 'umap', group.by = 'celltype')
 DimPlot(refs, reduction = 'umap', group.by = 'subtype')
 
 refs = subset(refs, cells = colnames(refs)[which(!is.na(refs$subtype))])
 
+DefaultAssay(refs) = 'mnn.reconstructed'
 refs <- FindVariableFeatures(refs, selection.method = "vst", nfeatures = 5000)
 
 refs <- ScaleData(refs, verbose = FALSE)
-refs <- RunPCA(refs, npcs = 30, verbose = FALSE)
+refs <- RunPCA(refs, npcs = 50, verbose = FALSE)
 
 ElbowPlot(refs, ndims = 30)
 
 #refs <- FindNeighbors(refs, reduction = "pca", dims = 1:20)
 #refs <- FindClusters(refs, resolution = 0.2)
 
-refs <- RunUMAP(refs, reduction = "pca", dims = 1:20, n.neighbors = 30, min.dist = 0.1) 
+refs <- RunUMAP(refs, reduction = "pca", dims = 1:20, n.neighbors = 30, min.dist = 0.1)
 
 DimPlot(refs, reduction = 'umap', group.by = 'celltype', raster = T,shuffle= T, pt.size = 2, 
         label = TRUE, repel = TRUE)

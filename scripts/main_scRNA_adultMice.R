@@ -1469,5 +1469,6 @@ if(Test_dataIntegration_fastMNN){
   ggsave(paste0(outDir, '/Forte2020_Ren2020_Integration_fastMNN.pdf'), 
          width = 24, height = 10)
   
+  
 }
 
