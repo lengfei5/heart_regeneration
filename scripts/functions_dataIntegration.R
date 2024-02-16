@@ -698,6 +698,8 @@ calculate_similarity_query_ref = function(query,
 }
 
 
+
+
 ##########################################
 # two test functions
 # - test to combine the adult heart datasets without integration

@@ -1665,8 +1665,8 @@ if(refine.subtypes_adultMice_immuneCells){
 # update the reference 
 ##########################################
 refs = readRDS(file = paste0(RdataDir, 
-                             'Ref_neonatalMice_CM.Cui2020_noCM.Wang2020_P1_refineSubtypes_', "ImmuneCells",
-                             '_20240202.rds'))
+                             'Ref_neonatalMice_CM.Cui2020_noCM.Wang2020_P1_refineSubtypes_', 
+                             "ImmuneCells", '_20240202.rds'))
 
 DimPlot(refs, reduction = 'umap', group.by = 'celltype')
 DimPlot(refs, reduction = 'umap', group.by = 'subtype')
@@ -1674,6 +1674,9 @@ DimPlot(refs, reduction = 'umap', group.by = 'subtype')
 refs = subset(refs, cells = colnames(refs)[which(!is.na(refs$subtype))])
 
 DefaultAssay(refs) = 'mnn.reconstructed'
+refs@assays$mnn.reconstructed@counts = refs@assays$RNA@counts
+refs[['RNA']] = NULL ## save mnn.reconstructed 
+
 refs <- FindVariableFeatures(refs, selection.method = "vst", nfeatures = 5000)
 
 refs <- ScaleData(refs, verbose = FALSE)
@@ -1692,7 +1695,5 @@ DimPlot(refs, reduction = 'umap', group.by = 'celltype', raster = T,shuffle= T, 
 DimPlot(refs, reduction = 'umap', group.by = 'subtype',raster = T,shuffle= T, pt.size = 2, 
         label = TRUE, repel = TRUE)
 
-saveRDS(refs, file = paste0('../data/data_examples/ref_scRNAseq_adultMice_clean.v1.rds'))
-
-
+saveRDS(refs, file = paste0('../data/data_examples/ref_scRNAseq_neonatalMice_clean.v1.rds'))
 
