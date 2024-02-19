@@ -697,8 +697,56 @@ calculate_similarity_query_ref = function(query,
   
 }
 
-
-
+##########################################
+# test the neighborhood-based correlation from 
+# https://github.com/MarioniLab/RabbitGastrulation2022/blob/master/8-compare_species/compare_nhoods.ipynb
+##########################################
+calculate_neighbourhood_based_correlation = function()
+{
+  # Load packages 
+  suppressPackageStartupMessages(library(scrabbitr)) 
+  suppressPackageStartupMessages(library(SingleCellExperiment)) 
+  suppressPackageStartupMessages(library(miloR)) 
+  suppressPackageStartupMessages(library(DelayedArray)) 
+  suppressPackageStartupMessages(library(Matrix)) 
+  suppressPackageStartupMessages(library(ggraph)) 
+  suppressPackageStartupMessages(library(igraph)) 
+  suppressPackageStartupMessages(library(viridis)) 
+  suppressPackageStartupMessages(library(gridExtra)) 
+  suppressPackageStartupMessages(library(RColorBrewer)) 
+  suppressPackageStartupMessages(library(jsonlite)) 
+  suppressPackageStartupMessages(library(ggrastr)) 
+  suppressPackageStartupMessages(library(ggridges)) 
+  suppressPackageStartupMessages(library(ggalluvial)) 
+  suppressPackageStartupMessages(library(ggrepel)) 
+  # TODO: Remove source("../data-in/rabbit/load_rabbit.R") source("../scrabbitr/R/plot_utils.R") #temp   
+  
+  # Load rabbit data 
+  r_data <- readRDS(file = '../data/RabbitGastrulation2022/r_sce.rds')
+  r_data 
+  
+  # Load mouse data
+  m_data <- readRDS("../data/RabbitGastrulation2022/embryo_sce.rds")
+  m_data
+  
+  # TODO: Remove
+  m_pcs <- read.csv("../data/RabbitGastrulation2022/pca_batch_corrected.csv")
+  rownames(m_pcs) = m_pcs$cell
+  m_pcs = m_pcs[, -1]
+  reducedDim(m_data,"PCA") <- as.matrix(m_pcs)
+  
+  #m_meta <- read.csv("../data/RabbitGastrulation2022/metadata_cells.csv")
+  #m_datacelltype.clustering
+  
+  #reducedDim(m_data,"UMAP") <- m_meta2[,c("BBKNN_UMAP1","BBKNN_UMAP2")]
+  m_genes <- read.csv("../data/RabbitGastrulation2022/metadata_genes.csv")
+  
+  # Load rabbit-mouse one-to-one orthologs
+  rm_orthologs <- read.table("../data-in/orthologs/mmusculus.tsv",sep="\t")
+  rm_orthologs[1:5,]
+  
+  
+}
 
 ##########################################
 # two test functions
