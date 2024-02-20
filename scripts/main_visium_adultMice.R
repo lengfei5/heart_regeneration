@@ -264,6 +264,64 @@ if(QCs.with.marker.genes){
   
 }
 
+##########################################
+# cell filtering and gene filtering (ribosome and mt genes)
+##########################################
+Filtering.cells.genes = FALSE
+if(Filtering.cells.genes){
+  
+  load(file = paste0("../results/visium_adultMice_R11934_20210827/Rdata/", 
+                     'seuratObject_design_variableGenes_mouse_adult_umap.clustered.Rdata'))
+  
+  Idents(st) = factor(st$condition, levels = c('adult.day1', 'adult.day4', 'adult.day7', 'adult.day14'))
+  
+  st[["percent.mt"]] <- PercentageFeatureSet(st, pattern = "^mt-")
+  
+  # Visualize QC metrics as a violin plot
+  VlnPlot(st, features = c("nCount_Spatial", "nFeature_Spatial", "percent.mt"), ncol = 3)
+  
+  
+  FeatureScatter(st, feature1 = "nCount_Spatial", feature2 = "nFeature_Spatial")
+  
+  #plot1 <- VlnPlot(st, features = "nCount_Spatial", pt.size = 0.1) + NoLegend()
+  #plot2 <- SpatialFeaturePlot(aa, features = "nCount_Spatial") + theme(legend.position = "right")
+  #wrap_plots(plot1, plot2)
+  
+  cells =  colnames(st)[which(st$nCount_Spatial > 500 & st$nFeature_Spatial > 300)]
+  ggs = rownames(st)[grep('^Rp[sl]|^mt-', rownames(st), invert = TRUE)]
+  
+  st = subset(st, cells = cells, features = ggs)
+  
+  cat(ncol(st), ' spots after cell filtering \n')
+  cat(nrow(st), ' genes left after MT and Ribo filtering \n')
+  
+  ## redo the SCT nomralization 
+  st <- SCTransform(st, assay = "Spatial", verbose = FALSE, variable.features.n = 3000, 
+                    return.only.var.genes = FALSE, 
+                    min_cells=5 ) 
+  
+  st <- RunPCA(st, verbose = FALSE, weight.by.var = TRUE)
+  ElbowPlot(st)
+  
+  st <- FindNeighbors(st, dims = 1:10)
+  st <- FindClusters(st, verbose = FALSE, algorithm = 3, resolution = 0.5)
+  st <- RunUMAP(st, dims = 1:10, n.neighbors = 30, min.dist = 0.1)
+  
+  DimPlot(st, reduction = "umap", group.by = c("ident"))
+  DimPlot(st, reduction = "umap", group.by = c("condition"))
+  
+  # check cell cycle scores and phase assignments
+  s.genes <- firstup(cc.genes.updated.2019$s.genes)
+  g2m.genes <- firstup(cc.genes.updated.2019$g2m.genes)
+  st <- CellCycleScoring(st, s.features = s.genes, g2m.features = g2m.genes, set.ident = FALSE)
+  
+  
+  saveRDS(st, file = paste0("../results/visium_adultMice_R11934_20210827/Rdata/",
+                            'seuratObject_mouse_adult_cell.gene.filtered_umap.clustered.rds'))
+  
+}
+
+
 ########################################################
 ########################################################
 # Section II : cell type deconvolution for each time point 
@@ -272,8 +330,8 @@ if(QCs.with.marker.genes){
 ########################################################
 source('functions_Visium.R')
 
-load(file = paste0("../results/visium_adultMice_R11934_20210827/Rdata/", 
-                   'seuratObject_design_variableGenes_mouse_adult_umap.clustered.Rdata'))
+st = readRDS(file = paste0("../results/visium_adultMice_R11934_20210827/Rdata/",
+                           'seuratObject_mouse_adult_cell.gene.filtered_umap.clustered.rds'))
 
 refs = readRDS(file = paste0('../data/data_examples/ref_scRNAseq_adultMice_clean.v1.rds'))
 
@@ -412,7 +470,6 @@ if(Spatial_variableGenes_analysis){
   
 }
 
-
 ########################################################
 ########################################################
 # Section IV : cell-to-cell communication analysis
@@ -423,24 +480,25 @@ if(Spatial_variableGenes_analysis){
 ########################################################
 ########################################################
 source('functions_Visium.R')
-load(file = paste0(RdataDir, 'seuratObject_design_variableGenes_', species, 
-                   '_umap.clustered.Rdata'))
+st = readRDS(file = paste0("../results/visium_adultMice_R11934_20210827/Rdata/",
+                           'seuratObject_mouse_adult_cell.gene.filtered_umap.clustered.rds'))
 
-st$condition = factor(st$condition, levels = design$condition)
+cc = c('adult.day1', 'adult.day4', 'adult.day7', 'adult.day14')
+st$condition = factor(st$condition, levels = cc)
 
 cat('visium conditions :\n')
 print(table(st$condition))
-cc = design$condition
+
 
 VlnPlot(st, features = 'nFeature_Spatial', group.by = 'condition') +
-  geom_hline(yintercept = c(200, 500, 1000, 2000))
+  geom_hline(yintercept = c(300, 500, 1000, 2000))
 
-ggsave(paste0(resDir, '/QCs_nFeatures_mergedReseq.pdf'), width = 12, height = 8)
+ggsave(paste0(resDir, '/QCs_nFeatures_ST_perCondition_afterFiltering.pdf'), width = 12, height = 8)
 
 VlnPlot(st, features = 'nFeature_SCT', group.by = 'condition') +
-  geom_hline(yintercept = c(200, 500, 1000, 2000))
+  geom_hline(yintercept = c(500, 1000, 2000))
 
-ggsave(paste0(resDir, '/QCs_nFeatures_SCT_mergedReseq.pdf'), width = 12, height = 8)
+ggsave(paste0(resDir, '/QCs_nFeatures_ST_perCondition_afterFiltering.pdf'), width = 12, height = 8)
 
 
 ##########################################
@@ -459,8 +517,7 @@ if(Import.manual.spatial.domains){
   #manual_selection_spots_image_Spata
   for(n in 1:length(cc))
   {
-    # n = 2
-    
+    # n = 1
     slice = cc[n]
     cat('slice -- ', slice, '\n')
     
@@ -478,22 +535,25 @@ if(Import.manual.spatial.domains){
     head(mm)
     cat(length(which(is.na(mm))), ' cells with no mapping out of ', length(mm),  ' \n ')
     
-    st$segmentation[kk[mm]] = sdomain$Anno
+    st$segmentation[kk[mm[which(!is.na(mm))]]] = sdomain$Anno[which(!is.na(mm))]
     
     rm(sdomain)
     
   }
   
+  st$segmentation = gsub('Mixed Inj_BZ', 'Mixed_Inj_BZ', st$segmentation)
+  st$segmentation = gsub('Proximal BZ', 'Proximal_BZ', st$segmentation)
+  st$segmentation = gsub('Remote_3_septum', 'Remote_3', st$segmentation)
+  
   st$segmentation = as.factor(st$segmentation)
   Idents(st) = as.factor(st$segmentation)
   SpatialDimPlot(st)
   
-  ggsave(paste0(resDir, '/Manual_segmentation_spata2_Elad.pdf'), width = 16, height = 6)
+  ggsave(paste0(resDir, '/Manual_segmentation_spata2_Elad_v2.pdf'), width = 16, height = 6)
   
-  st$segmentation = gsub('Mixed Inj_BZ', 'Mixed_Inj_BZ', st$segmentation)
-  st$segmentation = gsub('Proximal BZ', 'Proximal_BZ', st$segmentation)
   
-  save(st, design, file = paste0(RdataDir, 'seuratObject_design_variableGenes_umap.clustered_manualSegmentation', 
+  save(st, design, file = paste0(RdataDir,
+                                 'seuratObject_mouse_adult_cell.gene.filtered_umap.clustered_manualSegmentation', 
                                  species, '.Rdata'))
   
   
@@ -507,67 +567,44 @@ if(Import.manual.spatial.domains){
 # Step 2): cell neighborhood analysis
 ##########################################
 ##########################################
-# load ST data with additional region annotations
-load(file = paste0(RdataDir, 'seuratObject_design_variableGenes_umap.clustered_manualSegmentation', 
-                   species, '.Rdata'))
-
-st$segmentation = gsub('Distal_BZ', 'BZ', st$segmentation)
-st$segmentation = gsub('Proximal_BZ', 'BZ', st$segmentation)
-st$segmentation = gsub('Remote_1|Remote_2|Remote_3|Remote_3_septum', 'Remote', st$segmentation)
-
-table(st$segmentation, st$condition)
-
-## snRNA-seq reference  
-refs = readRDS(file = paste0('../data/data_examples/ref_scRNAseq.rds'))
-
-jj = which(refs$dataset == 'Ren2020')
-refs$timepoints[jj] = refs$condition[jj]
-refs$condition = refs$timepoints
-refs$subtypes = refs$subtype
-
-table(refs$subtypes)
-length(table(refs$subtypes))
-
-refs$subtypes = as.factor(refs$subtypes) 
-
-
-RCTD_out = paste0('../results/visium_adultMice_R11934_20210827/celltype_deconvolution/', 
-                  'RCTD_26Subtype_ref_v0.1')
-
-out_misty = paste0(resDir, '/neighborhood_test/Run_misty_v0.1/')
-
-
 Run_Neighborhood_Enrichment_Analysis = FALSE
 if(Run_Neighborhood_Enrichment_Analysis){
   
+  # load ST data with additional region annotations
+  load(file = paste0(RdataDir,
+                     'seuratObject_mouse_adult_cell.gene.filtered_umap.clustered_manualSegmentation', 
+                     species, '.Rdata'))
+  
+  st$segmentation = gsub('Distal_BZ', 'BZ', st$segmentation)
+  st$segmentation = gsub('Proximal_BZ', 'BZ', st$segmentation)
+  st$segmentation = gsub('Remote_1|Remote_2|Remote_3|Remote_3_septum', 'Remote', st$segmentation)
+  st$segmentation = as.factor(st$segmentation)
+  
+  table(st$segmentation, st$condition)
+  
+  Idents(st) = as.factor(st$segmentation)
+  SpatialDimPlot(st)
+  
+  ## snRNA-seq reference  
+  refs = readRDS(file = paste0('../data/data_examples/ref_scRNAseq_adultMice_clean.v1.rds'))
+  
+  jj = which(refs$dataset == 'Ren2020')
+  refs$timepoints[jj] = refs$condition[jj]
+  refs$condition = refs$timepoints
+  refs$subtypes = refs$subtype
+  
+  table(refs$subtypes)
+  length(table(refs$subtypes))
+  
+  refs$subtypes = as.factor(refs$subtypes) 
+  
+  RCTD_out = paste0(resDir, '/celltype_deconvolution/', 
+                    'RCTD_32Subtype_ref_v1.2')
+  
+  out_misty = paste0(resDir, '/neighborhood_test/Run_misty_1.0/')
+  
+  
   levels(refs$subtypes)
-  
-  # condition-specific subtypes selected
-  #condSpec_celltypes = readxl::read_xlsx("../data/neighbourhood_analysis_list_short.xlsx")
-  #condSpec_celltypes = as.data.frame(condSpec_celltypes)
-  
-  # condSpec_celltypes = list(d1 = c('EC', "EC_CEMIP", "EC_LHX6", 'EC_NOS3', "EC_WNT4", 'EC_IS_IARS1',
-  #                                  "FB_TNXB",'FB_IS_TFPI2',
-  #                                  'Mo.Macs_SNX22', "Neu_DYSF",
-  #                                  "CM_Cav3.1", "CM_Robo2", 'CM_IS',
-  #                                  "Megakeryocytes","RBC"),
-  #                           d4 = c('EC', "EC_CEMIP", "EC_LHX6", 'EC_NOS3', "EC_WNT4", 'EC_IS_IARS1',
-  #                                  "EC_IS_LOX",
-  #                                  "FB_PKD1", "FB_TNXB",
-  #                                  "Mo.Macs_resident",  "Mo.Macs_FAXDC2", 'Mo.Macs_SNX22', 'Neu_DYSF',
-  #                                  "CM_Cav3.1", "CM_Robo2", 'CM_IS',  'CM_Prol_IS',
-  #                                  "Megakeryocytes", 'RBC'),
-  #                           d7 = c('EC', "EC_CEMIP", "EC_LHX6", 'EC_NOS3', "EC_WNT4", "EC_IS_LOX",
-  #                                  "FB_PKD1", "FB_TNXB", "FB_VWA2",
-  #                                  "Mo.Macs_resident", "Mo.Macs_FAXDC2", 'Neu_DYSF',
-  #                                  "CM_Robo2", "CM_Cav3.1",  'CM_IS',  'CM_Prol_IS',
-  #                                  "Megakeryocytes", 'RBC'),
-  #                           d14 = c('EC', "EC_CEMIP", "EC_LHX6", 'EC_NOS3', "EC_WNT4", "EC_IS_LOX",
-  #                                   "FB_PKD1", "FB_TNXB", "FB_VWA2",
-  #                                   "Mo.Macs_resident", 'Neu_DYSF',
-  #                                   "CM_Robo2", "CM_Cav3.1",  'CM_IS',
-  #                                   "Megakeryocytes", 'RBC')
-  # )
   
   source('functions_Visium.R')
   run_misty_colocalization_analysis(st, 
@@ -585,7 +622,7 @@ if(Run_Neighborhood_Enrichment_Analysis){
 # time-specifc and space-specific niches for nichenet
 ########################################################
 # Define a list of cell type for each time point, 
-# either manual defined 
+# either manual defined
 # or from neighborhood enrichment analysis
 Define_manually_celltype_pairs = FALSE
 if(Define_manually_celltype_pairs){

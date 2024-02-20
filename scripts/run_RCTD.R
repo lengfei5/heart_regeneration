@@ -41,10 +41,11 @@ if(Run_RCTD_adultMice){
   
   mem_used()
   species = 'mouse_adult'
+  st = readRDS(file = paste0("../results/visium_adultMice_R11934_20210827/Rdata/",
+                             'seuratObject_mouse_adult_cell.gene.filtered_umap.clustered.rds'))
   
-  load(file = paste0("../results/visium_adultMice_R11934_20210827/Rdata/", 
-                     'seuratObject_design_variableGenes_mouse_adult_umap.clustered.Rdata'))
-  
+  #load(file = paste0("../results/visium_adultMice_R11934_20210827/Rdata/", 
+  #                   'seuratObject_design_variableGenes_mouse_adult_umap.clustered.Rdata'))
   refs = readRDS(file = paste0('../data/data_examples/ref_scRNAseq_adultMice_clean.v1.rds'))
   
   #jj = which(refs$dataset == 'Ren2020')
@@ -83,7 +84,7 @@ if(Run_RCTD_adultMice){
   condition.specific.ref = FALSE
   
   outDir = paste0(resDir, '/celltype_deconvolution')
-  RCTD_out = paste0(outDir, '/RCTD_', length(table(refs$celltype_toUse)), 'Subtype_ref_v1.0')
+  RCTD_out = paste0(outDir, '/RCTD_', length(table(refs$celltype_toUse)), 'Subtype_ref_v1.2')
   
   max_cores = 16
   
