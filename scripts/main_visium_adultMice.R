@@ -621,53 +621,13 @@ if(Run_Neighborhood_Enrichment_Analysis){
 # LIANA and NicheNet
 # time-specifc and space-specific niches for nichenet
 ########################################################
-# Define a list of cell type for each time point, 
-# either manual defined
-# or from neighborhood enrichment analysis
-Define_manually_celltype_pairs = FALSE
-if(Define_manually_celltype_pairs){
-  timepoint_specific = TRUE
-  celltypes_BZ_timeSpecific = list(day1 = c('EC', 'EC_NOS3', 'EC_IS_IARS1', 'FB_IS_TFPI2', 'Mo.Macs_SNX22',
-                                            'Neu_IL1R1',
-                                            'CM_IS', "RBC"),
-                                   day4 = c('EC_IS_LOX', 'EC_IS_Prol', 'Mo.Macs_SNX22', 'Neu_DYSF', 'CM_IS',
-                                            'CM_Prol_IS', 'RBC'),
-                                   day7 = c('EC_IS_LOX', 'EC_IS_Prol', 'Mo.Macs_FAXDC2', 'Neu_DYSF', 'Neu_IL1R1',
-                                            'CM_IS',
-                                            'CM_Prol_IS', 'RBC'),
-                                   day14 = c('EC_IS_LOX', 'EC_IS_Prol', 'FB_PKD1', 'Neu_DYSF', 'CM_IS', 'Megakeryocytes',
-                                             'RBC')
-  )
-  celltypes_RZ_timeSpecific = list(day1 = c('EC', 'EC_NOS3', 'FB_PKD1', 'CM_Robo2'),
-                                   day4 = c('EC', 'EC_NOS3', 'FB_PKD1', 'CM_Robo2'),
-                                   day7 = c('EC', 'EC_NOS3', 'FB_PKD1', 'CM_Robo2'),
-                                   day14 = c('EC', 'EC_NOS3', 'FB_PKD1', 'CM_Robo2')
-  )
-  receivers_BZ_timeSpecific = list(day1 = c("CM_IS"),
-                                   day4 = c('CM_Prol_IS', "CM_IS"),
-                                   day7 = c('CM_Prol_IS', "CM_IS"),
-                                   day14 = c('CM_Prol_IS', "CM_IS")
-  )
-  
-  receivers_RZ_timeSpecific = list(day1 = c("CM_Robo2"),
-                                   day4 = c("CM_Robo2"),
-                                   day7 = c("CM_Robo2"),
-                                   day14 = c("CM_Robo2")
-  )
-  
-}
-
-##########################################
-# run LIANA 
-##########################################
 # set parameter for ligand-receptor analysis
-outDir_liana = paste0(resDir, '/Ligand_Receptor_analysis/LIANA_v0.5')
+misty_Dir = paste0(out_misty, 'Plots_RCTD_density/')
+misty_cutoff = 1
+
+outDir_liana = paste0(resDir, '/LR_pairs/LIANA_v0.5_mistyCutoff_', misty_cutoff)
+
 if(!dir.exists(outDir_liana)) system(paste0('mkdir -p ', outDir_liana))
-
-out_misty = paste0("../results/visium_adultMice_R11934_20210827/neighborhood_test/",
-                   'Run_misty_v0.1/Plots_RCTD_density/')
-
-misty_cutoff = 0.5
 
 # run LIANA day by day
 timepoint_specific = TRUE
@@ -675,9 +635,9 @@ timepoint_specific = TRUE
 times_slice = levels(st$condition)
 #times_slice = c('d1', 'd7', 'd14')
 
-refs$celltypes = refs$subtype
+refs$celltypes = gsub('_', '.', refs$subtype)
 
-subtypes = unique(refs$subtype)
+subtypes = unique(refs$celltypes)
 
 for(n in 1:length(times_slice))
 {
@@ -690,8 +650,8 @@ for(n in 1:length(times_slice))
   outDir = gsub(' ', '', outDir)
   
   ## select the interacting subtype pairs  
-  intra = read.csv2(paste0(out_misty, time, '_all_summary_table_intra.csv'), row.names = 1)
-  juxta = read.csv2(paste0(out_misty, time, '_all_summary_table_juxta5.csv'), row.names = 1)
+  intra = read.csv2(paste0(misty_Dir, time, '_all_summary_table_intra.csv'), row.names = 1)
+  juxta = read.csv2(paste0(misty_Dir, time, '_all_summary_table_juxta5.csv'), row.names = 1)
   
   intra = intra > misty_cutoff
   juxta = juxta > misty_cutoff
@@ -743,34 +703,34 @@ for(n in 1:length(times_slice))
 # diff Nichenet for ligand-receptor analysis
 # original code from https://github.com/saeyslab/nichenetr/blob/master/vignettes/seurat_steps.md
 ########################################################
-Run_DiffNicheNet = FALSE
-if(Run_DiffNicheNet){
-  outDir_NicheNet = paste0(resDir, '/Ligand_Receptor_analysis/DiffNicheNet_v5.1_allpairs_intraOnly')
-  
-  for(n in 1:length(celltypes_BZ_timeSpecific))
-  {
-    # n = 2
-    source('functions_cccInference.R')
-    time = names(celltypes_BZ_timeSpecific)[n]
-    cat(' run DiffNicheNet for time -- ', time, '\n')
-    outDir = paste(outDir_NicheNet, '/', time, collapse = '')
-    outDir = gsub(' ', '', outDir)
-    
-    system(paste0('mkdir -p ', outDir))
-    
-    source('functions_cccInference.R')
-    
-    run_Diff_NicheNet(refs = refs, 
-                      timepoint_specific = TRUE,
-                      include_autocrine = TRUE,
-                      celltypes_BZ_specificDay = celltypes_BZ_timeSpecific[[n]],
-                      celltypes_RZ_specificDay = celltypes_RZ_timeSpecific[[n]],
-                      outDir = outDir
-    )
-    
-    # extract_tables_from_res_Diff_NicheNet(outDir)
-    
-  }
-  
-}
+# Run_DiffNicheNet = FALSE
+# if(Run_DiffNicheNet){
+#   outDir_NicheNet = paste0(resDir, '/Ligand_Receptor_analysis/DiffNicheNet_v5.1_allpairs_intraOnly')
+#   
+#   for(n in 1:length(celltypes_BZ_timeSpecific))
+#   {
+#     # n = 2
+#     source('functions_cccInference.R')
+#     time = names(celltypes_BZ_timeSpecific)[n]
+#     cat(' run DiffNicheNet for time -- ', time, '\n')
+#     outDir = paste(outDir_NicheNet, '/', time, collapse = '')
+#     outDir = gsub(' ', '', outDir)
+#     
+#     system(paste0('mkdir -p ', outDir))
+#     
+#     source('functions_cccInference.R')
+#     
+#     run_Diff_NicheNet(refs = refs, 
+#                       timepoint_specific = TRUE,
+#                       include_autocrine = TRUE,
+#                       celltypes_BZ_specificDay = celltypes_BZ_timeSpecific[[n]],
+#                       celltypes_RZ_specificDay = celltypes_RZ_timeSpecific[[n]],
+#                       outDir = outDir
+#     )
+#     
+#     # extract_tables_from_res_Diff_NicheNet(outDir)
+#     
+#   }
+#   
+# }
 
