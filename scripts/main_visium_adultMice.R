@@ -603,8 +603,8 @@ if(Run_Neighborhood_Enrichment_Analysis){
   
   out_misty = paste0(resDir, '/neighborhood_test/Run_misty_1.0/')
   
-  
   levels(refs$subtypes)
+  
   
   source('functions_Visium.R')
   run_misty_colocalization_analysis(st, 
