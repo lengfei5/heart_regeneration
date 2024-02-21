@@ -869,7 +869,8 @@ if(Test_DataIntegration){
   outDir = paste0(resDir, '/CM_Cui2020_noCM_Wang2020_P1_merged/')
   if(!dir.exists(outDir)) dir.create(outDir)
   
-  integration_methods = c('noDataIntegration',  'fastMNN')
+  integration_methods = c('noDataIntegration',  
+                          'fastMNN')
   
   for(method in integration_methods)
   {
