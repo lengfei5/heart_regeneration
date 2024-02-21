@@ -348,6 +348,7 @@ ggsave(filename = paste0(resDir, '/UMAP_scRNAseq_refrence_dataset_timepoints_cel
 
 Use_fineGrained_subtypes = FALSE
 if(Use_fineGrained_subtypes){
+  
   refs$celltype_toUse = as.character(refs$subtype)
   length(table(refs$celltype_toUse))
   table(refs$celltype_toUse)

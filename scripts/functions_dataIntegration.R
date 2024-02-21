@@ -272,6 +272,7 @@ RunFastMNN_fixed <- function (object.list,
 IntegrateData_runFastMNN = function(seuratObj, group.by = 'dataset', nfeatures = 2000,
                                     ndims = c(1:30),
                                     merge.order = NULL,
+                                    cos.norm = TRUE,
                                     correct.all = TRUE,
                                     reference = NULL)
 {
@@ -293,20 +294,21 @@ IntegrateData_runFastMNN = function(seuratObj, group.by = 'dataset', nfeatures =
   ## first-second batch, the fourth batch is merged with the combined first-second-third batch and so on. 
   ## We refer to this approach as a progressive merge. When batch is supplied for a single object in ..., 
   ## the ordering of batches in a progressive merge is determined by the ordering of factor levels in batch.
-  if(is.null(merge.order)){
-    refs.merged <- RunFastMNN_fixed(SplitObject(object = seuratObj, split.by = group.by), 
-                              features = nfeatures,
-                              correct.all = correct.all)
-    #DefaultAssay(refs.merged) = 'mnn.reconstructed'
-    
-  }else{
-    refs.merged <- RunFastMNN_fixed(SplitObject(object = seuratObj, split.by = group.by), 
-                              features = nfeatures,
-                              merge.order = merge.order,
-                              correct.all = correct.all)
-    
-  }
+  cat(' used the SeuratWrappers RunFastMNN \n')
+  refs.merged <- SeuratWrappers::RunFastMNN(SplitObject(object = seuratObj, split.by = group.by), 
+                                            features = nfeatures,
+                                            merge.order = merge.order,
+                                            correct.all = correct.all, 
+                                            cos.norm = TRUE)
   
+  # if(correct.all){
+  #   cat(' used the modified version of RunFastMNN \n')
+  #   refs.merged <- RunFastMNN_fixed(SplitObject(object = seuratObj, split.by = group.by), 
+  #                                   features = nfeatures,
+  #                                   merge.order = merge.order,
+  #                                   correct.all = correct.all, 
+  #                                   cos.norm = FALSE)
+  # }
   
   refs.merged <- RunUMAP(refs.merged, reduction = "mnn", dims = 1:30)
   

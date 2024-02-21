@@ -889,6 +889,7 @@ if(Test_DataIntegration){
     }
     
     if(method == 'fastMNN'){
+      # 
       source('functions_dataIntegration.R')
       ref.combined = IntegrateData_runFastMNN(aa, group.by = 'batch', 
                                               nfeatures = 3000,
