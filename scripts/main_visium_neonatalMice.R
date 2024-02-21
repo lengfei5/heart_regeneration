@@ -270,7 +270,130 @@ dev.off()
 # and cell type deconvolution
 ########################################################
 ########################################################
+##########################################
+# cell filtering and gene filtering (ribosome and mt genes)
+##########################################
+Filtering.cells.genes = FALSE
+if(Filtering.cells.genes){
+  load(file = paste0(RdataDir, 'seuratObject_cell.gene.filtering_design_variableGenes_', 
+                     species, '.Rdata'))
+  table(st$condition)
+  
+  Idents(st) = factor(st$condition, 
+                      levels = c("neonatal.day1", "neonatal.day4", "neonatal.day7", "neonatal.day14"))
+  
+  st[["percent.mt"]] <- PercentageFeatureSet(st, pattern = "^mt-")
+  
+  # Visualize QC metrics as a violin plot
+  VlnPlot(st, features = c("nCount_Spatial", "nFeature_Spatial", "percent.mt"), ncol = 3)
+  
+  cells =  colnames(st)[which(st$nCount_Spatial > 500 & st$nFeature_Spatial > 300)]
+  ggs = rownames(st)[grep('^Rp[sl]|^mt-', rownames(st), invert = TRUE)]
+  
+  st = subset(st, cells = cells, features = ggs)
+  
+  cat(ncol(st), ' spots after cell filtering \n')
+  cat(nrow(st), ' genes left after MT and Ribo filtering \n')
+  
+  ## redo the SCT nomralization 
+  st <- SCTransform(st, assay = "Spatial", verbose = FALSE, variable.features.n = 3000, 
+                    return.only.var.genes = FALSE, 
+                    min_cells = 5
+                    ) 
+  
+  st <- RunPCA(st, verbose = FALSE, weight.by.var = TRUE)
+  ElbowPlot(st)
+  
+  st <- FindNeighbors(st, dims = 1:10)
+  st <- FindClusters(st, verbose = FALSE, algorithm = 3, resolution = 0.5)
+  st <- RunUMAP(st, dims = 1:10, n.neighbors = 30, min.dist = 0.1)
+  
+  DimPlot(st, reduction = "umap", group.by = c("ident"))
+  DimPlot(st, reduction = "umap", group.by = c("condition"))
+  
+  # check cell cycle scores and phase assignments
+  s.genes <- firstup(cc.genes.updated.2019$s.genes)
+  g2m.genes <- firstup(cc.genes.updated.2019$g2m.genes)
+  st <- CellCycleScoring(st, s.features = s.genes, g2m.features = g2m.genes, set.ident = FALSE)
+  
+  
+  saveRDS(st, file = paste0(RdataDir,
+                            'seuratObject_neonatalMouse_cell.gene.filtered_umap.clustered.rds'))
+  
+}
 
+
+##########################################
+# cell type deconvolution for subtypes
+##########################################
+source('functions_Visium.R')
+
+st = readRDS(file = paste0(RdataDir,
+                           'seuratObject_neonatalMouse_cell.gene.filtered_umap.clustered.rds'))
+
+refs = readRDS(file = paste0('../data/data_examples/ref_scRNAseq_neonatalMice_clean.v1.rds'))
+#jj = which(refs$dataset == 'Ren2020')
+#refs$timepoints[jj] = refs$condition[jj]
+#refs$condition = refs$timepoints
+
+p1 = DimPlot(refs, reduction = 'umap', group.by = 'dataset',  label = TRUE, repel = TRUE)
+p2 = DimPlot(refs, reduction = 'umap', group.by = 'celltype',  label = TRUE, repel = TRUE)
+p3 = DimPlot(refs, reduction = 'umap', group.by = 'subtype',  label = TRUE, repel = TRUE)
+p4 = DimPlot(refs, reduction = 'umap', group.by = 'timepoints',  label = TRUE, repel = TRUE)
+
+(p1 + p2)/(p3 + p4)
+
+ggsave(filename = paste0(resDir, '/UMAP_scRNAseq_refrence_dataset_timepoints_celltypes.pdf'), 
+       width = 24, height = 18)
+
+Use_fineGrained_subtypes = FALSE
+if(Use_fineGrained_subtypes){
+  refs$celltype_toUse = as.character(refs$subtype)
+  length(table(refs$celltype_toUse))
+  table(refs$celltype_toUse)
+  DimPlot(refs, reduction = 'umap', group.by = 'celltype_toUse')
+  
+  ## prepare the celltype to use and also specify the time-specific subtypes
+  table(refs$condition)
+  
+  table(refs$celltype_toUse)
+  length(table(refs$celltype_toUse))
+  st$condition = factor(st$condition)
+  table(st$condition)
+  
+  ## preapre the paramters for RCTD subtypes
+  DefaultAssay(refs) = 'mnn.reconstructed'
+  DefaultAssay(st) = 'Spatial'
+  require_int_SpatialRNA = FALSE
+  
+  condition.specific.ref = FALSE
+  
+  outDir = paste0(resDir, '/celltype_deconvolution')
+  RCTD_out = paste0(outDir, '/RCTD_', length(table(refs$celltype_toUse)), 'Subtype_ref_v0.1')
+  max_cores = 16
+  
+  # st = subset(st, condition == 'adult.day7'); st$condition = droplevels(st$condition)
+  
+  source('functions_Visium.R')
+  Run.celltype.deconvolution.RCTD(st, refs, 
+                                  condition.specific.ref = condition.specific.ref,
+                                  #condition.specific_celltypes = condition.specific_celltypes,
+                                  require_int_SpatialRNA = require_int_SpatialRNA,
+                                  max_cores = max_cores,
+                                  RCTD_out = RCTD_out,
+                                  plot.RCTD.summary = FALSE, 
+                                  PLOT.scatterpie = FALSE
+                                  
+  )
+  
+  source('functions_Visium.R')
+  plot.RCTD.results(st = st, 
+                    RCTD_out = RCTD_out,
+                    species = species,
+                    plot.RCTD.summary = FALSE)
+  
+  
+}
 
 
 
