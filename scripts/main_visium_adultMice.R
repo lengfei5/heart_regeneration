@@ -605,7 +605,6 @@ if(Run_Neighborhood_Enrichment_Analysis){
   
   levels(refs$subtypes)
   
-  
   source('functions_Visium.R')
   run_misty_colocalization_analysis(st, 
                                     outDir = out_misty,
@@ -698,39 +697,3 @@ for(n in 1:length(times_slice))
 
 ## double check the ligand and receptor expression distribution
 #FeaturePlot(refs, features = rownames(refs)[grep('EGFC|VIPR2', rownames(refs))])
-
-########################################################
-# diff Nichenet for ligand-receptor analysis
-# original code from https://github.com/saeyslab/nichenetr/blob/master/vignettes/seurat_steps.md
-########################################################
-# Run_DiffNicheNet = FALSE
-# if(Run_DiffNicheNet){
-#   outDir_NicheNet = paste0(resDir, '/Ligand_Receptor_analysis/DiffNicheNet_v5.1_allpairs_intraOnly')
-#   
-#   for(n in 1:length(celltypes_BZ_timeSpecific))
-#   {
-#     # n = 2
-#     source('functions_cccInference.R')
-#     time = names(celltypes_BZ_timeSpecific)[n]
-#     cat(' run DiffNicheNet for time -- ', time, '\n')
-#     outDir = paste(outDir_NicheNet, '/', time, collapse = '')
-#     outDir = gsub(' ', '', outDir)
-#     
-#     system(paste0('mkdir -p ', outDir))
-#     
-#     source('functions_cccInference.R')
-#     
-#     run_Diff_NicheNet(refs = refs, 
-#                       timepoint_specific = TRUE,
-#                       include_autocrine = TRUE,
-#                       celltypes_BZ_specificDay = celltypes_BZ_timeSpecific[[n]],
-#                       celltypes_RZ_specificDay = celltypes_RZ_timeSpecific[[n]],
-#                       outDir = outDir
-#     )
-#     
-#     # extract_tables_from_res_Diff_NicheNet(outDir)
-#     
-#   }
-#   
-# }
-
