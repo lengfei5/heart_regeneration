@@ -1699,3 +1699,125 @@ DimPlot(refs, reduction = 'umap', group.by = 'subtype',raster = T,shuffle= T, pt
 
 saveRDS(refs, file = paste0('../data/data_examples/ref_scRNAseq_neonatalMice_clean.v1.rds'))
 
+
+##########################################
+# replaced the corrected expression matrix with Seurat_RPCA
+# keep mnn dimension reduction and corrected expression matrix from Seurat_RPCA, same as adult mice 
+##########################################
+refs = readRDS(file = paste0('../data/data_examples/ref_scRNAseq_neonatalMice_clean.v1.rds'))
+
+if(dataIntegration_method == 'Seurat_RPCA'){
+  ref.list <- SplitObject(refs.merged, split.by = "dataset")
+  
+  rm(list = c('aa', 'cms', 'refs.merged')) # remove big seurat objects to clear memory
+  
+  # normalize and identify variable features for each dataset independently
+  ref.list <- lapply(X = ref.list, FUN = function(x) {
+    x <- NormalizeData(x)
+    x <- FindVariableFeatures(x, selection.method = "vst", nfeatures = 3000)
+  })
+  
+  # select features that are repeatedly variable across datasets for integration run PCA on each
+  # dataset using these features
+  features <- SelectIntegrationFeatures(object.list = ref.list, nfeatures = 3000)
+  
+  ref.list <- lapply(X = ref.list, FUN = function(x) {
+    x <- ScaleData(x, features = features.common, verbose = FALSE)
+    x <- RunPCA(x, features = features, verbose = FALSE)
+    
+  })
+  
+  ref.anchors <- FindIntegrationAnchors(object.list = ref.list, anchor.features = features, reduction = "rpca", 
+                                        k.anchor = 5)
+  
+  rm(ref.list)
+  
+  # this command creates an 'integrated' data assay
+  ref.combined <- IntegrateData(anchorset = ref.anchors, features.to.integrate = features.common)
+  
+  rm(ref.anchors)
+  # specify that we will perform downstream analysis on the corrected data note that the
+  # original unmodified data still resides in the 'RNA' assay
+  DefaultAssay(ref.combined) <- "integrated"
+  
+  xx = DietSeurat(ref.combined, counts = TRUE, data = TRUE, scale.data = FALSE, assays = 'integrated')
+  xx@assays$integrated@counts = ref.combined@assays$RNA@counts
+  
+  saveRDS(xx, file = paste0(RdataDir, 
+                            'Seurat.obj_adultMiceHeart_Forte2020_Ren2020_refCombined_logNormalize_counts_v3.rds'))
+  
+  
+  # Run the standard workflow for visualization and clustering
+  ref.combined = readRDS(file = 
+                           paste0(RdataDir, 
+                                  'Seurat.obj_adultMiceHeart_Forte2020_Ren2020_refCombined_logNormalize_counts_v3.rds'))
+  
+  ref.combined <- ScaleData(ref.combined, verbose = FALSE)
+  ref.combined <- RunPCA(ref.combined, npcs = 30, verbose = FALSE)
+  
+  ElbowPlot(ref.combined, ndims = 30)
+  
+  ref.combined <- FindNeighbors(ref.combined, reduction = "pca", dims = 1:20)
+  ref.combined <- FindClusters(ref.combined, resolution = 0.2)
+  
+  ref.combined <- RunUMAP(ref.combined, reduction = "pca", dims = 1:30, n.neighbors = 50, min.dist = 0.05) 
+  
+  DimPlot(ref.combined, reduction = "umap")
+  
+  kk = which(ref.combined$dataset == 'Ren2020' & ref.combined$celltype != 'CM')
+  ref.combined$celltype[kk] = paste0(ref.combined$celltype[kk], '_Ren2020')
+  
+  # Visualization
+  p1 <- DimPlot(ref.combined, reduction = "umap", group.by = "dataset")
+  p2 <- DimPlot(ref.combined, reduction = "umap", group.by = "celltype", label = TRUE,
+                repel = TRUE)
+  p1 + p2 
+  
+  ggsave(paste0(resDir, '/Forte2020_Ren2020_IntegrationRPCA_', Normalization, '.pdf'), 
+         width = 24, height = 10)
+  
+  
+  ##########################################
+  # clean the reference, i.e. remove the non-cardiomyocyte from Ren2020
+  # change the confusing annotation names from Shoval
+  ##########################################
+  kk = which(ref.combined$dataset == 'Forte2020'| 
+               (ref.combined$dataset == 'Ren2020' & ref.combined$celltype == 'CM'))
+  refs = ref.combined[,kk]
+  
+  p1 <- DimPlot(refs, reduction = "umap", group.by = "dataset")
+  p2 <- DimPlot(refs, reduction = "umap", group.by = "celltype", label = TRUE,
+                repel = TRUE)
+  p1 + p2 
+  
+  ggsave(paste0(resDir, '/Forte2020_Ren2020onlyCM_IntegrationRPCA_', Normalization, '.pdf'), 
+         width = 24, height = 10)
+  
+  p2 
+  ggsave(paste0(resDir, '/Forte2020_Ren2020onlyCM_IntegrationRPCA_celltypes.in.Refs_', Normalization, '.pdf'), 
+         width = 12, height = 10)
+  
+  DimPlot(refs, reduction = "umap", group.by = "subtype", label = TRUE,
+          repel = TRUE)
+  
+  ggsave(paste0(resDir, '/Forte2020_Ren2020onlyCM_IntegrationRPCA_subtypes.in.Refs_', Normalization, '.pdf'), 
+         width = 12, height = 10)
+  
+  DimPlot(refs, reduction = "umap", group.by = "celltype", split.by = 'dataset',  label = TRUE, repel = TRUE)
+  # DimPlot(refs, reduction = 'umap', group.by = 'integrated_snn_res.0.5')
+  
+  rm(ref.combined)
+  
+  saveRDS(refs, file = paste0(RdataDir, 
+                              'Seurat.obj_adultMiceHeart_Forte2020.nonCM_Ren2020CM_refCombined_',
+                              'cleanAnnot_logNormalize_v4.rds'))
+  saveRDS(refs, file = paste0(RdataDir, 
+                              'SeuratObj_adultMiceHeart_refCombine_Forte2020.nonCM_Ren2020CM_',
+                              'cleanAnnot_logNormalize_v4.rds'))
+  
+}
+
+
+
+
+
