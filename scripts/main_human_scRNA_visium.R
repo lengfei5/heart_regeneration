@@ -1,3 +1,13 @@
+##########################################################################
+##########################################################################
+# Project: heart regeneration project
+# Script purpose: process and analyze the scRNA-seq data and visium data from Kuppe_et_al_2022
+# Usage example: 
+# Author: Jingkui Wang (jingkui.wang@imp.ac.at)
+# Date of creation: Thu Feb 22 11:34:57 2024
+##########################################################################
+##########################################################################
+
 rm(list = ls())
 
 version.analysis = '_20231207'

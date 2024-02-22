@@ -870,22 +870,30 @@ if(Test_DataIntegration){
   if(!dir.exists(outDir)) dir.create(outDir)
   
   integration_methods = c('noDataIntegration',  
-                          'fastMNN')
+                          'fastMNN',
+                          'Seurat_RPCA')
   
   for(method in integration_methods)
   {
     
-    method = "fastMNN"
+    method = "Seurat_RPCA"
     
     source('functions_dataIntegration.R')
     
     ## no data integration 
     if(method == 'noDataIntegration'){ref.combined = aa}
     
-    
-    if(method == 'Seurat_CCA'){
-      ref.combined = IntegrateData_Seurat_CCA(aa, group.by = 'dataset', redo.normalization.scaling = FALSE,
-                                              correct.all = TRUE)
+    if(method == 'Seurat_RPCA'){
+      ref.combined = IntegrateData_Seurat_RPCA(aa, 
+                                               group.by = 'batch', 
+                                               nfeatures = 3000,
+                                               merge.order = matrix(c(-2, -3, 1, -8, -5, 5, 3,
+                                                                      -1, -4, 2, -7, -6, 4, 6), ncol = 2),
+                                               redo.normalization.scaling = TRUE,
+                                               correct.all = TRUE)
+      
+      DefaultAssay(ref.combined) = 'integrated'
+      
     }
     
     if(method == 'fastMNN'){
@@ -1665,6 +1673,8 @@ if(refine.subtypes_adultMice_immuneCells){
 
 ##########################################
 # update the reference 
+# replaced the corrected expression matrix with Seurat_RPCA
+# keep mnn dimension reduction and corrected expression matrix from Seurat_RPCA, same as adult mice 
 ##########################################
 refs = readRDS(file = paste0(RdataDir, 
                              'Ref_neonatalMice_CM.Cui2020_noCM.Wang2020_P1_refineSubtypes_', 
@@ -1676,20 +1686,29 @@ DimPlot(refs, reduction = 'umap', group.by = 'subtype')
 refs = subset(refs, cells = colnames(refs)[which(!is.na(refs$subtype))])
 
 DefaultAssay(refs) = 'mnn.reconstructed'
-refs@assays$mnn.reconstructed@counts = refs@assays$RNA@counts
-refs[['RNA']] = NULL ## save mnn.reconstructed 
 
-refs <- FindVariableFeatures(refs, selection.method = "vst", nfeatures = 5000)
+xx = readRDS(file = paste0('../results/scRNAseq_neonatalMouse_20231108/Rdata/', 
+                           'Seurat.obj_neonatalMice_CM.Cui2020_noCM.Wang2020_P1_dataIntegration_',
+                           'Seurat_RPCA', '_allgeneCorrected.rds'))
 
-refs <- ScaleData(refs, verbose = FALSE)
-refs <- RunPCA(refs, npcs = 50, verbose = FALSE)
+DefaultAssay(xx) <- "integrated"
 
-ElbowPlot(refs, ndims = 30)
+xx = subset(xx, cells = colnames(refs))
+refs[['integrated']] = xx[['integrated']]
+
+#refs@assays$mnn.reconstructed@counts = refs@assays$RNA@counts
+# refs[['RNA']] = NULL ## save mnn.reconstructed 
+
+#refs <- FindVariableFeatures(refs, selection.method = "vst", nfeatures = 5000)
+#refs <- ScaleData(refs, verbose = FALSE)
+#refs <- RunPCA(refs, npcs = 50, verbose = FALSE)
+
+#ElbowPlot(refs, ndims = 30)
 
 #refs <- FindNeighbors(refs, reduction = "pca", dims = 1:20)
 #refs <- FindClusters(refs, resolution = 0.2)
 
-refs <- RunUMAP(refs, reduction = "pca", dims = 1:20, n.neighbors = 30, min.dist = 0.1)
+#refs <- RunUMAP(refs, reduction = "pca", dims = 1:20, n.neighbors = 30, min.dist = 0.1)
 
 DimPlot(refs, reduction = 'umap', group.by = 'celltype', raster = T,shuffle= T, pt.size = 2, 
         label = TRUE, repel = TRUE)
@@ -1697,127 +1716,6 @@ DimPlot(refs, reduction = 'umap', group.by = 'celltype', raster = T,shuffle= T, 
 DimPlot(refs, reduction = 'umap', group.by = 'subtype',raster = T,shuffle= T, pt.size = 2, 
         label = TRUE, repel = TRUE)
 
-saveRDS(refs, file = paste0('../data/data_examples/ref_scRNAseq_neonatalMice_clean.v1.rds'))
-
-
-##########################################
-# replaced the corrected expression matrix with Seurat_RPCA
-# keep mnn dimension reduction and corrected expression matrix from Seurat_RPCA, same as adult mice 
-##########################################
-refs = readRDS(file = paste0('../data/data_examples/ref_scRNAseq_neonatalMice_clean.v1.rds'))
-
-if(dataIntegration_method == 'Seurat_RPCA'){
-  ref.list <- SplitObject(refs.merged, split.by = "dataset")
-  
-  rm(list = c('aa', 'cms', 'refs.merged')) # remove big seurat objects to clear memory
-  
-  # normalize and identify variable features for each dataset independently
-  ref.list <- lapply(X = ref.list, FUN = function(x) {
-    x <- NormalizeData(x)
-    x <- FindVariableFeatures(x, selection.method = "vst", nfeatures = 3000)
-  })
-  
-  # select features that are repeatedly variable across datasets for integration run PCA on each
-  # dataset using these features
-  features <- SelectIntegrationFeatures(object.list = ref.list, nfeatures = 3000)
-  
-  ref.list <- lapply(X = ref.list, FUN = function(x) {
-    x <- ScaleData(x, features = features.common, verbose = FALSE)
-    x <- RunPCA(x, features = features, verbose = FALSE)
-    
-  })
-  
-  ref.anchors <- FindIntegrationAnchors(object.list = ref.list, anchor.features = features, reduction = "rpca", 
-                                        k.anchor = 5)
-  
-  rm(ref.list)
-  
-  # this command creates an 'integrated' data assay
-  ref.combined <- IntegrateData(anchorset = ref.anchors, features.to.integrate = features.common)
-  
-  rm(ref.anchors)
-  # specify that we will perform downstream analysis on the corrected data note that the
-  # original unmodified data still resides in the 'RNA' assay
-  DefaultAssay(ref.combined) <- "integrated"
-  
-  xx = DietSeurat(ref.combined, counts = TRUE, data = TRUE, scale.data = FALSE, assays = 'integrated')
-  xx@assays$integrated@counts = ref.combined@assays$RNA@counts
-  
-  saveRDS(xx, file = paste0(RdataDir, 
-                            'Seurat.obj_adultMiceHeart_Forte2020_Ren2020_refCombined_logNormalize_counts_v3.rds'))
-  
-  
-  # Run the standard workflow for visualization and clustering
-  ref.combined = readRDS(file = 
-                           paste0(RdataDir, 
-                                  'Seurat.obj_adultMiceHeart_Forte2020_Ren2020_refCombined_logNormalize_counts_v3.rds'))
-  
-  ref.combined <- ScaleData(ref.combined, verbose = FALSE)
-  ref.combined <- RunPCA(ref.combined, npcs = 30, verbose = FALSE)
-  
-  ElbowPlot(ref.combined, ndims = 30)
-  
-  ref.combined <- FindNeighbors(ref.combined, reduction = "pca", dims = 1:20)
-  ref.combined <- FindClusters(ref.combined, resolution = 0.2)
-  
-  ref.combined <- RunUMAP(ref.combined, reduction = "pca", dims = 1:30, n.neighbors = 50, min.dist = 0.05) 
-  
-  DimPlot(ref.combined, reduction = "umap")
-  
-  kk = which(ref.combined$dataset == 'Ren2020' & ref.combined$celltype != 'CM')
-  ref.combined$celltype[kk] = paste0(ref.combined$celltype[kk], '_Ren2020')
-  
-  # Visualization
-  p1 <- DimPlot(ref.combined, reduction = "umap", group.by = "dataset")
-  p2 <- DimPlot(ref.combined, reduction = "umap", group.by = "celltype", label = TRUE,
-                repel = TRUE)
-  p1 + p2 
-  
-  ggsave(paste0(resDir, '/Forte2020_Ren2020_IntegrationRPCA_', Normalization, '.pdf'), 
-         width = 24, height = 10)
-  
-  
-  ##########################################
-  # clean the reference, i.e. remove the non-cardiomyocyte from Ren2020
-  # change the confusing annotation names from Shoval
-  ##########################################
-  kk = which(ref.combined$dataset == 'Forte2020'| 
-               (ref.combined$dataset == 'Ren2020' & ref.combined$celltype == 'CM'))
-  refs = ref.combined[,kk]
-  
-  p1 <- DimPlot(refs, reduction = "umap", group.by = "dataset")
-  p2 <- DimPlot(refs, reduction = "umap", group.by = "celltype", label = TRUE,
-                repel = TRUE)
-  p1 + p2 
-  
-  ggsave(paste0(resDir, '/Forte2020_Ren2020onlyCM_IntegrationRPCA_', Normalization, '.pdf'), 
-         width = 24, height = 10)
-  
-  p2 
-  ggsave(paste0(resDir, '/Forte2020_Ren2020onlyCM_IntegrationRPCA_celltypes.in.Refs_', Normalization, '.pdf'), 
-         width = 12, height = 10)
-  
-  DimPlot(refs, reduction = "umap", group.by = "subtype", label = TRUE,
-          repel = TRUE)
-  
-  ggsave(paste0(resDir, '/Forte2020_Ren2020onlyCM_IntegrationRPCA_subtypes.in.Refs_', Normalization, '.pdf'), 
-         width = 12, height = 10)
-  
-  DimPlot(refs, reduction = "umap", group.by = "celltype", split.by = 'dataset',  label = TRUE, repel = TRUE)
-  # DimPlot(refs, reduction = 'umap', group.by = 'integrated_snn_res.0.5')
-  
-  rm(ref.combined)
-  
-  saveRDS(refs, file = paste0(RdataDir, 
-                              'Seurat.obj_adultMiceHeart_Forte2020.nonCM_Ren2020CM_refCombined_',
-                              'cleanAnnot_logNormalize_v4.rds'))
-  saveRDS(refs, file = paste0(RdataDir, 
-                              'SeuratObj_adultMiceHeart_refCombine_Forte2020.nonCM_Ren2020CM_',
-                              'cleanAnnot_logNormalize_v4.rds'))
-  
-}
-
-
-
+saveRDS(refs, file = paste0('../data/data_examples/ref_scRNAseq_neonatalMice_clean.v1.2.rds'))
 
 

@@ -331,10 +331,11 @@ source('functions_Visium.R')
 st = readRDS(file = paste0(RdataDir,
                            'seuratObject_neonatalMouse_cell.gene.filtered_umap.clustered.rds'))
 
-refs = readRDS(file = paste0('../data/data_examples/ref_scRNAseq_neonatalMice_clean.v1.rds'))
-#jj = which(refs$dataset == 'Ren2020')
-#refs$timepoints[jj] = refs$condition[jj]
-#refs$condition = refs$timepoints
+refs = readRDS(file = paste0('../data/data_examples/ref_scRNAseq_neonatalMice_clean.v1.2.rds'))
+
+refs$subtype = gsub(' ','.', refs$subtype)
+refs$subtype = gsub('_','.', refs$subtype)
+refs$subtype = gsub('-','.', refs$subtype)
 
 p1 = DimPlot(refs, reduction = 'umap', group.by = 'dataset',  label = TRUE, repel = TRUE)
 p2 = DimPlot(refs, reduction = 'umap', group.by = 'celltype',  label = TRUE, repel = TRUE)
@@ -350,8 +351,10 @@ Use_fineGrained_subtypes = FALSE
 if(Use_fineGrained_subtypes){
   
   refs$celltype_toUse = as.character(refs$subtype)
+  
   length(table(refs$celltype_toUse))
   table(refs$celltype_toUse)
+  
   DimPlot(refs, reduction = 'umap', group.by = 'celltype_toUse')
   
   ## prepare the celltype to use and also specify the time-specific subtypes
@@ -363,7 +366,7 @@ if(Use_fineGrained_subtypes){
   table(st$condition)
   
   ## preapre the paramters for RCTD subtypes
-  DefaultAssay(refs) = 'mnn.reconstructed'
+  DefaultAssay(refs) = 'integrated'
   DefaultAssay(st) = 'Spatial'
   require_int_SpatialRNA = FALSE
   
@@ -395,10 +398,5 @@ if(Use_fineGrained_subtypes){
   
   
 }
-
-
-
-
-
 
 
