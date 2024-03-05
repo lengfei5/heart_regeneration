@@ -48,12 +48,60 @@ dataDir = "../published_dataset/human/Kuppe_et_al_2022/processed_data_Robj/snRNA
 ########################################################
 aa = readRDS(file = paste0(dataDir, 'all-snRNA.rds'))
 
-DimPlot(aa, reduction = 'umap', group.by = 'cell_type_original', raster=FALSE, label = TRUE, repel = TRUE)
+p1 = DimPlot(aa, reduction = 'umap', group.by = 'cell_type_original', raster=FALSE, label = TRUE, repel = TRUE)
 
-DimPlot(aa, reduction = 'umap', group.by = 'final_cluster', raster=FALSE, label = TRUE, repel = TRUE)
+p2 = DimPlot(aa, reduction = 'umap', group.by = 'final_cluster', raster=FALSE, label = TRUE, repel = TRUE)
+
+p1 + p2 
+
+ggsave(paste0(resDir, '/Kupper2022_Umap_clusters_cellType.original.pdf'), 
+       width = 16, height = 8)
+
+p1 = DimPlot(aa, reduction = 'umap', group.by = 'patient_region_id', raster=FALSE, label = TRUE, repel = TRUE)
+p2 = DimPlot(aa, reduction = 'umap', group.by = 'major_labl', raster=FALSE, label = TRUE, repel = TRUE)
+p1 + p2
+
+ggsave(paste0(resDir, '/Kupper2022_Umap_patienceID_major_labels.pdf'), 
+       width = 16, height = 8)
+
+saveRDS(aa, file = paste0(RdataDir, '/Kuppe2022_heart_all.rds'))
+
+##########################################
+# subset the snRNA-seq with the donor based on the metadata (41586_2022_5060_MOESM6_ESM)
+# donors with days after infarction >30 were filtered
+##########################################
+Idents(aa) = aa$donor_id
+
+aa = subset(aa, idents = c("P14", "P18", 'P20', 'P19', 'P4', 'P13', 'P11', 'P12', 'P5'), invert = TRUE)
 
 DimPlot(aa, reduction = 'umap', group.by = 'donor_id', raster=FALSE, label = TRUE, repel = TRUE)
 
-saveRDS(aa, file = paste0(RdataDir, '/Kuppe2022_heart_all.rds'))
+ggsave(paste0(resDir, '/Kupper2022_Umap_selectedDonor.pdf'), 
+       width = 16, height = 12)
+
+
+p1 = DimPlot(aa, reduction = 'umap', group.by = 'cell_type_original', raster=FALSE, label = TRUE, repel = TRUE)
+
+p2 = DimPlot(aa, reduction = 'umap', group.by = 'donor_id', raster=FALSE, label = TRUE, repel = TRUE)
+
+p1 + p2 
+
+ggsave(paste0(resDir, '/Kupper2022_Umap_clusters_cellType.original_selectedDonor.pdf'), 
+       width = 16, height = 8)
+
+
+saveRDS(aa, file = paste0(RdataDir, '/Kuppe2022_heart_donorSelected.rds'))
+
+##########################################
+# add subtypes with the original subclusterd based on snRNA and scATAC
+# original R objects from https://zenodo.org/records/7098004#.Y0P_LC0RoeY
+##########################################
+
+
+
+
+
+
+
 
 

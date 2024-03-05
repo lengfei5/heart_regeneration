@@ -374,9 +374,12 @@ if(Use_fineGrained_subtypes){
   
   outDir = paste0(resDir, '/celltype_deconvolution')
   RCTD_out = paste0(outDir, '/RCTD_', length(table(refs$celltype_toUse)), 'Subtype_ref_v0.1')
+  
   max_cores = 16
   
-  # st = subset(st, condition == 'adult.day7'); st$condition = droplevels(st$condition)
+  Idents(st) = st$condition
+  st = subset(st, idents = c('neonatal.day4', 'neonatal.day7')); 
+  st$condition = droplevels(st$condition)
   
   source('functions_Visium.R')
   Run.celltype.deconvolution.RCTD(st, refs, 

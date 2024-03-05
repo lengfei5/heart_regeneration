@@ -301,7 +301,7 @@ if(version_testing_all.subtype.pairs){
 # run LIANA 
 ##########################################
 # set parameter for ligand-receptor analysis
-outDir_version = paste0(resDir, '/Ligand_Receptor_analysis/LIANA_v5.4_allpairs_intraOnly')
+outDir_version = paste0(resDir, '/Ligand_Receptor_analysis/LIANA_v5.5_FB.Immue_intraOnly')
 if(!dir.exists(outDir_version)) dir.create(outDir_version)
 
 out_misty = paste0('../results/visium_axolotl_R12830_resequenced_20220308/neighborhood_test/',
