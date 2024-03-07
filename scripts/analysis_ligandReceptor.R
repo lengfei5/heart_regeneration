@@ -28,6 +28,11 @@ library(circlize)
 library(RColorBrewer)
 require(scran)
 require(scater)
+library(nichenetr)
+library(tidyverse)
+library(circlize)
+library(randomcoloR)
+
 source('functions_scRNAseq.R')
 source('functions_Visium.R')
 dataPath_nichenet = '../data/NicheNet/'
@@ -298,7 +303,7 @@ if(version_testing_all.subtype.pairs){
 
 
 ##########################################
-# run LIANA 
+# run LIANA for all pairs
 ##########################################
 # set parameter for ligand-receptor analysis
 outDir_version = paste0(resDir, '/Ligand_Receptor_analysis/LIANA_v5.5_FB.Immue_intraOnly')
@@ -306,19 +311,20 @@ if(!dir.exists(outDir_version)) dir.create(outDir_version)
 
 out_misty = paste0('../results/visium_axolotl_R12830_resequenced_20220308/neighborhood_test/',
                    'Run_misty_v1.8_short/Plots_RCTD_density')
-misty_cutoff = 0.5
+
+misty_cutoff = 0.2
 
 # run LIANA day by day
 timepoint_specific = TRUE
 
 #times_slice = c('d1', 'd4', 'd7', 'd14')
-times_slice = c('d1', 'd7', 'd14')
+times_slice = c('d7')
 
 subtypes = unique(refs$celltypes)
 
 for(n in 1:length(times_slice))
 {
-  # n = 2
+  # n = 1
   source('functions_cccInference.R')
   time = times_slice[n]
   cat(' run LIANA for time -- ', time, '\n')
@@ -341,8 +347,28 @@ for(n in 1:length(times_slice))
   ss_row = apply(pairs, 1, sum)
   ss_col = apply(pairs, 2, sum)
   
-  pairs = pairs[ ,which(ss_col >= 1)] # at least interacting with 1 receivers
-  pairs = pairs[which(ss_row >= 3), ] # at least have 3 senders 
+  Select_specificPairs = TRUE
+  if(Select_specificPairs){
+    
+    FB_Immune = c('FB.TNXB', 'FB.PKD1', 'Mo.Macs,FAXDC2', 'Mo.Macs.SNX22', 'Neu.DYSF')
+    ii1 = which(!is.na(match(colnames(pairs), FB_Immune)))
+    jj1 = which(!is.na(match(rownames(pairs), FB_Immune)))
+    
+    pairs = pairs[jj1, ii1] 
+    
+    ss_col = apply(pairs, 2, sum)
+    ss_row = apply(pairs, 1, sum)
+    
+    pairs = pairs[which(ss_row>=1), which(ss_col >= 1)] # at least interacting with 1 receivers
+    
+    
+  }else{
+    
+    pairs = pairs[ ,which(ss_col >= 1)] # at least interacting with 1 receivers
+    pairs = pairs[which(ss_row >= 3), ] # at least have 3 senders 
+    
+  }
+  
   
   colnames(pairs) = gsub("Cav3_1", "Cav3.1", gsub('Mo_Macs', 'Mo.Macs', gsub('[.]','_', colnames(pairs))))
   rownames(pairs) = gsub("Cav3_1", "Cav3.1", gsub('Mo_Macs', 'Mo.Macs', gsub('[.]','_', rownames(pairs))))
@@ -351,6 +377,7 @@ for(n in 1:length(times_slice))
   cat(match(rownames(pairs), subtypes), '\n')
   
   celltypes_BZ_timeSpecific = vector("list", nrow(pairs))
+  
   for(m in 1:nrow(pairs))
   {
     # m = 16
@@ -367,7 +394,68 @@ for(n in 1:length(times_slice))
             outDir = outDir
   )
   
-  #res = aggregate_output_LIANA(paste(outDir, time))
+  source("functions_cccInference.R")
+  res = aggregate_output_LIANA(liana_out = paste(outDir))
+  
+  require(cellcall)
+  
+  subtypes = unique(c(res$sender, res$receiver))
+  cell_color = data.frame(color = distinctColorPalette(length(subtypes)), stringsAsFactors = FALSE)
+  rownames(cell_color) <- subtypes
+  
+  # ViewInterCircos(object = mt, font = 2, cellColor = cell_color, 
+  #                 lrColor = c("#F16B6F", "#84B1ED"),
+  #                 arr.type = "big.arrow",arr.length = 0.04,
+  #                 trackhight1 = 0.05, 
+  #                 slot="expr_l_r_log2_scale",
+  #                 linkcolor.from.sender = TRUE,
+  #                 linkcolor = NULL, 
+  #                 gap.degree = 2,
+  #                 order.vector=c('ST', "SSC", "SPGing", "SPGed"),
+  #                 trackhight2 = 0.032, 
+  #                 track.margin2 = c(0.01,0.12), 
+  #                 DIY = FALSE)
+  
+  ## test celltalker
+  library(celltalker)
+  #xx = readRDS(file = paste0(resDir, '/test_LianaOut_for_circoPlot.rds'))
+  xx = res
+  xx$sender = gsub('_', '.', xx$sender)
+  xx$receiver = gsub('_', '.', xx$receiver)
+  xx$interaction_pairs = paste0(xx$sender, '_', xx$receiver)
+  xx$interaction = paste0(xx$ligand, '_', xx$receptor)
+  xx = xx[,c(8, 9, 7, 1:5)]
+  colnames(xx)[3:5] = c('value', 'cell_type1', 'cell_type2')
+  
+  top_stats_xx <- xx %>% as_tibble() %>%
+    #mutate(fdr=p.adjust(p_val,method="fdr")) %>%
+    #filter(fdr<0.05) %>%
+    group_by(cell_type2) %>%
+    top_n(-50, aggregate_rank) %>%
+    ungroup()
+  
+  cat(nrow(top_stats_xx), ' top pairs \n')
+  #top_stats_xx = as_tibble(xx)
+  subtypes = unique(c(top_stats_xx$cell_type1, top_stats_xx$cell_type2))
+  colors_use <- distinctColorPalette(length(subtypes))
+  
+  svg(paste0(outDir, "/ligand_target_circos_", time, "_test.svg"), width = 6, height = 6)
+  
+  source("functions_cccInference.R")
+  circos_plot_customized(ligand_receptor_frame=top_stats_xx,
+                         cell_group_colors=colors_use,
+                         ligand_color="#84B1ED",
+                         receptor_color="#F16B6F",
+                         cex_outer=0.5,
+                         cex_inner=0.2,
+                         link.lwd=0.1, 
+                         arr.length=0., 
+                         arr.width=0.05
+  )
+  
+  dev.off()
+  
+  
   
 }
 

@@ -303,33 +303,128 @@ run_LIANA_defined_celltype = function(subref,
 }
 
 
-aggregate_output_LIANA = function(outDir)
+##########################################
+# aggreate LIANA outputs and visiualize them
+##########################################
+aggregate_output_LIANA = function(liana_out)
 {
-  xlist = list.files(path = outDir, pattern = '*.txt', full.names = TRUE)
+  cat('liana output folder --- ', liana_out, '\n')
+  xlist = list.files(path = liana_out, pattern = '*.txt', full.names = TRUE)
   
+  # for(n in 1:length(xlist))
+  # {
+  #   # n = 2
+  #   cat(n, ' -- ', basename(xlist[n]), '\n')
+  #   test = read.table(xlist[n], header = TRUE)
+  #   
+  #   ## aggregate_rank interpretation: https://saezlab.github.io/liana/articles/liana_tutorial.html
+  #   ## RRA scores can be interpreted as p-values and 
+  #   ## interactions which are ranked consistently higher than random are assigned low scores/p-values.
+  #   test = data.frame(test[, c(1:6, 
+  #                              which(colnames(test) == 'natmi.edge_specificity'), 
+  #                              which(colnames(test) == 'sca.LRscore'))], stringsAsFactors = FALSE)
+  #   
+  #   write.table(test, file = paste0(liana_out, '/',  gsub('.txt', '_simplied.txt', basename(xlist[n]))),
+  #               quote = FALSE, col.names = TRUE, row.names = FALSE)
+  #   
+  #   
+  # }
+  
+  cat('concate the tables \n')
+  res = c()
   for(n in 1:length(xlist))
   {
-    # n = 2
-    cat(n, ' -- ', basename(xlist[n]), '\n')
-    test = read.table(xlist[n], header = TRUE)
+    # n = 3
+    test = read.table(file = xlist[n])
+    test = test[, c(1:5, which(colnames(test) == 'natmi.edge_specificity'), 
+                    which(colnames(test) == 'sca.LRscore'))]
+    colnames(test)[1:4] = c('sender', 'receiver', 'ligand', 'receptor')
     
-    ## aggregate_rank interpretation: https://saezlab.github.io/liana/articles/liana_tutorial.html
-    ## RRA scores can be interpreted as p-values and 
-    ## interactions which are ranked consistently higher than random are assigned low scores/p-values.
-    test = data.frame(test[, c(1:6, 
-                               which(colnames(test) == 'natmi.edge_specificity'), 
-                               which(colnames(test) == 'sca.LRscore'))], stringsAsFactors = FALSE)
-    
-    write.table(test, file = paste0(outDir, '/',  gsub('.txt', '_simplied.txt', basename(xlist[n]))),
-                quote = FALSE, col.names = TRUE, row.names = FALSE)
-    
+    kk = which(test$ligand == 'GAS6' & test$receptor == 'AXL')[1]
+    cat('receiver: ', unique(test$receiver), '--',
+        'sender: ', test$sender[kk], 
+        'rank :', kk, '\n')
+    #test = test[1:ntop, c(1:5)]
+    res = rbind(res, test)
   }
+  
+  saveRDS(res, file = paste0(liana_out, '/test_LianaOut_for_circoPlot.rds'))
+  
+  return(res)
   
   
 }
 
-assembly.liana.plot = function()
+assembly.liana.plot = function(output)
 {
+  ##########################################
+  # Test some other packages
+  ##########################################
+  require(cellcall)
+  
+  res = readRDS(file = paste0(resDir, '/test_LianaOut_for_circoPlot.rds'))
+  #colors_use <- RColorBrewer::brewer.pal(n=length(unique(c(res$sender, res$receiver))),"Set2")
+  
+  subtypes = unique(c(res$sender, res$receiver))
+  cell_color = data.frame(color = distinctColorPalette(length(subtypes)), stringsAsFactors = FALSE)
+  rownames(cell_color) <- subtypes
+  
+  ViewInterCircos(object = mt, font = 2, cellColor = cell_color, 
+                  lrColor = c("#F16B6F", "#84B1ED"),
+                  arr.type = "big.arrow",arr.length = 0.04,
+                  trackhight1 = 0.05, 
+                  slot="expr_l_r_log2_scale",
+                  linkcolor.from.sender = TRUE,
+                  linkcolor = NULL, 
+                  gap.degree = 2,
+                  order.vector=c('ST', "SSC", "SPGing", "SPGed"),
+                  trackhight2 = 0.032, 
+                  track.margin2 = c(0.01,0.12), 
+                  DIY = FALSE)
+  
+  
+  
+  
+  ## test celltalker
+  library(celltalker)
+  xx = readRDS(file = paste0(resDir, '/test_LianaOut_for_circoPlot.rds'))
+  xx$sender = gsub('_', '.', xx$sender)
+  xx$receiver = gsub('_', '.', xx$receiver)
+  xx$interaction_pairs = paste0(xx$sender, '_', xx$receiver)
+  xx$interaction = paste0(xx$ligand, '_', xx$receptor)
+  xx = xx[,c(8, 9, 7, 1:5)]
+  colnames(xx)[3:5] = c('value', 'cell_type1', 'cell_type2')
+  
+  top_stats_xx <- xx %>% as_tibble() %>%
+    #mutate(fdr=p.adjust(p_val,method="fdr")) %>%
+    #filter(fdr<0.05) %>%
+    group_by(cell_type2) %>%
+    top_n(-50, aggregate_rank) %>%
+    ungroup()
+  
+  #top_stats_xx = as_tibble(xx)
+  subtypes = unique(c(top_stats_xx$cell_type1, top_stats_xx$cell_type2))
+  colors_use <- distinctColorPalette(length(subtypes))
+  
+  
+  svg(paste0(resDir, "/ligand_target_circos_day4_test.svg"), width = 10, height = 10)
+  
+  source("functions_cccInference.R")
+  circos_plot_customized(ligand_receptor_frame=top_stats_xx,
+                         cell_group_colors=colors_use,
+                         ligand_color="#84B1ED",
+                         receptor_color="#F16B6F",
+                         cex_outer=0.7,
+                         cex_inner=0.1,
+                         link.lwd=0.1, 
+                         arr.length=0.1, 
+                         arr.width=0.05
+  )
+  dev.off()
+  
+  
+  
+  
   liana_test = readRDS(file = paste0(outDir, '/res_lianaTest_Consensus.rds'))
   ntop = 80
   
