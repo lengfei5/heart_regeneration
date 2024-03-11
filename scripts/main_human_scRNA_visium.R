@@ -92,16 +92,68 @@ ggsave(paste0(resDir, '/Kupper2022_Umap_clusters_cellType.original_selectedDonor
 
 saveRDS(aa, file = paste0(RdataDir, '/Kuppe2022_heart_donorSelected.rds'))
 
-##########################################
-# add subtypes with the original subclusterd based on snRNA and scATAC
+
+########################################################
+########################################################
+# Section II: # add subtypes with the original subclusterd based on snRNA and scATAC
 # original R objects from https://zenodo.org/records/7098004#.Y0P_LC0RoeY
+# 
+########################################################
+########################################################
+aa = readRDS(file = paste0(RdataDir, '/Kuppe2022_heart_donorSelected.rds'))
+aa$patient_region_id = droplevels(aa$patient_region_id)
+
+aa$cell.id = sapply(colnames(aa), function(x) {unlist(strsplit(x, '_'))[1]})
+aa$cell.id = paste0(aa$patient_region_id, '_', aa$cell.id)
+
+# ax = readRDS(file = paste0())
+
+DimPlot(aa, reduction = 'umap', group.by = 'cell_type_original', raster=FALSE, label = TRUE, repel = TRUE)
+
+annot_file = list.files(path = '../published_dataset/human/Kuppe_et_al_2022/processed_data_Robj/subtype_annot',
+                        pattern = '*.Rds', full.names = TRUE)
+
+aa$annotation = NA
+
 ##########################################
-
-
-
-
-
-
-
+# subtypes of CMs
+##########################################
+for(n in 1:length(annot_file))
+{
+  # n = 1
+  celltype = gsub('_snRNA_snATAC.Rds', '', basename(annot_file[n]))
+  cat(n, '--', basename(annot_file[n]), '\n')
+  xx = readRDS(annot_file[n])
+  cat(nrow(xx), 'cells \n')
+  print(table(xx$annotation))
+  
+  xx$cell.id = sapply(colnames(xx), function(x) {unlist(strsplit(x, '#'))[2]})
+  xx$cell.id = paste0(xx$patient_region_id, '_', xx$cell.id)
+  
+  xx = DietSeurat(xx, data = TRUE, assays = 'RNA')
+  
+  subs = subset(aa, cells = colnames(aa)[which(aa$cell_type_original == celltype)])
+  DimPlot(subs, group.by = 'cell_type_original', raster=FALSE, label = TRUE, repel = TRUE)
+    
+  #mm = match(xx$cell.id, aa$cell.id)
+  #cat(length(which(!is.na(mm))), 'cell matches \n')
+  subs <- FindVariableFeatures(aa, selection.method = 'vst', nfeatures = 2000)
+  #subs <- ScaleData(subs)
+  #subs <- RunPCA(subs, features = VariableFeatures(object = subs), verbose = FALSE, weight.by.var = FALSE)
+  
+  #ElbowPlot(subs, ndims = 50)
+  subs <- FindNeighbors(subs, dims = 1:20, reduction = 'harmony')
+  subs <- FindClusters(subs, verbose = FALSE, algorithm = 3, resolution = 0.7)
+  
+  #Idents(subs) = subs$condition
+  subs <- RunUMAP(subs, dims = 1:20, reduction = 'harmony', n.neighbors = 30, min.dist = 0.3)
+  
+  DimPlot(subs, label = TRUE, repel = TRUE, group.by = 'seurat_clusters', raster=FALSE)
+  
+  ggsave(filename = paste0(resDir, '/umap_timepoints_clusters_regress.nCounts.pdf'), width = 16, height = 6)
+  
+  
+    
+}
 
 
