@@ -37,6 +37,15 @@ Normalization = 'lognormal' # ('lognormal or SCT')
 
 dataDir = "../published_dataset/human/Kuppe_et_al_2022/processed_data_Robj/snRNA/"
 
+# annot = import(paste0('/groups/tanaka/People/current/jiwang/Genomes/human/hg38/annotation/', 
+#                       'Homo_sapiens.GRCh38.111.gtf'))
+# 
+# annot = data.frame(id = annot$gene_id, symbol = annot$gene_name, type = annot$gene_biotype)
+# annot = annot[which(annot$type == 'protein_coding'), ]
+# annot = annot[match(unique(annot$id), annot$id), ]
+# 
+# saveRDS(annot, file = paste0(RdataDir, 'human_gtf_ens_geneSymbol.rds'))
+
 ########################################################
 ########################################################
 # Section I : Import the processed seurat object of scRNA-seq from
@@ -90,9 +99,82 @@ ggsave(paste0(resDir, '/Kupper2022_Umap_clusters_cellType.original_selectedDonor
 
 saveRDS(aa, file = paste0(RdataDir, '/Kuppe2022_heart_donorSelected.rds'))
 
+
 ########################################################
 ########################################################
-# Section II: # add subtypes with the original subclusterd based on snRNA and scATAC
+# Section II: import and process the human visium data
+# 
+########################################################
+########################################################
+visiumDir = "../published_dataset/human/Kuppe_et_al_2022/processed_data_Robj/visium"
+
+outDir = paste0(resDir, '/visium_data/')
+if(!dir.exists(outDir)) dir.create(outDir)
+
+st_file = list.files(path = visiumDir,
+                        pattern = '*.rds', full.names = TRUE)
+
+annot = readRDS(file = paste0(RdataDir, 'human_gtf_ens_geneSymbol.rds'))
+
+##########################################
+# manually select the control, BZ, RZ  
+##########################################
+st_file = st_file[grep('control_P|RZ_BZ_P|RZ_P|IZ_BZ_P2', st_file)]
+st_file = st_file[grep('RZ_P9|RZ_BZ_P12', st_file, invert = TRUE)]
+
+for(n in 1:length(st_file))
+{
+  # n = 2
+  cc = gsub('.rds', '', basename(st_file[n]))
+  cc = gsub('Visium-', '', cc)
+  cat(n, ' -- ', cc, '\n')
+  aa = readRDS(st_file[n])
+  aa$sample = cc
+  
+  cat(nrow(aa), ' genes -- ', ncol(aa), ' spots\n')
+  
+  pdfname = paste0(outDir, '/QCs_gene_marker_check_', cc, '.pdf')
+  pdf(pdfname, width=16, height = 8)
+  
+  p1 = VlnPlot(aa, features = c("nCounts_RNA", "nFeaturess_RNA", "percent.mt"), 
+               ncol = 3, pt.size = 1.0)
+  plot(p1)
+  
+  plot1 <- FeaturePlot(aa, features = "nCounts_RNA", reduction = 'spatial') 
+  plot2 <- FeaturePlot(aa, features = "nFeaturess_RNA", reduction = 'spatial') 
+  plot3 <- FeaturePlot(aa, features = "percent.mt", reduction = 'spatial') 
+  plot(wrap_plots(plot1, plot2, plot3))
+  
+  markers = c('Nppa', 'Myh6', 'Lum', 'Itgb5', 'Vim', 'Col1a1')
+  markers = toupper(markers)
+  mm = match(annot$id[match(markers, annot$symbol)], rownames(aa))
+  
+  p4 = FeaturePlot(aa, features = rownames(aa)[mm], reduction = 'spatial', ncol = 3) 
+  plot(p4)
+  ##########################################
+  # normalization 
+  ##########################################
+  # min_cells = 5 only use genes that have been detected in at least this many cells 
+    
+  # merge slices from different time points and 
+  if(n == 1) {
+    st = aa
+  }else{
+    st = merge(st, aa)
+  }
+  
+  remove(aa)
+  
+  dev.off()
+  
+}
+
+save(st, file = paste0(RdataDir,  'seuratObject_visium_humanHeart_selected_control_BZ_RZ.rds'))
+
+
+########################################################
+########################################################
+# Section III: # add subtypes with the original subclusterd based on snRNA and scATAC
 # original R objects from https://zenodo.org/records/7098004#.Y0P_LC0RoeY
 # 
 ########################################################
@@ -102,12 +184,7 @@ library('rtracklayer')
 library(GenomicRanges)
 library('GenomicFeatures')
 
-annot = import(paste0('/groups/tanaka/People/current/jiwang/Genomes/human/hg38/annotation/', 
-                      'Homo_sapiens.GRCh38.111.gtf'))
-
-annot = data.frame(id = annot$gene_id, symbol = annot$gene_name, type = annot$gene_biotype)
-annot = annot[which(annot$type == 'protein_coding'), ]
-annot = annot[match(unique(annot$id), annot$id), ]
+annot = readRDS(file = paste0(RdataDir, 'human_gtf_ens_geneSymbol.rds'))
 
 aa = readRDS(file = paste0(RdataDir, '/Kuppe2022_heart_donorSelected.rds'))
 aa$patient_region_id = droplevels(aa$patient_region_id)
@@ -229,6 +306,23 @@ for(n in 3:length(annot_file))
 
 saveRDS(aa, file = paste0(RdataDir, '/Kuppe2022_heart_donorSelected_subtypes.added.rds'))
 
+
+##########################################
+# double check the subtypes  
+##########################################
+aa = readRDS(file = paste0(RdataDir, '/Kuppe2022_heart_donorSelected_subtypes.added.rds'))
+
+jj = which(aa$cell_type_original == 'Mast'| aa$cell_type_original == 'Cycling cells' |
+             aa$cell_type_original == 'Adipocyte')
+
+aa$annotation[jj] = as.character(aa$cell_type_original[jj])
+
+p1 = DimPlot(aa, reduction = 'umap', group.by = 'cell_type_original', raster=FALSE, label = TRUE, repel = TRUE)
+p2 = DimPlot(aa, reduction = 'umap', group.by = 'annotation', raster=FALSE, label = TRUE, repel = TRUE)
+
+p1 + p2
+
+ggsave(filename = paste0(resDir, '/umap_celltype_sutypes.pdf'), width = 16, height = 6)
 
 
 
