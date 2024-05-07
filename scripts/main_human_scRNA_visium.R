@@ -201,11 +201,10 @@ annot_file = list.files(path = '../published_dataset/human/Kuppe_et_al_2022/proc
 
 aa$annotation = NA
 
-
 ##########################################
-# subtypes of CMs
+# systematic annotate the subtypes 
 ##########################################
-for(n in 3:length(annot_file))
+for(n in 1:length(annot_file))
 {
   # n = 2
   celltype = gsub('_snRNA_snATAC.Rds', '', basename(annot_file[n]))
@@ -227,13 +226,25 @@ for(n in 3:length(annot_file))
   
   DimPlot(subs, group.by = 'cell_type_original', raster=FALSE, label = TRUE, repel = TRUE)
   
-  subs <- FindVariableFeatures(subs, selection.method = 'vst', nfeatures = 2000)
-    
+  subs <- FindVariableFeatures(subs, selection.method = 'vst', nfeatures = 2000) %>% 
+    ScaleData() %>% RunPCA()
+  
+  subs <- RunUMAP(subs, dims = 1:20, reduction = 'pca', n.neighbors = 30, min.dist = 0.1)
+  
+  subs <- RunUMAP(subs, dims = 1:20, reduction = 'harmony', n.neighbors = 30, min.dist = 0.1,
+                  reduction.name = "harmony_umap")
+  
+  p1 = DimPlot(subs, label = TRUE, repel = TRUE, group.by = 'annotation', raster=FALSE)
+  p2 =  DimPlot(subs, label = TRUE, repel = TRUE, group.by = 'annotation', raster=FALSE, 
+                reduction = 'harmony_umap')
+  
+  p1 + p2 
+  
   #ElbowPlot(subs, ndims = 50)
   subs <- FindNeighbors(subs, dims = 1:20, reduction = 'harmony')
   subs <- FindClusters(subs, verbose = FALSE, algorithm = 3, resolution = 1.0)
   
-  subs <- RunUMAP(subs, dims = 1:20, reduction = 'harmony', n.neighbors = 30, min.dist = 0.3)
+ 
   
   p1 = DimPlot(subs, label = TRUE, repel = TRUE, group.by = 'cell_type_original', raster=FALSE)
   p2 =  DimPlot(subs, label = TRUE, repel = TRUE, group.by = 'seurat_clusters', raster=FALSE)
@@ -306,16 +317,30 @@ for(n in 3:length(annot_file))
 
 saveRDS(aa, file = paste0(RdataDir, '/Kuppe2022_heart_donorSelected_subtypes.added.rds'))
 
+########################################################
+########################################################
+# Section IV: double check the subtypes  
+# 
+########################################################
+########################################################
+aa = readRDS(file = paste0(RdataDir, '/Kuppe2022_heart_donorSelected_subtypes.added.rds'))
+
+annot_file = list.files(path = '../published_dataset/human/Kuppe_et_al_2022/processed_data_Robj/subtype_annot',
+                        pattern = '*.Rds', full.names = TRUE)
 
 ##########################################
-# double check the subtypes  
+# manually add the batch information, those batch information were found in the subtype_annot files 
 ##########################################
-aa = readRDS(file = paste0(RdataDir, '/Kuppe2022_heart_donorSelected_subtypes.added.rds'))
+aa$sample = droplevels(aa$sample)
+aa$batch = 'B'
+aa$batch[grep('CK1', aa$sample)] = 'A' 
 
 jj = which(aa$cell_type_original == 'Mast'| aa$cell_type_original == 'Cycling cells' |
              aa$cell_type_original == 'Adipocyte')
 
 aa$annotation[jj] = as.character(aa$cell_type_original[jj])
+
+
 
 p1 = DimPlot(aa, reduction = 'umap', group.by = 'cell_type_original', raster=FALSE, label = TRUE, repel = TRUE)
 p2 = DimPlot(aa, reduction = 'umap', group.by = 'annotation', raster=FALSE, label = TRUE, repel = TRUE)
@@ -325,6 +350,147 @@ p1 + p2
 ggsave(filename = paste0(resDir, '/umap_celltype_sutypes.pdf'), width = 16, height = 6)
 
 
+##########################################
+# ## double check CM
+##########################################
+source('functions_dataIntegration.R')
+
+celltype = 'Cardiomyocyte'
+#celltype = 'Fibroblast'
+
+outDir = paste0(resDir, '/', celltype)
+if(!dir.exists(outDir)) dir.create(outDir)
+n = grep(celltype, annot_file)
+cat(n, '--', basename(annot_file[n]), '-- cell type : ', celltype, '\n')
+
+xx = readRDS(annot_file[n])
+cat(nrow(xx), 'cells \n')
+print(table(xx$annotation))
+
+p1 = DimPlot(xx, group.by = 'annotation', reduction = 'umap')
+p2 = DimPlot(xx, group.by = 'orig.ident', reduction = 'umap')
+p3 = DimPlot(xx, group.by = 'patient', reduction = 'umap')
+p4 = DimPlot(xx, group.by = 'batch', reduction = 'umap')
+
+(p1 + p2)/(p3 + p4)
+
+ggsave(filename = paste0(outDir, '/umap_subtypes_sample_patient_batch_', celltype, '.pdf'),
+       width = 16, height = 12)
 
 
+p1 = DimPlot(xx, group.by = 'annotation', reduction = 'umap_harmony')
+p2 = DimPlot(xx, group.by = 'annotation', reduction = 'umap_harmony_v2')
 
+p1 + p2
+
+ggsave(filename = paste0(outDir, '/umap_clusters_celltype_originalIntegration_', celltype, '.pdf'),
+       width = 16, height = 8)
+
+rm(xx)
+
+## code modified based on 
+## https://github.com/saezlab/visium_heart/blob/master/sub-clustering/Cardiomyocyte/03_integrate_snRNA.ipynb
+subs = subset(aa, cells = colnames(aa)[which(aa$cell_type_original == celltype)])
+
+### we remove samples with less than 400 cells
+df_cell_count <- as.data.frame(subs@meta.data) %>%
+  group_by(sample) %>%
+  summarise(count = n()) %>%
+  arrange(desc(count))
+
+df_cell_count
+df_cell_count <- subset(df_cell_count, count > 400)
+
+subs <- subset(subs, sample %in% df_cell_count$sample)
+
+DimPlot(subs, group.by = 'cell_type_original', raster=FALSE, label = TRUE, repel = TRUE)
+
+subs  <-  subs %>% 
+  NormalizeData() %>%
+  FindVariableFeatures() %>%
+  ScaleData() %>%
+  RunPCA(verbose = FALSE) %>%
+  RunUMAP(dims = 1:30, reduction = 'pca', n.neighbors = 30, min.dist = 0.1)
+
+subs <- RunUMAP(subs, dims = 1:30, reduction = 'harmony', n.neighbors = 30, min.dist = 0.1,
+                reduction.name = 'harmony_umap')
+
+p1 = DimPlot(subs, label = TRUE, repel = TRUE, group.by = 'annotation', raster=FALSE, reduction = 'umap')
+p2 = DimPlot(subs, label = TRUE, repel = TRUE, group.by = 'annotation', raster=FALSE, 
+             reduction = 'harmony_umap')
+
+p1 + p2 
+
+ggsave(filename = paste0(outDir, '/umap_subtypes_umap.no.integration_original.harmony.umap_',
+                         celltype, '.pdf'), width = 16, height = 8)
+
+
+options(repr.plot.height = 5, repr.plot.width = 20)
+p1 <- DimPlot(subs, reduction = "umap", group.by = "sample")
+p2 <- DimPlot(subs, reduction = "umap", group.by = "patient_region_id")
+p3 <- DimPlot(subs, reduction = "umap", group.by = "batch")
+p4 <- DimPlot(subs, reduction = "umap", group.by = "patient_group", label = TRUE)
+
+patchwork::wrap_plots(list(p1, p2, p3, p4), nrow = 2)
+
+ggsave(filename = paste0(outDir, '/umap_samples_patient_region_batch_', celltype, '.pdf'), 
+       width = 12, height = 8)
+
+subs$sample = droplevels(subs$sample)
+subs$patient_region_id = droplevels(subs$patient_region_id)
+#subs$batch = droplevels(subs$batch)
+
+subs <- harmony::RunHarmony(subs, 
+                   group.by.vars = c("sample", "patient_region_id", "batch"),
+                    reduction = "pca", 
+                    max.iter.harmony = 30, 
+                          dims.use = 1:30,
+                          project.dim = FALSE,
+                          plot_convergence = TRUE)
+
+subs <- RunUMAP(subs, dims = 1:30, 
+                reduction = 'harmony',
+                reduction.name = "umap_harmony2",
+                reduction.ke = 'umapharmony2_',
+                verbose = FALSE,
+                min.dist = 0.1)
+
+p1 = DimPlot(subs, label = TRUE, repel = TRUE, group.by = 'annotation', raster=FALSE, reduction = 'umap')
+p2 = DimPlot(subs, label = TRUE, repel = TRUE, group.by = 'annotation', raster=FALSE, 
+             reduction = 'harmony_umap')
+p3 = DimPlot(subs, label = TRUE, repel = TRUE, group.by = 'annotation', raster=FALSE, 
+             reduction = 'umap_harmony2')
+
+p1 + p2 + p3
+
+ggsave(filename = paste0(outDir, '/umap_subtypes_umap.no.integration_original.harmony.umap_',
+                         celltype, '.pdf'), width = 20, height = 8)
+
+subs$condition = paste0(subs$sample, '_', subs$patient_region_id, '_', subs$batch)
+
+ref.combined = IntegrateData_Seurat_RPCA(subs, group.by = 'condition', 
+                                         redo.normalization.scaling = TRUE,
+                                         correct.all = TRUE)
+
+saveRDS(ref.combined, file = paste0(outDir, '/seuratObj_dataIntegration_seuratRPCA_', 
+                                    celltype, '.rds'))
+
+DimPlot(ref.combined, group.by = 'annotation', label = TRUE, repel = TRUE)
+
+ggsave(filename = paste0(outDir, '/umap_subtypes_seuratRPCA_',
+                         celltype, '.pdf'), width = 12, height = 8)
+
+
+#ElbowPlot(subs, ndims = 50)
+ref.combined <- FindNeighbors(ref.combined, dims = 1:20, reduction = 'pca')
+ref.combined <- FindClusters(ref.combined, verbose = FALSE, algorithm = 3, resolution = 0.7)
+ref.combined <- RunUMAP(ref.combined, dims = 1:30, reduction = 'pca', n.neighbors = 30, min.dist = 0.1,
+                reduction.name = 'umap')
+
+p1 = DimPlot(ref.combined, group.by = 'annotation', label = TRUE, repel = TRUE)
+p2 = DimPlot(ref.combined, group.by = 'seurat_cluster', label = TRUE, repel = TRUE)
+
+p1 + p2
+
+ggsave(filename = paste0(outDir, '/umap_subtypes_seuratRPCA_clusters_',
+                         celltype, '.pdf'), width = 16, height = 8)

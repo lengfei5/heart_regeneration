@@ -52,7 +52,8 @@ for(n in 1:nrow(design))
   #aa <- SCTransform(aa, assay = "Spatial",  method = "glmGamPoi", verbose = FALSE)
   
   aa = subset(aa, subset = nCount_Spatial > 10) # 10 umi from the umi rank
-  aa <- SCTransform(aa, assay = "Spatial", verbose = FALSE, variable.features.n = 3000, return.only.var.genes = FALSE)
+  aa <- SCTransform(aa, assay = "Spatial", verbose = FALSE, 
+                    variable.features.n = 3000, return.only.var.genes = FALSE)
   
   if(check.QC.each.condition){
     
@@ -442,6 +443,8 @@ for(n in 1:length(cc))
 ########################################################
 load(file = paste0(RdataDir, 'seuratObject_design_variableGenes_umap.clustered', species, '.Rdata'))
 st$condition = factor(st$condition, levels = design$condition)
+
+#saveRDS(st, file = paste0(RdataDir, 'seuratObj_visum_share_Ines.rds'))
 
 # refined subtypes by Elad
 refs_file = paste0('/groups/tanaka/Collaborations/Jingkui-Elad/scMultiome/aa_subtypes_final_20221117.rds')
