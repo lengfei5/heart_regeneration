@@ -341,7 +341,6 @@ jj = which(aa$cell_type_original == 'Mast'| aa$cell_type_original == 'Cycling ce
 aa$annotation[jj] = as.character(aa$cell_type_original[jj])
 
 
-
 p1 = DimPlot(aa, reduction = 'umap', group.by = 'cell_type_original', raster=FALSE, label = TRUE, repel = TRUE)
 p2 = DimPlot(aa, reduction = 'umap', group.by = 'annotation', raster=FALSE, label = TRUE, repel = TRUE)
 
@@ -494,3 +493,5 @@ p1 + p2
 
 ggsave(filename = paste0(outDir, '/umap_subtypes_seuratRPCA_clusters_',
                          celltype, '.pdf'), width = 16, height = 8)
+
+
