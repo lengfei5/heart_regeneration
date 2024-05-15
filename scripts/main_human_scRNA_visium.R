@@ -495,3 +495,4 @@ ggsave(filename = paste0(outDir, '/umap_subtypes_seuratRPCA_clusters_',
                          celltype, '.pdf'), width = 16, height = 8)
 
 
+

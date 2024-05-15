@@ -814,13 +814,14 @@ if(process_and_batchCorrection_noCM){
 ## 2) merge CM and noCM first and correct the batch in data integration
 ########################################################
 ########################################################
+cms = readRDS(file = paste0(RdataDir, 'Seurat.obj_neonatalMice_CM_Cui2020_shoval.version_P1_clusterd.rds'))
+aa = readRDS(file = paste0(RdataDir, 'Wang_DevCell_2020_scRNAseq_P1_regressedout.rds'))
+
 
 ##########################################
 # merge CMs and noCMs 
 # also test if correct the batch effect on each dataset
 ##########################################
-cms = readRDS(file = paste0(RdataDir, 'Seurat.obj_neonatalMice_CM_Cui2020_shoval.version_P1_clusterd.rds'))
-aa = readRDS(file = paste0(RdataDir, 'Wang_DevCell_2020_scRNAseq_P1_regressedout.rds'))
 
 cms[['integrated']] <- NULL
 
@@ -1719,3 +1720,23 @@ DimPlot(refs, reduction = 'umap', group.by = 'subtype',raster = T,shuffle= T, pt
 saveRDS(refs, file = paste0('../data/data_examples/ref_scRNAseq_neonatalMice_clean.v1.2.rds'))
 
 
+##########################################
+# check Axl gene
+##########################################
+Check_Axl_inCM =FALSE
+if(Check_Axl_inCM){
+  aa = readRDS(file = paste0('../data/data_examples/ref_scRNAseq_neonatalMice_clean.v1.2.rds'))
+  
+  #DefaultAssay(cms) = 'integrated'
+  p1 = DimPlot(aa, group.by = 'celltype', label = TRUE, repel = TRUE)
+  p2 = DimPlot(aa, group.by = 'condition',label = TRUE, repel = TRUE)
+  p1 / p2
+  p3 = FeaturePlot(aa, features = c('Axl', 'Gas6', 'Nppa', 'Myh6'), max.cutoff = 'q99')
+  
+  (p1 + p2) / p3
+  
+  ggsave(paste0(resDir, '/Ref_neonatalMice_CM.Cui2020_noCM.Wang2020_P1_UMAP_',
+                '_afterFiltering_clusterPerCondition_Gas6_Axl.pdf'), 
+         width = 16, height = 16)
+  
+}
