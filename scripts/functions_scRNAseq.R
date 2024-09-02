@@ -628,7 +628,8 @@ explore.umap.params.combination = function(sub.obj,
   {
     # nfeatures = nfeatures.sampling[1]
     cat('------------- nfeatures - ', nfeatures, '\n')
-    sub.obj <- FindVariableFeatures(sub.obj, selection.method = "vst", nfeatures = nfeatures, verbose = FALSE)
+    sub.obj <- FindVariableFeatures(sub.obj, selection.method = "vst", nfeatures = nfeatures, 
+                                    verbose = FALSE)
     # not scale every time
     # sub.obj = ScaleData(sub.obj, verbose = FALSE)
     sub.obj <- RunPCA(object = sub.obj, features = VariableFeatures(sub.obj), verbose = FALSE, 
@@ -648,7 +649,8 @@ explore.umap.params.combination = function(sub.obj,
             # nb.pcs = 50 # nb of pcs depends on the considered clusters or ids 
             # n.neighbors = 50;
             # min.dist = 0.05; spread = 1;
-            sub.obj <- RunUMAP(object = sub.obj, reduction = 'pca', reduction.name = "umap", dims = 1:nb.pcs, 
+            sub.obj <- RunUMAP(object = sub.obj, reduction = 'pca', reduction.name = "umap", 
+                               dims = 1:nb.pcs, 
                                spread = spread, n.neighbors = n.neighbors, 
                                min.dist = min.dist, verbose = FALSE)
             
