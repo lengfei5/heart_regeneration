@@ -10,10 +10,11 @@
 rm(list = ls())
 
 species = 'axolotl'
-version.analysis = '_R17246_visium_20240902'
+version.analysis = '_R17246_R12830_allVisium_20240905'
 dataDir = '../R17246_visium_axolotl/nf_out'
+
 resDir = paste0("../results/visium_axolotl", version.analysis)
-RdataDir = paste0('../results/Rdata/')
+RdataDir = paste0(resDir, '/Rdata/')
 
 if(!dir.exists(resDir)) dir.create(resDir)
 if(!dir.exists(RdataDir)) dir.create(RdataDir)
@@ -31,26 +32,29 @@ mem_used()
 # first processing and QCs 
 ########################################################
 ########################################################
-design = data.frame(sampleID = seq(294946, 294949), 
-                    condition = c(paste0('Amex_d', c(0, 0, 4, 7))), stringsAsFactors = FALSE)
+design = data.frame(sampleID = c(seq(294946, 294949),seq(183623, 183626)), 
+                    time = c(paste0('Amex_d', c(0, 4, 7, 0, 1, 4, 7, 14))), 
+                    stringsAsFactors = FALSE)
+
+design$condition = paste0(design$time, '_', design$sampleID)
+
 varibleGenes = c()
 check.QC.each.condition = TRUE
 
 for(n in 1:nrow(design))
 {
   # n = 1
-  cat('-----------', design$condition[n], '-------------\n')
+  cat('-----------', design$condition[n], '--', design$sampleID[n], '-------------\n')
   # load nf output and process
   source('functions_Visium.R')
-  aa = make_SeuratObj_visium(topdir = paste0(dataDir, '/', design$condition[n], '_', 
-                                             design$sampleID[n], '/'), 
+  aa = make_SeuratObj_visium(topdir = paste0(dataDir, '/', design$condition[n],  '/'), 
                              saveDir = paste0(resDir, '/', 
-                                              design$condition[n], '_', design$sampleID[n], '/'), 
+                                              design$condition[n], '/'), 
                              keyname = design$condition[n], 
                              QC.umi = TRUE)
   
   aa$condition = design$condition[n]
-  
+  aa$sampleid = design$sampleID[n]
   #aa <- SCTransform(aa, assay = "Spatial",  method = "glmGamPoi", verbose = FALSE)
   
   aa = subset(aa, subset = nCount_Spatial > 10) # 10 umi from the umi rank
@@ -66,6 +70,7 @@ for(n in 1:nrow(design))
     # get MT% (genes curated from NCBI chrMT genes)
     mtgenes = c("COX1", "COX2", "COX3", "ATP6", "ND1", "ND5", "CYTB", "ND2", 
                 "ND4", "ATP8", "MT-CO1", "COI", "LOC9829747")
+    
     mtgenes = c(mtgenes, paste0("MT", mtgenes), paste0("MT-", mtgenes))
     
     ggs = sapply(rownames(aa), function(x) unlist(strsplit(as.character(x), '-'))[1])
@@ -111,12 +116,11 @@ for(n in 1:nrow(design))
     
     SpatialFeaturePlot(aa, features = features[2])
     
-    
     dev.off()
     
     
     saveRDS(aa, file = paste0(RdataDir, 'seuratObject_design_st_', design$condition[n], 
-                              version.analysis, '.rds'))
+                               version.analysis, '.rds'))
     
   }
   
@@ -135,15 +139,28 @@ for(n in 1:nrow(design))
 }
 
 save(design, varibleGenes, st, 
-     file = paste0(RdataDir, 'seuratObject_design_variableGenes_', species, version.analysis, '.Rdata'))
+     file = paste0(RdataDir, 'seuratObject_design_variableGenes_', species, version.analysis, 
+                   '.Rdata'))
 
 ########################################################
 ########################################################
-# Section : QC and marker gene checking
+# Section II: QC and marker gene checking
 # 
 ########################################################
 ########################################################
-load(file = paste0(RdataDir, 'seuratObject_design_variableGenes_', species, version.analysis, '.Rdata'))
+load(file = paste0(RdataDir, 'seuratObject_design_variableGenes_', species, 
+                   version.analysis, '.Rdata'))
+
+st$condition = factor(st$condition, levels = c('Amex_d0_294946', 'Amex_d0_294949',
+                                                  'Amex_d1_183623',
+                                                  'Amex_d4_294947', 'Amex_d4_183624',
+                                                  'Amex_d7_294948', 'Amex_d7_183625', 
+                                                  'Amex_d14_183626'))
+
+Idents(st) = st$condition
+
+SpatialFeaturePlot(st, features = 'nCount_Spatial', ncol = 4, image.alpha = 0.1)
+SpatialFeaturePlot(st, features = 'nFeature_Spatial', ncol = 4)
 
 ##########################################
 # gene and cell filtering (to add later)
@@ -151,20 +168,24 @@ load(file = paste0(RdataDir, 'seuratObject_design_variableGenes_', species, vers
 Filtering.cells.genes = FALSE
 if(Filtering.cells.genes){
   #st[["percent.mt"]] <- PercentageFeatureSet(st, pattern = "^Mt-")
-  # Visualize QC metrics as a violin plot
-  Idents(st) = st$condition
   
-  VlnPlot(st, features = c("nCount_Spatial")) + 
-    geom_hline( yintercept = c(2500, 5000)) + 
-    scale_y_continuous(limits = c(0, 30000))
-  ggsave(paste0(resDir, '/QCs_reseq_nUMI.counts.pdf'), width = 12, height = 8)
+  # Visualize QC metrics as a violin plot
+  #Idents(st) = st$condition
+  
+  VlnPlot(st, features = c("nCount_Spatial"), log = FALSE) + 
+    geom_hline(yintercept = c(300, 500)) + 
+    scale_y_continuous(limits = c(0, 5000))
+  
+  ggsave(paste0(resDir, '/QCs_reseq_nUMI.counts_linear.pdf'), width = 12, height = 8)
   
   VlnPlot(st, features = c("nFeature_Spatial")) + 
-    geom_hline( yintercept = c(500, 1000)) + 
-    scale_y_continuous(limits = c(0, 3000))
+    geom_hline( yintercept = c(100, 200, 500)) + 
+    scale_y_continuous(limits = c(0, 2000))
   ggsave(paste0(resDir, '/QCs_reseq_nFeatures_Spatial.pdf'), width = 12, height = 8)
   
-  FeatureScatter(st, feature1 = "nCount_Spatial", feature2 = "nFeature_Spatial")
+  FeatureScatter(st, feature1 = "nCount_Spatial", feature2 = "nFeature_Spatial") + 
+  geom_hline(yintercept = c(100, 200)) + 
+  geom_vline(xintercept = c(100, 300, 500))
   
   FeatureScatter(st, feature1 = "nCount_Spatial", feature2 = "nCount_SCT")
   
@@ -185,13 +206,45 @@ if(Filtering.cells.genes){
   features = rownames(st)[grep('MYH6|NPPA|CLU-AMEX60DD032706', rownames(st))]
   #FeaturePlot(aa, features = features)
   
-  SpatialFeaturePlot(st, features = features[2])
-  #SpatialFeaturePlot(st, features = features[3])
+  SpatialFeaturePlot(st, features = features[2], ncol = 4)
+  ggsave(paste0(resDir, '/QCs_Visium_featurePlots_NPPA.pdf'), width = 12, height = 8)
+  
+  SpatialFeaturePlot(st, features = features[4], ncol = 4)
+  ggsave(paste0(resDir, '/QCs_Visium_featurePlots_MYH6.pdf'), width = 12, height = 8)
+  
+  
+  
+  p1 = VlnPlot(st, features = c("nCount_Spatial"), pt.size = 0.7) + NoLegend() +
+    geom_hline(yintercept = 200)
+  
+  p2 = VlnPlot(st, features = c("nFeature_Spatial"), pt.size = 0.7) + NoLegend() +
+    geom_hline(yintercept = 100)
+  
+  plot(wrap_plots(p1, p2))
+  
+  
+  cat(ncol(st), ' spots before cell filtering \n')
+  sels = which(st$nCount_Spatial > 300 & st$nFeature_Spatial > 200)
+  st= st[, sels]
+  cat(ncol(st), ' spots after cell filtering \n')
+  
+  p1 = SpatialFeaturePlot(st, features = features[2])
+  
+  p2 = SpatialFeaturePlot(st, features = features[4])
+  
+  p1 / p2
+ 
+  saveRDS(st, file = paste0(RdataDir, 'seuratObject_st_filtered.spots', version.analysis, '.rds'))
   
 }
 
-#st = SCTransform(st, assay = "Spatial", verbose = FALSE)
 
+st = readRDS(file = paste0(RdataDir, 'seuratObject_st_filtered.spots', version.analysis, '.rds'))
+
+##########################################
+# test SCT normalization
+##########################################
+#st = SCTransform(st, assay = "Spatial", verbose = FALSE)
 DefaultAssay(st) <- "SCT"
 VariableFeatures(st) <- varibleGenes
 
@@ -208,18 +261,42 @@ DimPlot(st, reduction = "umap", group.by = c("ident", "condition"))
 
 ggsave(filename = paste0(resDir, '/UMAP_all.timepoints_', species, '.pdf'), width = 16, height = 8)
 
-features = rownames(st)[grep('MYH6|NPPA|CLU-AMEX60DD032706', rownames(st))]
-FeaturePlot(st, features = features)
-
-SpatialFeaturePlot(st, features = features[2])
+#features = rownames(st)[grep('MYH6|NPPA|AXL|CLU-AMEX60DD032706', rownames(st))]
+#FeaturePlot(st, features = features)
+#SpatialFeaturePlot(st, features = features[1])
 
 save(design, varibleGenes, st, 
-     file = paste0(RdataDir, 'seuratObject_design_variableGenes_umap.clustered', species, version.analysis,'.Rdata'))
+     file = paste0(RdataDir, 'seuratObject_design_variableGenes_umap.clustered', 
+                   species, version.analysis,'.Rdata'))
 
 ##########################################
 # QCs with marker genes
 ##########################################
-load(file = paste0(RdataDir, 'seuratObject_design_variableGenes_umap.clustered', species, version.analysis,'.Rdata'))
+st = readRDS(file = paste0(RdataDir, 'seuratObject_st_filtered.spots', version.analysis, '.rds'))
+
+SpatialFeaturePlot(st, features = 'nCount_Spatial', image.alpha = 0.5, ncol = 4)
+
+ggsave(paste0(resDir, '/QCs_allVisium_SpatialFeatures_nCount.pdf'), width = 12, height = 8)
+
+SpatialFeaturePlot(st, features = 'nFeature_Spatial', image.alpha = 0.5, ncol = 4)
+ggsave(paste0(resDir, '/QCs_allVisium_SpatialFeatures_nFeature.pdf'), width = 12, height = 8)
+
+VlnPlot(st, features = c("nCount_Spatial"), log = FALSE) + 
+  geom_hline(yintercept = c(300, 500)) + 
+  scale_y_continuous(limits = c(0, 20000))
+
+ggsave(paste0(resDir, '/QCs_allVisium_VlinPlot_nCount.pdf'), width = 12, height = 8)
+
+VlnPlot(st, features = c("nFeature_Spatial"), log = FALSE) + 
+  geom_hline(yintercept = c(500, 1000)) + 
+  scale_y_continuous(limits = c(0, 3000))
+ggsave(paste0(resDir, '/QCs_allVisium_VlinPlot_nFeature.pdf'), width = 12, height = 8)
+
+VlnPlot(st, features = c("percent.mt"), log = FALSE) + 
+  geom_hline(yintercept = c(30, 50)) + 
+  scale_y_continuous(limits = c(0, 70))
+ggsave(paste0(resDir, '/QCs_allVisium_VlinPlot_pctMT.pdf'), width = 12, height = 8)
+
 
 QCs.with.marker.genes = FALSE
 if(QCs.with.marker.genes){
@@ -237,7 +314,10 @@ if(QCs.with.marker.genes){
   }
   markers = unique(c(markers, c('hmgb2', 'top2a', 'AGRN')))
   
-  markers = c("Ntn1", "Mfap5", "Ubb", "Spon2", "Sparc", "Comp", "Ncanb", "Cthrc1", "Gpr42", "Ffr2")
+  markers = unique(c(markers, 
+                     c("Ntn1", "Mfap5", "Ubb", "Spon2", "Sparc", "Comp", 
+                       "Ncanb", "Cthrc1", "Gpr42", "Ffr2")))
+                   
   markers = markers[which(markers != '')]
   markers = firstup(tolower(unique(markers)))
   markers = gsub(' ', '', markers)
@@ -257,18 +337,19 @@ if(QCs.with.marker.genes){
   #markers[is.na(match(markers, rownames(st)))]
   #markers = markers[!is.na(match(markers, rownames(st)))]
   xx = rownames(st)[grep('CLU', rownames(st))]
-  p0 = SpatialFeaturePlot(st, features = xx[2], image.alpha = 0.5)
+  p0 = SpatialFeaturePlot(st, features = features[4], image.alpha = 0.2)
   p1 = SpatialDimPlot(st, image.alpha = 0.5)
   plot(wrap_plots(p0, p1, nrow = 2))
   
-  pdfname = paste0(resDir, "/check_detected_celltypes_using_AdditionalMarkerGenes_Bern_", species, ".pdf")
+  pdfname = paste0(resDir, "/check_detected_celltypes_using_AdditionalMarkerGenes_Bern_", 
+                   species, ".pdf")
   pdf(pdfname, width = 16, height = 8)
   par(cex = 1.0, las = 1, mgp = c(2,0.2,0), mar = c(3,2,2,0.2), tcl = -0.3)
   
   for(n in 1:length(markers))
   {
     cat(markers[n], '\n')
-    p3 = SpatialFeaturePlot(st, features = markers[n], image.alpha = 0.5)
+    p3 = SpatialFeaturePlot(st, features = markers[n], image.alpha = 0.5, ncol = 4)
     
     plot(p3)
     
@@ -278,164 +359,167 @@ if(QCs.with.marker.genes){
   
 }
 
-#features = rownames(st)[grep('COL2A1|COL3A1|AMEX60DD013528|CIRBP', rownames(st))]
-features = rownames(st)[grep('AMEX60DD028911|AMEX60DD002594|TGFBI|AMEX60DD029613', rownames(st))]
-
-SpatialFeaturePlot(st, features = features[1], image.alpha = 0.5)
 
 ########################################################
 ########################################################
-# Section : start the analysis 
+# Section III: start the analysis 
 # analyze the axolotl visium per condition
 # To identify the boarder zone
 ########################################################
 ########################################################
-##########################################
-# loop over all conditions of st
-##########################################
-load(file = paste0(RdataDir, 'seuratObject_design_variableGenes_umap.clustered', species, '.Rdata'))
-#st = Seurat::SplitObject(st, split.by = 'condition')
-
-st$condition = factor(st$condition, levels = design$condition)
-
-DefaultAssay(st) = 'Spatial'
-st <- NormalizeData(st, normalization.method = "LogNormalize", scale.factor = 10000)
-st <- FindVariableFeatures(st, selection.method = "vst", nfeatures = 3000)
-all.genes <- rownames(st)
-st <- ScaleData(st, features = all.genes)
-
-st <- RunPCA(st, verbose = FALSE, features = VariableFeatures(object = st), weight.by.var = TRUE)
-ElbowPlot(st, ndims = 30)
-
-st <- RunUMAP(st, dims = 1:20, n.neighbors = 30, min.dist = 0.05)
-
-DimPlot(st, group.by = 'condition', label = TRUE, repel = TRUE)
-
-
-cat('visium conditions :\n')
-print(table(design$condition))
-cc = design$condition
-
-use.SCTransform = TRUE
-
-for(n in 1:length(cc))
-#for(n in 1:2)
-{
-  # n = 4
-  aa = readRDS(file = paste0(RdataDir, 'seuratObject_design_st_', cc[n],  '.rds'))
-  
-  if(use.SCTransform){
-    DefaultAssay(aa) <- "SCT"
-  }else{
-    
-    DefaultAssay(aa) = 'Spatial'
-    aa <- NormalizeData(aa, normalization.method = "LogNormalize", scale.factor = 10000)
-    aa <- FindVariableFeatures(aa, selection.method = "vst", nfeatures = 2000)
-    all.genes <- rownames(aa)
-    aa <- ScaleData(aa, features = all.genes)
-    
-  }
-  
-  aa <- RunPCA(aa, verbose = FALSE, features = VariableFeatures(object = aa), weight.by.var = TRUE)
-  ElbowPlot(aa)
-  
-  DimPlot(aa, reduction = 'pca')
-  
-  par(mfrow = c(2,2))
-  plot(aa@reductions$pca@cell.embeddings[,1], aa$nCount_Spatial, xlab = 'PC1')
-  plot(aa@reductions$pca@cell.embeddings[,2], aa$nCount_Spatial, xlab = 'PC2')
-  plot(aa@reductions$pca@cell.embeddings[,3], aa$nCount_Spatial, xlab = 'PC3')
-  plot(aa@reductions$pca@cell.embeddings[,4], aa$nCount_Spatial, xlab = 'PC4')
-  
-  aa <- RunUMAP(aa, dims = 1:20, n.neighbors = 30, min.dist = 0.05)
-  
-  aa <- FindNeighbors(aa, dims = 1:20)
-  aa <- FindClusters(aa, verbose = FALSE, algorithm = 3, resolution = 1.5)
-  
-  p1 = DimPlot(aa, reduction = "umap", group.by = c("ident"), label = TRUE, label.size = 8)
-  p2 <- SpatialDimPlot(aa, label = TRUE, label.size = 5)
-  p1 + p2
-  
-  
-  ggsave(filename =  paste0(resDir, "/Spatial_patterning_", species, '_', cc[n], ".pdf"), width = 12, height = 8)
-  
-  features = rownames(st)[grep('MYH6|NPPA|CLU-AMEX60DD032706', rownames(st))]
-  FeaturePlot(st, features = features)
-  
-  SpatialFeaturePlot(st, features = features[2])
-  
+Data_Exploration = FALSE
+if(Data_Exploration){
   ##########################################
-  # to check if there is border zone, manually select border zone and remote zones from images 
+  # loop over all conditions of st
   ##########################################
-  source('functions_Visium.R')
-  aa = manual_selection_spots_image_Spata(aa, slice = cc[n])
+  #st = readRDS(file = paste0(RdataDir, 'seuratObject_st_filtered.spots', version.analysis, '.rds'))
+  st = readRDS(file = paste0(RdataDir, 'seuratObject_st_filtered.spots_time_conditions', 
+                             version.analysis, '.rds'))
+  #load(file = paste0(RdataDir, 'seuratObject_design_variableGenes_umap.clustered', species, '.Rdata'))
+  #st = Seurat::SplitObject(st, split.by = 'condition')
   
-  SpatialDimPlot(aa, group.by = 'segmentation', label = TRUE, label.size = 5)
+  #st$condition = factor(st$condition, levels = design$condition)
   
-  ggsave(filename =  paste0(resDir, "/manual_segmentation_", species, '_', cc[n], ".pdf"), width = 12, height = 8)
+  DefaultAssay(st) = 'Spatial'
+  st <- NormalizeData(st, normalization.method = "LogNormalize", scale.factor = 10000)
+  st <- FindVariableFeatures(st, selection.method = "vst", nfeatures = 3000)
+  all.genes <- rownames(st)
+  st <- ScaleData(st, features = all.genes)
   
-  Idents(aa) = aa$segmentation
+  st <- RunPCA(st, verbose = FALSE, features = VariableFeatures(object = st), weight.by.var = TRUE)
+  ElbowPlot(st, ndims = 30)
   
-  border_markers1 = FindMarkers(aa, ident.1 = 'border_zone', ident.2 = 'remote_zone1', only.pos = FALSE, 
-                               min.pct = 0.2, logfc.threshold = 0.25)
+  st <- RunUMAP(st, dims = 1:20, n.neighbors = 30, min.dist = 0.05)
   
-  border_markers2 = FindMarkers(aa, ident.1 = 'border_zone', ident.2 = 'remote_zone2', only.pos = FALSE, 
-                               min.pct = 0.2, logfc.threshold = 0.25)
+  DimPlot(st, group.by = 'condition', label = TRUE, repel = TRUE)
   
-  SpatialFeaturePlot(aa, features = rownames(border_markers1)[c(1:4)])
+  cat('visium conditions :\n')
+  print(table(design$condition))
+  cc = design$condition
   
-  SpatialFeaturePlot(aa, features = rownames(border_markers2)[c(1:4)])
+  use.SCTransform = TRUE
   
-  
-  ##########################################
-  # test BayesSpace to predict spatial domain
-  ##########################################
-  source('functions_Visium.R')
-  
-  ##########################################
-  # # test SpatialDE
-  ##########################################
-  source('functions_Visium.R')
-  ggs = Find.SpatialDE(aa, use.method = 'sparkX')
-  
-  markers = rownames(ggs)[which(ggs$adjustedPval<10^-6)]
-  markers = markers[c(1:300)]
-  
-  pdfname = paste0(resDir, "/Spatial_patterningGenes_", species, '_', cc[n], ".pdf")
-  pdf(pdfname, width = 20, height = 8)
-  par(cex = 1.0, las = 1, mgp = c(2,0.2,0), mar = c(3,2,2,0.2), tcl = -0.3)
-  
-  for(n in 1:length(markers))
+  for(n in 1:length(cc))
+    #for(n in 1:2)
   {
-    cat(n, '--', markers[n], '\n')
-    p3 = SpatialFeaturePlot(st, features = markers[n], alpha = c(0.1, 1))
+    # n = 4
+    aa = readRDS(file = paste0(RdataDir, 'seuratObject_design_st_', cc[n],  '.rds'))
     
-    plot(p3)
+    if(use.SCTransform){
+      DefaultAssay(aa) <- "SCT"
+    }else{
+      
+      DefaultAssay(aa) = 'Spatial'
+      aa <- NormalizeData(aa, normalization.method = "LogNormalize", scale.factor = 10000)
+      aa <- FindVariableFeatures(aa, selection.method = "vst", nfeatures = 2000)
+      all.genes <- rownames(aa)
+      aa <- ScaleData(aa, features = all.genes)
+      
+    }
+    
+    aa <- RunPCA(aa, verbose = FALSE, features = VariableFeatures(object = aa), weight.by.var = TRUE)
+    ElbowPlot(aa)
+    
+    DimPlot(aa, reduction = 'pca')
+    
+    par(mfrow = c(2,2))
+    plot(aa@reductions$pca@cell.embeddings[,1], aa$nCount_Spatial, xlab = 'PC1')
+    plot(aa@reductions$pca@cell.embeddings[,2], aa$nCount_Spatial, xlab = 'PC2')
+    plot(aa@reductions$pca@cell.embeddings[,3], aa$nCount_Spatial, xlab = 'PC3')
+    plot(aa@reductions$pca@cell.embeddings[,4], aa$nCount_Spatial, xlab = 'PC4')
+    
+    aa <- RunUMAP(aa, dims = 1:20, n.neighbors = 30, min.dist = 0.05)
+    
+    aa <- FindNeighbors(aa, dims = 1:20)
+    aa <- FindClusters(aa, verbose = FALSE, algorithm = 3, resolution = 1.5)
+    
+    p1 = DimPlot(aa, reduction = "umap", group.by = c("ident"), label = TRUE, label.size = 8)
+    p2 <- SpatialDimPlot(aa, label = TRUE, label.size = 5)
+    p1 + p2
+    
+    
+    ggsave(filename =  paste0(resDir, "/Spatial_patterning_", species, '_', cc[n], ".pdf"), 
+           width = 12, height = 8)
+    
+    features = rownames(st)[grep('MYH6|NPPA|CLU-AMEX60DD032706', rownames(st))]
+    FeaturePlot(st, features = features)
+    
+    SpatialFeaturePlot(st, features = features[2])
+    
+    ##########################################
+    # to check if there is border zone, manually select border zone and remote zones from images 
+    ##########################################
+    source('functions_Visium.R')
+    aa = manual_selection_spots_image_Spata(aa, slice = cc[n])
+    
+    SpatialDimPlot(aa, group.by = 'segmentation', label = TRUE, label.size = 5)
+    
+    ggsave(filename =  paste0(resDir, "/manual_segmentation_", species, '_', cc[n], ".pdf"), width = 12, height = 8)
+    
+    Idents(aa) = aa$segmentation
+    
+    border_markers1 = FindMarkers(aa, ident.1 = 'border_zone', ident.2 = 'remote_zone1', only.pos = FALSE, 
+                                  min.pct = 0.2, logfc.threshold = 0.25)
+    
+    border_markers2 = FindMarkers(aa, ident.1 = 'border_zone', ident.2 = 'remote_zone2', only.pos = FALSE, 
+                                  min.pct = 0.2, logfc.threshold = 0.25)
+    
+    SpatialFeaturePlot(aa, features = rownames(border_markers1)[c(1:4)])
+    
+    SpatialFeaturePlot(aa, features = rownames(border_markers2)[c(1:4)])
+    
+    
+    ##########################################
+    # test BayesSpace to predict spatial domain
+    ##########################################
+    source('functions_Visium.R')
+    
+    ##########################################
+    # # test SpatialDE
+    ##########################################
+    source('functions_Visium.R')
+    ggs = Find.SpatialDE(aa, use.method = 'sparkX')
+    
+    markers = rownames(ggs)[which(ggs$adjustedPval<10^-6)]
+    markers = markers[c(1:300)]
+    
+    pdfname = paste0(resDir, "/Spatial_patterningGenes_", species, '_', cc[n], ".pdf")
+    pdf(pdfname, width = 20, height = 8)
+    par(cex = 1.0, las = 1, mgp = c(2,0.2,0), mar = c(3,2,2,0.2), tcl = -0.3)
+    
+    for(n in 1:length(markers))
+    {
+      cat(n, '--', markers[n], '\n')
+      p3 = SpatialFeaturePlot(st, features = markers[n], alpha = c(0.1, 1))
+      
+      plot(p3)
+      
+    }
+    
+    dev.off()
+    
+    
+    ##########################################
+    #  # test different clustering methods
+    ##########################################
+    source('functions_Visium.R')
+    aa = findClusters_SC3(aa)
+    
+    ggsave(filename = paste0(resDir, '/Visium_Clustering_SptialDimPLot', cc[n], '.pdf'), width = 16, height = 8)
+    
+    # find marker of those clusters
+    aa.markers <- FindAllMarkers(aa, only.pos = TRUE, min.pct = 0.2, logfc.threshold = 0.3)
+    
+    aa.markers %>%
+      group_by(cluster) %>%
+      top_n(n = 15, wt = avg_log2FC) -> top10
+    
+    DoHeatmap(aa, features = top10$gene)
+    
+    ggsave(paste0(resDir, '/heatmap_markerGenes_', cc[n], '.pdf'), width = 12, height = 20)
+    
     
   }
-  
-  dev.off()
-  
-  
-  ##########################################
-  #  # test different clustering methods
-  ##########################################
-  source('functions_Visium.R')
-  aa = findClusters_SC3(aa)
-  
-  ggsave(filename = paste0(resDir, '/Visium_Clustering_SptialDimPLot', cc[n], '.pdf'), width = 16, height = 8)
-  
-  # find marker of those clusters
-  aa.markers <- FindAllMarkers(aa, only.pos = TRUE, min.pct = 0.2, logfc.threshold = 0.3)
-  
-  aa.markers %>%
-    group_by(cluster) %>%
-    top_n(n = 15, wt = avg_log2FC) -> top10
-  
-  DoHeatmap(aa, features = top10$gene)
-  
-  ggsave(paste0(resDir, '/heatmap_markerGenes_', cc[n], '.pdf'), width = 12, height = 20)
-  
   
 }
 
@@ -445,10 +529,18 @@ for(n in 1:length(cc))
 # using the snRNA-seq annotated by Elad
 ########################################################
 ########################################################
-load(file = paste0(RdataDir, 'seuratObject_design_variableGenes_umap.clustered', species, '.Rdata'))
-st$condition = factor(st$condition, levels = design$condition)
+st = readRDS(file = paste0(RdataDir, 'seuratObject_st_filtered.spots_time_conditions', 
+                               version.analysis, '.rds'))
+#load(file = paste0(RdataDir, 'seuratObject_design_variableGenes_umap.clustered', species, '.Rdata'))
+#st = readRDS(file = paste0(RdataDir, 'seuratObject_st_filtered.spots', version.analysis, '.rds'))
+#st$time = design$time[match(st$sampleid, design$sampleID)]
 
-#saveRDS(st, file = paste0(RdataDir, 'seuratObj_visum_share_Ines.rds'))
+#saveRDS(st, file = paste0(RdataDir, 'seuratObject_st_filtered.spots_time_conditions', 
+#                          version.analysis, '.rds'))
+
+#st$condition = factor(st$condition, levels = design$condition)
+
+table(st$condition)
 
 # refined subtypes by Elad
 refs_file = paste0('/groups/tanaka/Collaborations/Jingkui-Elad/scMultiome/aa_subtypes_final_20221117.rds')
@@ -472,33 +564,80 @@ refs$celltype_toUse = gsub("[)]", '', refs$celltype_toUse)
 table(refs$celltype_toUse)
 length(table(refs$celltype_toUse))
 
-condition.specific_celltypes = openxlsx::read.xlsx('../data/subtypes_timespecific.xlsx', rowNames = TRUE)
-colnames(condition.specific_celltypes) = gsub('day', 'd', 
-                                              paste0('Amex_', colnames(condition.specific_celltypes)))
+Import_manually_timeSpecific_celltypes = FALSE
+if(Import_manually_timeSpecific_celltypes){
+  condition.specific_celltypes = openxlsx::read.xlsx('../data/subtypes_timespecific_v2.xlsx', 
+                                                     rowNames = TRUE)
+  colnames(condition.specific_celltypes) = gsub('day', 'd', 
+                                                paste0('Amex_', colnames(condition.specific_celltypes)))
+  
+  names = gsub('MO/Macs', 'Mo.Macs', rownames(condition.specific_celltypes))
+  names = gsub("[(]", '', names)
+  names = gsub("[)]", '', names)
+  names = gsub('_PROL', '_Prol', names)
+  names = gsub('_prol', '_Prol', names)
+  names = gsub("CM_ROBO2", "CM_ven_Cav3_1", names)
+  names = gsub("CM_CAV3.1", "CM_ven_Robo2", names)
+  names = gsub("CM_IS_Prol", "CM_Prol_IS", names)
+  names = gsub("CM_Prol1", "CM_Prol_1", names)
+  names = gsub("CM_Prol2", "CM_Prol_2", names)
+  names = gsub("CM_Prol3", "CM_Prol_3", names)
+  names = gsub("CM_atria$", "CM_Atria", names)
+  names = gsub("CM_atria_tagln", "CM_Atria_Tagln", names)
+  names = gsub("RBC_Prol", "Proliferating_RBC", names)
+  names = gsub("Megakeryocytes_Prol", "Proliferating_Megakeryocytes", names)
+  
+  rownames(condition.specific_celltypes) = names
+  
+}else{
+  cutoff = 0.25 # fraciton of subtypes in the time point
+  csc = table(refs$celltype_toUse, refs$condition)
+  #colnames(csc) = gsub('Amex_', '', colnames(csc))
+  csc = csc[, c(1,2, 4, 5, 3)]
+  for(n in 1:ncol(csc))
+  {
+    csc[,n] = csc[,n]/sum(csc[,n])*100
+  }
+  
+  csc[which(csc<=0.25)] = NA
+  #csc[which(!is.na(csc))] = 
+  
+  ## further removing the proliferating cells
+  csc[which(rownames(csc) == 'Proliferating_RBC'), ] = NA
+  csc[which(rownames(csc) == 'Proliferating_Megakeryocytes'), ] = NA
+  csc[which(rownames(csc) == 'Neuronal'), ] = NA
+  csc[which(rownames(csc) == 'Mo.Macs_Prol'), ] = NA
+  
+  csc[which(rownames(csc) == 'EC_Prol'), ] = NA
+  #csc[which(rownames(csc) == 'EC_IS_Prol'), ] = NA
+  
+  csc[which(rownames(csc) == 'CM_Prol_3'), ] = NA
+  csc[which(rownames(csc) == 'CM_Prol_2'), ] = NA
+  csc[which(rownames(csc) == 'CM_Prol_1'), ] = NA
+  
+  csc[which(rownames(csc) == 'B_cells_Prol'), ] = NA
+  
+  condition.specific_celltypes = csc
+  
+  
+}
 
-
-names = gsub('MO/Macs', 'Mo.Macs', rownames(condition.specific_celltypes))
-names = gsub("[(]", '', names)
-names = gsub("[)]", '', names)
-names = gsub('_PROL', '_Prol', names)
-names = gsub('_prol', '_Prol', names)
-names = gsub("CM_ROBO2", "CM_ven_Cav3_1", names)
-names = gsub("CM_CAV3.1", "CM_ven_Robo2", names)
-names = gsub("CM_IS_Prol", "CM_Prol_IS", names)
-names = gsub("CM_Prol1", "CM_Prol_1", names)
-names = gsub("CM_Prol2", "CM_Prol_2", names)
-names = gsub("CM_Prol3", "CM_Prol_3", names)
-names = gsub("CM_atria$", "CM_Atria", names)
-names = gsub("CM_atria_tagln", "CM_Atria_Tagln", names)
-names = gsub("RBC_Prol", "Proliferating_RBC", names)
-names = gsub("Megakeryocytes_Prol", "Proliferating_Megakeryocytes", names)
-
-rownames(condition.specific_celltypes) = names
 
 celltypes = unique(refs$celltype_toUse)
 mm = match(rownames(condition.specific_celltypes), celltypes)
 cat(length(which(is.na(mm))), ' cell types missing in the condition.specific_celltypes \n')
 
+
+# st = subset(st, condition == 'Amex_d4')
+saveRDS(st, file = paste(resDir, 'RCTD_st_axolotl_allVisium.rds'))
+
+saveRDS(refs, file = paste0(resDir, '/RCTD_refs_subtypes_final_20221117.rds'))
+
+saveRDS(condition.specific_celltypes, 
+        file = paste0(resDir, '/RCTD_refs_condition_specificity_v3.rds'))
+
+
+source('functions_Visium.R')
 ## preapre the paramters for RCTD subtypes
 DefaultAssay(refs) = 'RNA'
 DefaultAssay(st) = 'Spatial'
@@ -506,12 +645,16 @@ require_int_SpatialRNA = FALSE
 
 condition.specific.ref = TRUE
 
-RCTD_out = paste0(resDir, '/RCTD_subtype_out_42subtypes_ref.time.specific_v4.3')
-max_cores = 32
-# st = subset(st, condition == 'Amex_d4')
+RCTD_out = paste0(resDir, '/RCTD_subtype_out_41subtypes_ref.time.specific_v2.0')
+max_cores = 16
+
+cc = names(table(st$condition))
+
 
 source('functions_Visium.R')
-Run.celltype.deconvolution.RCTD(st, refs, 
+Run.celltype.deconvolution.RCTD(st = st,
+                                refs, 
+                                mapping_ref = 'time',
                                 condition.specific.ref = condition.specific.ref,
                                 condition.specific_celltypes = condition.specific_celltypes,
                                 require_int_SpatialRNA = require_int_SpatialRNA,
@@ -519,15 +662,14 @@ Run.celltype.deconvolution.RCTD(st, refs,
                                 RCTD_out = RCTD_out,
                                 plot.RCTD.summary = FALSE, 
                                 PLOT.scatterpie = FALSE
+                                
 )
 
-saveRDS(condition.specific_celltypes, 'RCTD_refs_condition_specificity.rds')
-saveRDS(refs, file = paste0(RdataDir, 'RCTD_refs_subtypes_final_20221117.rds'))
 
 source('functions_Visium.R')
-plot.RCTD.results(RCTD_out = RCTD_out,
+plot.RCTD.results(st = st,
+                  RCTD_out = RCTD_out,
                   plot.RCTD.summary = FALSE)
-
 
 
 ## prepare the parameters for RCTD coarse cell types
@@ -603,6 +745,7 @@ if(Import.manual.spatial.domains){
   st$segmentation = NA
   
   inputDir = '/groups/tanaka/Collaborations/Jingkui-Elad/visium_axolotl_reseq/spata2_manual_regions/'
+  
   #manual_selection_spots_image_Spata
   for(n in 1:length(cc))
   {
@@ -626,10 +769,8 @@ SpatialDimPlot(st)
 
 ggsave(paste0(resDir, '/Manual_segmentation_spata2_Elad.pdf'), width = 16, height = 6)
 
-save(st, design, file = paste0(RdataDir, 'seuratObject_design_variableGenes_umap.clustered_manualSegmentation', 
+save(st, design, file = paste0(RdataDir, 
+                               'seuratObject_design_variableGenes_umap.clustered_manualSegmentation', 
                                species, '.Rdata'))
 
-## run bayesSpace to systematic spatial domain searching
-source('functions_Visium.R')
-run_bayesSpace(st, outDir = paste0(resDir, '/bayesSpace/'))
 

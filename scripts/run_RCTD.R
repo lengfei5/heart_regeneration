@@ -11,7 +11,7 @@ rm(list = ls())
 
 library(pryr) # monitor the memory usage
 require(ggplot2)
-library(nichenetr)
+#library(nichenetr)
 library(Seurat) # please update to Seurat V4
 library(tidyverse)
 library(circlize)
@@ -25,7 +25,73 @@ source('functions_scRNAseq.R')
 source('functions_Visium.R')
 
 
-Run_RCTD_adultMice = TRUE
+Run_RCTD_axolotl_allVisium = TRUE
+
+if(Run_RCTD_axolotl_allVisium){
+  #rm(list = ls())
+  
+  species = 'axolotl'
+  version.analysis = '_R17246_R12830_allVisium_20240905'
+  dataDir = '../R17246_visium_axolotl/nf_out'
+  
+  resDir = paste0("../results/visium_axolotl", version.analysis)
+  RdataDir = paste0(resDir, '/Rdata/')
+  
+  if(!dir.exists(resDir)) dir.create(resDir)
+  if(!dir.exists(RdataDir)) dir.create(RdataDir)
+  
+  source('functions_Visium.R')
+  library(pryr) # monitor the memory usage
+  require(ggplot2)
+  options(future.globals.maxSize = 120000 * 1024^2)
+  
+  mem_used()
+  
+  st = readRDS(file = paste(resDir, 'RCTD_st_axolotl_allVisium.rds'))
+  # st = subset(st, condition == 'Amex_d4')
+  refs = readRDS(file = paste0(resDir, '/RCTD_refs_subtypes_final_20221117.rds'))
+  
+  condition.specific_celltypes = readRDS(file = paste0(resDir, '/RCTD_refs_condition_specificity_v1.rds'))
+  
+  source('functions_Visium.R')
+  
+  RCTD_out = paste0(resDir, '/RCTD_allVisium_subtype_out_41subtypes_ref.time.specific_v1.0')
+  max_cores = 16
+  
+  ## preapre the paramters for RCTD subtypes
+  DefaultAssay(refs) = 'RNA'
+  DefaultAssay(st) = 'Spatial'
+  require_int_SpatialRNA = FALSE
+  
+  condition.specific.ref = TRUE
+  
+  cc = names(table(st$condition))
+  
+  source('functions_Visium.R')
+  Run.celltype.deconvolution.RCTD(st = st,
+                                  refs, 
+                                  mapping_ref = 'time',
+                                  condition.specific.ref = condition.specific.ref,
+                                  condition.specific_celltypes = condition.specific_celltypes,
+                                  require_int_SpatialRNA = require_int_SpatialRNA,
+                                  max_cores = max_cores,
+                                  RCTD_out = RCTD_out,
+                                  plot.RCTD.summary = FALSE, 
+                                  PLOT.scatterpie = FALSE
+                                  
+  )
+  
+  
+  source('functions_Visium.R')
+  plot.RCTD.results(st = st,
+                    RCTD_out = RCTD_out,
+                    plot.RCTD.summary = FALSE)
+  
+  
+}
+
+
+Run_RCTD_adultMice = FALSE
 if(Run_RCTD_adultMice){
   dataPath_nichenet = '../data/NicheNet/'
   version.analysis = '_R11934_20240131'

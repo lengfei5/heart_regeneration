@@ -27,7 +27,8 @@ firstup <- function(x) {
 # original codes from nf pipeline from Ashley and Tomas
 ########################################################
 ########################################################
-make_SeuratObj_visium = function(topdir = './', saveDir = './results', changeGeneName = TRUE, keyname = 'slice1', 
+make_SeuratObj_visium = function(topdir = './', saveDir = './results', changeGeneName = TRUE, 
+                                 keyname = 'slice1', 
                                  QC.umi = TRUE)
 {
   #topdir = "./" # source dir
@@ -171,6 +172,7 @@ make_SeuratObj_visium = function(topdir = './', saveDir = './results', changeGen
 ##########################################
 Run.celltype.deconvolution.RCTD = function(st, # spatial transcriptome seurat object 
                                            refs, # scRNA-seq reference with annotation names celltype_toUse
+                                           mapping_ref = 'condition',
                                            condition.specific.ref = FALSE,
                                            condition.specific_celltypes = NULL,
                                            RCTD_out = '../results/RCTD_out', 
@@ -231,7 +233,13 @@ Run.celltype.deconvolution.RCTD = function(st, # spatial transcriptome seurat ob
       
       if(is.null(condition.specific_celltypes)){
         cat('subset refs based on the condition -- ', cc[n], '\n')
-        refs_sub = subset(refs, condition == cc[n])
+        
+        if(mapping_ref == 'condition'){
+          refs_sub = subset(refs, condition == cc[n])
+        }else{
+          tt = paste0(unlist(strsplit(as.character(cc[n]), '_'))[1:2], collapse = '_')
+          refs_sub = subset(refs, condition == tt)
+        }
         
         celltypes_nbs = table(refs_sub$celltype_toUse)
         celltypes_nbs = celltypes_nbs[which(celltypes_nbs>30)]
@@ -239,10 +247,18 @@ Run.celltype.deconvolution.RCTD = function(st, # spatial transcriptome seurat ob
                                                                             names(celltypes_nbs)))])
       }else{
         cat('subset refs based on the  -- condition.specific_celltypes ', cc[n], '\n')
-        ii_col = which(colnames(condition.specific_celltypes) == cc[n])
+        
+        if(mapping_ref == 'condition'){
+          ii_col = which(colnames(condition.specific_celltypes) == cc[n])
+        }else{
+          tt = paste0(unlist(strsplit(as.character(cc[n]), '_'))[1:2], collapse = '_')
+          ii_col = which(colnames(condition.specific_celltypes) == tt)
+        }
+        
         if(length(ii_col) != 1) stop(paste0('Error -- no celltypes found for ', cc[n]))
         
-        celltypes_sel = rownames(condition.specific_celltypes)[which(!is.na(condition.specific_celltypes[, ii_col]))]
+        celltypes_sel = 
+          rownames(condition.specific_celltypes)[which(!is.na(condition.specific_celltypes[, ii_col]))]
         
         refs_sub = subset(refs, cells = colnames(refs)[!is.na(match(refs$celltype_toUse, 
                                                                             celltypes_sel))])
@@ -531,6 +547,8 @@ plot.RCTD.results = function(st,
   library(spacexr)
   require(Matrix)
   require(scatterpie)
+  library(tidyr)
+  library(dplyr)
   require(cowplot)
   library(RColorBrewer)
   
@@ -549,7 +567,7 @@ plot.RCTD.results = function(st,
   for(n in 1:length(cc))
   #for(n in c(1, 2, 4))
   {
-    # n = 2
+    # n = 3
     cat('slice -- ', cc[n], '\n')
     slice = cc[n]
     #stx = st[, which(st$condition == slice)]
@@ -567,7 +585,23 @@ plot.RCTD.results = function(st,
     # check the result
     # it seems that the full mode works better than doublet mode
     ##########################################
-    myRCTD = readRDS(file = paste0(resultsdir, '/RCTD_out_doubletMode_', slice, '.rds'))
+    file = paste0(resultsdir, '/RCTD_out_doubletMode_', slice, '.rds')
+    
+    if(file.exists(file)){
+      myRCTD = readRDS(file = file)
+    }else{
+      slice_name = paste0(unlist(strsplit(as.character(slice), '_'))[1:2], collapse = '_')
+      file = paste0(resultsdir, '/', slice_name,  '/RCTD_out_doubletMode_', 
+                    slice_name, '.rds')
+      
+      if(file.exists(file)){
+        myRCTD = readRDS(file = file)
+      }else{
+        cat('-- RCTD output for', slice, ' not found -- \n')
+        next()
+      }
+    }
+   
     results <- myRCTD@results
     
     # normalize the cell type proportions to sum to 1.
@@ -577,13 +611,13 @@ plot.RCTD.results = function(st,
     
     spatialRNA <- myRCTD@spatialRNA
     
-    
+    stx$condition = as.factor(stx$condition)
     stx$condition = droplevels(stx$condition)
     DefaultAssay(stx) = 'SCT'
     
     if(species == 'axolotl'){
       SpatialFeaturePlot(stx, images =  slice, #slot = 'data',
-                         features = "LOC115076416-AMEX60DD051098") +
+                         features = "NPPA-AMEX60DD051098") +
         ggtitle('NPPA-AMEX60DD051098')
     }
     if(species == 'mouse_adult'|species == 'mouse_neonatal'){
@@ -594,7 +628,8 @@ plot.RCTD.results = function(st,
    
     #coord_flip() + 
     #ggplot2::scale_y_reverse() # rotate the coordinates to have the same as RCTD 
-    ggsave(filename =  paste0(RCTD_out, "/Spatial_patterning_", slice, "_NPPA.pdf"), width = 12, height = 8)
+    ggsave(filename =  paste0(RCTD_out, "/Spatial_patterning_", slice, "_NPPA.pdf"), 
+           width = 12, height = 8)
     
     # make the plots 
     if(plot.RCTD.summary){
@@ -933,7 +968,7 @@ manual_selection_spots_image_Spata2 = function(st,
     aa$segmentation[match(getSegmentDf(spata_obj, segment_names = c('remote_zone1'))$barcodes, colnames(aa))] = 'remote_zone1'
     aa$segmentation[match(getSegmentDf(spata_obj, segment_names = c('remote_zone2'))$barcodes, colnames(aa))] = 'remote_zone2'
     
-  
+    
   }
 }
 
