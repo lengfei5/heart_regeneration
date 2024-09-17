@@ -910,7 +910,8 @@ manual_selection_spots_image_Spata2 = function(st,
 {
   #dyn.load("/software/f2021/software/proj/7.2.1-gcccore-10.2.0/lib/libproj.so")
   #dyn.load("/software/f2021/software/gdal/3.2.1-foss-2020b/lib/libgdal.so") 
-  
+  # outDir = '/groups/tanaka/Collaborations/Jingkui-Elad/visium_axolotl_reseq/spata2_manual_regions/'
+  # st = readRDS(file = paste0(outDir, 'axolotl_visium_newRep.rds'))
   require(SPATA2)
   
   # slice = cc[n]
@@ -921,7 +922,7 @@ manual_selection_spots_image_Spata2 = function(st,
   
   for(n in 1:length(cc))
   {
-    # n = 1
+    # n = 2
     cat('slice -- ', cc[n], '\n')
     slice = cc[n]
     aa = st[, which(st$condition == slice)]
@@ -957,16 +958,20 @@ manual_selection_spots_image_Spata2 = function(st,
     plotSegmentation(object = spata_obj, pt_size = 1.9) +
       ggplot2::scale_y_reverse()
     
+    saveRDS(spata_obj, file = paste0(outDir, '/segemented_spata2_', slice, '.rds'))
+    
     #coord_flip() + 
     #ggplot2::scale_y_reverse() +
     #  ggplot2::scale_x_reverse()  # flip first and reverse x to match seurat Spatial plots
     
     #getFeatureVariables(spata_obj, features = "segmentation", return = "data.frame")
-    
     aa$segmentation = 'others'
-    aa$segmentation[match(getSegmentDf(spata_obj, segment_names = c('border_zone'))$barcodes, colnames(aa))] = 'border_zone'
-    aa$segmentation[match(getSegmentDf(spata_obj, segment_names = c('remote_zone1'))$barcodes, colnames(aa))] = 'remote_zone1'
-    aa$segmentation[match(getSegmentDf(spata_obj, segment_names = c('remote_zone2'))$barcodes, colnames(aa))] = 'remote_zone2'
+    aa$segmentation[match(getSegmentDf(spata_obj, segment_names = c('border_zone'))$barcodes, 
+                          colnames(aa))] = 'border_zone'
+    aa$segmentation[match(getSegmentDf(spata_obj, segment_names = c('remote_zone1'))$barcodes, 
+                          colnames(aa))] = 'remote_zone1'
+    aa$segmentation[match(getSegmentDf(spata_obj, segment_names = c('remote_zone2'))$barcodes, 
+                          colnames(aa))] = 'remote_zone2'
     
     
   }
@@ -980,8 +985,7 @@ manual_selection_spots_image_Spata2 = function(st,
 run_bayesSpace = function(st, 
                           outDir = paste0(resDir, '/bayesSpace/'),
                           Find.top.markers.for.spatial.clusters = FALSE,
-                          Run.bayesSpace.enhanced.clustering = FALSE
-)
+                          Run.bayesSpace.enhanced.clustering = FALSE)
 {
   ## aa is a seurat objet with one slice / one image
   require(SingleCellExperiment)

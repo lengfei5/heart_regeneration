@@ -454,7 +454,8 @@ if(Data_Exploration){
     
     SpatialDimPlot(aa, group.by = 'segmentation', label = TRUE, label.size = 5)
     
-    ggsave(filename =  paste0(resDir, "/manual_segmentation_", species, '_', cc[n], ".pdf"), width = 12, height = 8)
+    ggsave(filename =  paste0(resDir, "/manual_segmentation_", species, '_', cc[n], ".pdf"), 
+           width = 12, height = 8)
     
     Idents(aa) = aa$segmentation
     
@@ -505,7 +506,8 @@ if(Data_Exploration){
     source('functions_Visium.R')
     aa = findClusters_SC3(aa)
     
-    ggsave(filename = paste0(resDir, '/Visium_Clustering_SptialDimPLot', cc[n], '.pdf'), width = 16, height = 8)
+    ggsave(filename = paste0(resDir, '/Visium_Clustering_SptialDimPLot', cc[n], '.pdf'), 
+           width = 16, height = 8)
     
     # find marker of those clusters
     aa.markers <- FindAllMarkers(aa, only.pos = TRUE, min.pct = 0.2, logfc.threshold = 0.3)
@@ -550,7 +552,8 @@ table(refs$subtypes)
 length(table(refs$subtypes))
 
 refs$subtypes = droplevels(refs$subtypes) 
-length(table(refs$subtypes)) # only 41 subtype annotations from Elad, with additional annotation "doublet" with 0 cell
+length(table(refs$subtypes)) 
+## only 41 subtype annotations from Elad, with additional annotation "doublet" with 0 cell
 
 ## prepare the celltype to use and also specify the time-specific subtypes
 refs$celltype_toUse = as.character(refs$subtypes)
@@ -563,6 +566,8 @@ refs$celltype_toUse = gsub("[)]", '', refs$celltype_toUse)
 
 table(refs$celltype_toUse)
 length(table(refs$celltype_toUse))
+
+
 
 Import_manually_timeSpecific_celltypes = FALSE
 if(Import_manually_timeSpecific_celltypes){
@@ -707,30 +712,19 @@ if(Run.RCTD.coarse.celltypes){
 
 ########################################################
 ########################################################
-# Section : cell-to-cell communication analysis
-# 1) step: define spatial domain 
-# 2) step: neighborhood enrichment analysis
-# 3) step: ligand-receptor analysis
+# Section V: manually define borzder zones, injury zones
+
 ########################################################
 ########################################################
 source('functions_Visium.R')
-load(file = paste0(RdataDir, 'seuratObject_design_variableGenes_umap.clustered', species, '.Rdata'))
-st$condition = factor(st$condition, levels = design$condition)
+st = readRDS(file = paste0(RdataDir, 'seuratObject_st_filtered.spots_time_conditions', 
+                           version.analysis, '.rds'))
 
 
+Idents(st) = st$condition
 cat('visium conditions :\n')
 print(table(st$condition))
-cc = design$condition
-
-VlnPlot(st, features = 'nFeature_Spatial', group.by = 'condition') +
-  geom_hline(yintercept = c(200, 500, 1000, 2000))
-
-ggsave(paste0(resDir, '/QCs_nFeatures_mergedReseq.pdf'), width = 12, height = 8)
-
-VlnPlot(st, features = 'nFeature_SCT', group.by = 'condition') +
-  geom_hline(yintercept = c(200, 500, 1000, 2000))
-
-ggsave(paste0(resDir, '/QCs_nFeatures_SCT_mergedReseq.pdf'), width = 12, height = 8)
+cc = names(table(st$condition))
 
 
 ##########################################
@@ -744,7 +738,9 @@ if(Import.manual.spatial.domains){
   
   st$segmentation = NA
   
-  inputDir = '/groups/tanaka/Collaborations/Jingkui-Elad/visium_axolotl_reseq/spata2_manual_regions/'
+  #inputDir = '/groups/tanaka/Collaborations/Jingkui-Elad/visium_axolotl_reseq/spata2_manual_regions/'
+  #saveRDS(aa, file = paste0(inputDir, 'axolotl_visium_newRep.rds'))
+  inputDir = paste0(resDir, '/manual_borderZones_spata2/')
   
   #manual_selection_spots_image_Spata
   for(n in 1:length(cc))
@@ -753,24 +749,169 @@ if(Import.manual.spatial.domains){
     cat('slice -- ', cc[n], '\n')
     slice = cc[n]
     
-    aa = readRDS(file = paste0(inputDir, 'visium_manual_segmentation_', slice, '.rds'))
-    Idents(aa) = as.factor(aa$segmentation)
-    SpatialDimPlot(aa)
+    file = paste0(inputDir, 'segemented_spata2_', slice, '.rds')
     
-    st$segmentation[match(colnames(aa), colnames(st))] = aa$segmentation
+    if(file.exists(file)){
+      aa = readRDS(file = file)
+      plotSegmentation(object = aa, pt_size = 1.9) +
+        ggplot2::scale_y_reverse()
+      
+      segs = getSegmentNames(aa)
+      for(s in segs)
+      {
+        cat('-- segmentation : ', s, '--\n')
+        st$segmentation[match(getSegmentDf(aa, segment_names = c(s))$barcodes, 
+                              colnames(st))] = s
+      }
+      
+      #Idents(aa) = as.factor(aa$segmentation)
+      
+      #SpatialDimPlot(aa)
+      #mm = match(colnames(aa), colnames(st))
+      #jj = which(!is.na(mm))
+      #st$segmentation[mm[jj]] = aa$segmentation[jj]
+      
+    }else{
+      cat('no manual segmentation found for -- ', slice, '\n' )
+    }
         
   }
   
+  st$segmentation = as.factor(st$segmentation)
+  Idents(st) = as.factor(st$segmentation)
+  SpatialDimPlot(st, ncol = 4)
+  
+  # add the segmentation from the old replicates
+  st$cell.id = colnames(st)
+  st$cell.id = sapply(st$cell.id, function(x) unlist(strsplit(as.character(x), '[-]'))[1])
+  st$cell.id = paste0(st$condition, '_', st$cell.id)
+  
+  aa = st;
+  rm(st)
+  
+  load(file = paste0('../results/Rdata/', 
+                     'seuratObject_design_variableGenes_umap.clustered_manualSegmentation', 
+                     'axolotl', '.Rdata'))
+  rm(design)
+  st$condition = as.character(st$condition)
+  st$condition[which(st$condition == 'Amex_d1')] = 'Amex_d1_183623'
+  st$condition[which(st$condition == 'Amex_d4')] = 'Amex_d4_183624'
+  st$condition[which(st$condition == 'Amex_d7')] = 'Amex_d7_183625'
+  st$condition[which(st$condition == 'Amex_d14')] = 'Amex_d14_183626'
+  st$cell.id = colnames(st)
+  st$cell.id = sapply(st$cell.id, function(x) unlist(strsplit(as.character(x), '[-]'))[1])
+  st$cell.id = paste0(st$condition, '_', st$cell.id)
+  
+  mm = match(st$cell.id, aa$cell.id)
+  
+  aa$segmentation = as.character(aa$segmentation)
+  st$segmentation = as.character(st$segmentation)
+  aa$segmentation[mm[which(!is.na(mm))]] = st$segmentation[which(!is.na(mm))]
+  
+  st = aa;
+  st$segmentation = as.factor(st$segmentation)
+  Idents(st) = as.factor(st$segmentation)
+  SpatialDimPlot(st, ncol = 4)
+  
+  rm(aa)
+  
+  st$segmentation[which(st$segmentation == 'border_zone')] = 'BZ'
+  st$segmentation[which(st$segmentation == 'Border_zone')] = 'BZ'
+  
+  st$segmentation[which(st$segmentation == 'injury_zone')] = 'Injury'
+  st$segmentation[which(st$segmentation == 'InjUry_zone')] = 'Injury'
+  
+  st$segmentation[which(st$segmentation == 'Remote1')] = 'RZ1'
+  st$segmentation[which(st$segmentation == 'Remote2')] = 'RZ2'
+  
+  st$segmentation = droplevels(st$segmentation)
+  
+  Idents(st) = as.factor(st$segmentation)
+  SpatialDimPlot(st, ncol = 4)
+  
+  ggsave(paste0(resDir, '/Manual_segmentation_spata2_Elad.pdf'), width = 16, height = 10)
+  
+  saveRDS(st, file = paste0(RdataDir, 'seuratObject_allVisiusmst_',
+                            'filtered.spots_time_conditions_manualSegmentation', 
+                            version.analysis, '.rds'))
+  
+  
 }
 
+##########################################
+# compare the injury zone, border zone, remote and intact   
+##########################################
+st = readRDS(file = paste0(RdataDir, 'seuratObject_allVisiusmst_',
+                           'filtered.spots_time_conditions_manualSegmentation', 
+                           version.analysis, '.rds'))
+st = subset(st, cells = which(!is.na(st$segmentation)))
+
+#st <- SCTransform(st, assay = "Spatial", verbose = FALSE, variable.features.n = 3000)
+# DefaultAssay(st) <- "SCT"
+st = NormalizeData(st, normalization.method = "LogNormalize", scale.factor = 10000)
+st = FindVariableFeatures(st, selection.method = "vst", nfeatures = 2000)
+st = ScaleData(st,  
+               vars.to.regress = c('nCount_Spatial'), 
+               assay = 'Spatial')
+
+st <- RunPCA(st, verbose = FALSE)
+ElbowPlot(st)
+
+st <- FindNeighbors(st, dims = 1:20)
+st <- FindClusters(st, verbose = FALSE, resolution = 1.0)
+
+st <- RunUMAP(st, dims = 1:20, n.neighbors = 30, min.dist = 0.1)
+
+st$segmentation = as.character(st$segmentation)
+st$segmentation[which(st$segmentation == 'RZ1')] = 'RZ'
+st$segmentation[which(st$segmentation == 'RZ2')] = 'RZ'
+st$segmentation[which(st$segmentation == 'Intact1')] = 'Intact'
+st$segmentation[which(st$segmentation == 'Intact2')] = 'Intact'
+
 st$segmentation = as.factor(st$segmentation)
-Idents(st) = as.factor(st$segmentation)
-SpatialDimPlot(st)
 
-ggsave(paste0(resDir, '/Manual_segmentation_spata2_Elad.pdf'), width = 16, height = 6)
+p1 = DimPlot(st, reduction = "umap", group.by = c("condition"), label = TRUE, repel = TRUE) 
+p2 = DimPlot(st, reduction = "umap", group.by = c("segmentation"), label = TRUE, repel = TRUE) 
 
-save(st, design, file = paste0(RdataDir, 
-                               'seuratObject_design_variableGenes_umap.clustered_manualSegmentation', 
-                               species, '.Rdata'))
+p1 / p2
+
+ggsave(paste0(resDir, '/Compare_diffRegions_intact_injuried_time_logNormal_regressed.nCounts.pdf'), 
+       width = 10, height = 12)
+
+
+
+st$dataset = 'batch1'
+st$dataset[grep('_2949', st$condition)] = 'batch2'
+
+source('functions_dataIntegration.R')
+st_bc = IntegrateData_Seurat_CCA(st, group.by = 'dataset', k.weight = 100)
+
+st_bc = IntegrateData_runFastMNN(st, group.by = 'dataset', assays = 'Spatial',
+                                 nfeatures = 1000,
+                                 correct.all = FALSE)
+
+st_bc <- RunUMAP(st_bc, reduction = "mnn", dims = 1:20, 
+                       n.neighbors = 30, min.dist = 0.1)
+
+st_bc$condition = factor(st_bc$condition, levels = c('Amex_d0_294946', 'Amex_d0_294949',
+                                                     'Amex_d1_183623', 'Amex_d4_294947', 
+                                                     'Amex_d4_183624', 'Amex_d7_294948', 
+                                                     'Amex_d7_183625', 'Amex_d14_183626'))
+
+p1 = DimPlot(st_bc, reduction = "umap", group.by = c("condition"), label = TRUE, repel = TRUE) 
+p2 = DimPlot(st_bc, reduction = "umap", group.by = c("segmentation"), label = TRUE, repel = TRUE) 
+
+p1 / p2
+
+ggsave(paste0(resDir, '/Compare_diffRegions_intact_injuried_time_logNormal_seurat.RunfastMNN.pdf'), 
+       width = 10, height = 12)
+#st$time = gsub('Amex_', '', st$time)
+#st$cc = paste0(st$time, '_', st$segmentation)
+#p3 = DimPlot(st, reduction = "umap", group.by = c("cc"), label = TRUE, repel = TRUE) 
+
+#p1 / p2 /p3
+SpatialPlot(st, group.by = 'segmentation', image.alpha = 0.5, ncol = 4)
+
+ggsave(filename = paste0(resDir, '/UMAP_all.timepoints_', species, '.pdf'), width = 16, height = 8)
 
 

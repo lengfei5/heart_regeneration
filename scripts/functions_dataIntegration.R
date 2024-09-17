@@ -8,7 +8,7 @@
 ##########################################################################
 ##########################################################################
 IntegrateData_Seurat_CCA = function(seuratObj, group.by = 'dataset', nfeatures = 2000,
-                                    ndims = c(1:30),
+                                    ndims = c(1:30), k.weight = 100,
                                     merge.order = NULL,
                                     redo.normalization.scaling = TRUE,
                                     correct.all = FALSE,
@@ -68,12 +68,13 @@ IntegrateData_Seurat_CCA = function(seuratObj, group.by = 'dataset', nfeatures =
   if(is.null(merge.order)){
     ref.combined <- IntegrateData(anchorset = ref.anchors, 
                                   features.to.integrate = feature2integrate, 
-                                  dims = ndims) 
+                                  dims = ndims, 
+                                  k.weight = k.weight) 
   }else{
     ref.combined <- IntegrateData(anchorset = ref.anchors, 
                                   features.to.integrate = feature2integrate,
                                   sample.tree = merge.order,
-                                  dims = ndims)
+                                  dims = ndims, k.weight = k.weight)
   }
   
   
@@ -103,13 +104,13 @@ IntegrateData_Seurat_CCA = function(seuratObj, group.by = 'dataset', nfeatures =
 }
 
 IntegrateData_Seurat_RPCA = function(seuratObj, group.by = 'dataset', nfeatures = 2000,
-                                     ndims = c(1:30), 
+                                     ndims = c(1:30), k.weight = 100,
                                      merge.order = NULL,
                                      redo.normalization.scaling = TRUE,
                                      correct.all = FALSE,
                                      reference = NULL)
 {
-  # seuratObj = aa; group.by = "condition"; ndims = c(1:30); reference = NULL;nfeatures = 2000
+  # seuratObj = st; group.by = "dataset"; ndims = c(1:30); reference = NULL;nfeatures = 2000
   ref.list <- SplitObject(seuratObj, split.by = group.by)
   
   # normalize and identify variable features for each dataset independently
@@ -163,12 +164,14 @@ IntegrateData_Seurat_RPCA = function(seuratObj, group.by = 'dataset', nfeatures 
   if(is.null(merge.order)){
     ref.combined <- IntegrateData(anchorset = ref.anchors, 
                                   features.to.integrate = feature2integrate, 
-                                  dims = ndims) 
+                                  dims = ndims,
+                                  k.weight = k.weight) 
   }else{
     ref.combined <- IntegrateData(anchorset = ref.anchors, 
                                   features.to.integrate = feature2integrate,
                                   sample.tree = merge.order,
-                                  dims = ndims)
+                                  dims = ndims,
+                                  k.weight = k.weight)
   }
   
   rm(ref.list)
@@ -269,7 +272,9 @@ RunFastMNN_fixed <- function (object.list,
   
 }
 
-IntegrateData_runFastMNN = function(seuratObj, group.by = 'dataset', nfeatures = 2000,
+IntegrateData_runFastMNN = function(seuratObj, group.by = 'dataset', 
+                                    assays = 'RNA', 
+                                    nfeatures = 2000,
                                     ndims = c(1:30),
                                     merge.order = NULL,
                                     cos.norm = TRUE,
@@ -286,7 +291,7 @@ IntegrateData_runFastMNN = function(seuratObj, group.by = 'dataset', nfeatures =
   
   #DefaultAssay(seuratObj) = 'RNA'
   ## one error solved (see https://github.com/satijalab/seurat-wrappers/issues/126)
-  seuratObj = DietSeurat(object = seuratObj, counts = TRUE, data = TRUE, assays = 'RNA', 
+  seuratObj = DietSeurat(object = seuratObj, counts = TRUE, data = TRUE, assays = assays, 
                          dimreducs = c('pca'))
   
   ## By default, batches are merged in the user-supplied order in ..., i.e., 
