@@ -836,6 +836,7 @@ if(Import.manual.spatial.domains){
                             version.analysis, '.rds'))
   
   
+  
 }
 
 ##########################################
@@ -844,6 +845,7 @@ if(Import.manual.spatial.domains){
 st = readRDS(file = paste0(RdataDir, 'seuratObject_allVisiusmst_',
                            'filtered.spots_time_conditions_manualSegmentation', 
                            version.analysis, '.rds'))
+
 st = subset(st, cells = which(!is.na(st$segmentation)))
 
 #st <- SCTransform(st, assay = "Spatial", verbose = FALSE, variable.features.n = 3000)

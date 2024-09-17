@@ -10,13 +10,22 @@
 rm(list = ls())
 
 species = 'axolotl'
-version.analysis = '_R12830_resequenced_20220308'
-dataDir = '../R12830_visium_reseqenced/nf_out'
+version.analysis = '_R17246_R12830_allVisium_20240905'
+dataDir = '../R17246_visium_axolotl/nf_out'
+
 resDir = paste0("../results/visium_axolotl", version.analysis)
-RdataDir = paste0('../results/Rdata/')
+RdataDir = paste0(resDir, '/Rdata/')
 
 if(!dir.exists(resDir)) dir.create(resDir)
 if(!dir.exists(RdataDir)) dir.create(RdataDir)
+
+source('functions_Visium.R')
+library(pryr) # monitor the memory usage
+require(ggplot2)
+options(future.globals.maxSize = 120000 * 1024^2)
+
+mem_used()
+
 
 
 library(pryr) # monitor the memory usage
