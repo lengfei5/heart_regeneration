@@ -1340,7 +1340,8 @@ run_neighborhood_analysis = function(st,
 run_misty_colocalization_analysis = function(st, 
                                              outDir,
                                              RCTD_out,
-                                             condSpec_celltypes = NULL
+                                             condSpec_celltypes = NULL,
+                                             segmentation_annots = c('all', 'BZ', 'RZ', 'Intact')
                                              )
 {
   library(tidyverse)
@@ -1420,6 +1421,11 @@ run_misty_colocalization_analysis = function(st,
   st$condition = droplevels(as.factor(st$condition))
   print(table(st$condition))
   cc = names(table(st$condition))
+  cat('ST conditions : \n')
+  print(cc)
+  tt = as.character(sapply(cc, function(x){unlist(strsplit(as.character(x), '_'))[2]}))
+  cat('ST time :\n')
+  print(tt)
   
   Idents(st) = st$condition
   
@@ -1454,7 +1460,8 @@ run_misty_colocalization_analysis = function(st,
     
     if(!is.null(condSpec_celltypes)){
       cat('-- condition-specific cell types were specified --\n')
-      celltypes_sels = condSpec_celltypes[[which(names(condSpec_celltypes) == gsub('Amex_', '', cc[n]))]]
+      
+      celltypes_sels = condSpec_celltypes[[which(names(condSpec_celltypes) == tt[n])]]
       mm = match(celltypes_sels, rownames(weights))
       #celltypes_sels[which(is.na(mm))]
       
@@ -1494,7 +1501,7 @@ run_misty_colocalization_analysis = function(st,
     
     for(assay_label in c("RCTD_propos", "RCTD_density"))
     {
-      for(segment in c('all', 'BZ', 'Remote'))
+      for(segment in segmentation_annots)
       {
         # assay_label = 'RCTD_density'; segment = 'all'
         cat(' --- selected assay ', assay_label, '; selected region ', segment, '---\n')
@@ -1506,99 +1513,104 @@ run_misty_colocalization_analysis = function(st,
         if(segment == 'all'){
           stx_sel = stx
           cv.folds = 10
+          
         }else{
           #jj = grep(segment, stx$segmentation)
           jj = which(stx$segmentation == segment)
           if(length(jj)>0){
             stx_sel = subset(stx, cells = colnames(stx)[jj])
             cv.folds = 5
+            
           }else{
             cat('no spots annoated in segment: ', segment, '\n')
+            stx_sel = NULL
           }
           
         }
         
-        xx = GetAssayData(stx_sel, slot = 'data', assay = assay)
-        sds = apply(xx, 1, sd)
-        useful_features <- rownames(stx_sel)[which(sds>0.001)]
-        
-        mout <- run_colocalization(slide = stx_sel,
-                                   useful_features = useful_features,
-                                   slide_id = slide_id,
-                                   assay = assay,
-                                   cv.folds = cv.folds,
-                                   misty_out_alias = paste0(outDir, 'out_misty/'))
-        
-        misty_res_slide <- collect_results(mout)
-        
-        plot_folder <- paste0(outDir, "Plots_", assay_label)
-        system(paste0("mkdir -p ", plot_folder))
-        
-        pdf(file = paste0(plot_folder, "/", slide_id, "_", segment,  "_summary_plots.pdf"), 
-            height = 10, width = 16)
-        
-        mistyR::plot_improvement_stats(misty_res_slide)
-        mistyR::plot_view_contributions(misty_res_slide)
-        
-        mistyR::plot_interaction_heatmap(misty_res_slide, "intra", cutoff = 0)
-        mistyR::plot_interaction_communities(misty_res_slide, "intra", cutoff = 0.5)
-        
-        mistyR::plot_interaction_heatmap(misty_res_slide, "juxta_5", cutoff = 0)
-        mistyR::plot_interaction_communities(misty_res_slide, "juxta_5", cutoff = 0.5)
-        
-        mistyR::plot_interaction_heatmap(misty_res_slide, "para_15", cutoff = 0)
-        mistyR::plot_interaction_communities(misty_res_slide, "para_15", cutoff = 0.5)
-        
-        dev.off()
-        
-        transform_tibble_matrix = function(imp)
-        {
-          # imp = intra_imp 
-          predictors = unique(imp$Predictor)
-          targets = unique(imp$Target)
+        if(!is.null(stx_sel)){
+          xx = GetAssayData(stx_sel, slot = 'data', assay = assay)
+          sds = apply(xx, 1, sd)
+          useful_features <- rownames(stx_sel)[which(sds>0.001)]
           
-          res = matrix(NA, ncol = length(predictors), nrow = length(targets))
-          colnames(res) = predictors[order(predictors, decreasing = FALSE)]
-          rownames(res) = targets[order(targets, decreasing = TRUE)]
+          mout <- run_colocalization(slide = stx_sel,
+                                     useful_features = useful_features,
+                                     slide_id = slide_id,
+                                     assay = assay,
+                                     cv.folds = cv.folds,
+                                     misty_out_alias = paste0(outDir, 'out_misty/'))
           
-          for(nn in 1:nrow(imp)){
-            # nn = 1
-            index_col = which(colnames(res) == imp$Predictor[nn])
-            index_row = which(rownames(res) == imp$Target[nn])
-            res[index_row, index_col] = imp$Importance[nn]
+          misty_res_slide <- collect_results(mout)
+          
+          plot_folder <- paste0(outDir, "Plots_", assay_label)
+          system(paste0("mkdir -p ", plot_folder))
+          
+          pdf(file = paste0(plot_folder, "/", slide_id, "_", segment,  "_summary_plots.pdf"), 
+              height = 10, width = 16)
+          
+          mistyR::plot_improvement_stats(misty_res_slide)
+          mistyR::plot_view_contributions(misty_res_slide)
+          
+          mistyR::plot_interaction_heatmap(misty_res_slide, "intra", cutoff = 0)
+          mistyR::plot_interaction_communities(misty_res_slide, "intra", cutoff = 0.5)
+          
+          mistyR::plot_interaction_heatmap(misty_res_slide, "juxta_5", cutoff = 0)
+          mistyR::plot_interaction_communities(misty_res_slide, "juxta_5", cutoff = 0.5)
+          
+          mistyR::plot_interaction_heatmap(misty_res_slide, "para_15", cutoff = 0)
+          mistyR::plot_interaction_communities(misty_res_slide, "para_15", cutoff = 0.5)
+          
+          dev.off()
+          
+          transform_tibble_matrix = function(imp)
+          {
+            # imp = intra_imp 
+            predictors = unique(imp$Predictor)
+            targets = unique(imp$Target)
+            
+            res = matrix(NA, ncol = length(predictors), nrow = length(targets))
+            colnames(res) = predictors[order(predictors, decreasing = FALSE)]
+            rownames(res) = targets[order(targets, decreasing = TRUE)]
+            
+            for(nn in 1:nrow(imp)){
+              # nn = 1
+              index_col = which(colnames(res) == imp$Predictor[nn])
+              index_row = which(rownames(res) == imp$Target[nn])
+              res[index_row, index_col] = imp$Importance[nn]
+              
+            }
+            return(res)
             
           }
-          return(res)
+          
+          importances = as.data.frame(misty_res_slide$importances)
+          importances = importances[, -1]
+          importances$Importance[which(importances$Importance<0)] = 0
+          
+          
+          intra_imp = importances[which(importances$view == 'intra'), ]
+          intra_imp = transform_tibble_matrix(intra_imp)
+          
+          write.csv2(intra_imp, file = paste0(plot_folder, "/", slide_id, "_", segment,  
+                                              "_summary_table_intra.csv"), quote = FALSE, 
+                     row.names = TRUE)
+          
+          juxta_imp = importances[which(importances$view == 'juxta_5'), ]
+          juxta_imp = transform_tibble_matrix(juxta_imp)
+          
+          write.csv2(juxta_imp, file = paste0(plot_folder, "/", slide_id, "_", segment,  
+                                              "_summary_table_juxta5.csv"), quote = FALSE, 
+                     row.names = TRUE)
+          
+          para_imp = importances[which(importances$view == 'para_15'), ]
+          para_imp = transform_tibble_matrix(para_imp)
+          
+          write.csv2(para_imp, file = paste0(plot_folder, "/", slide_id, "_", segment,  
+                                             "_summary_table_para15.csv"), quote = FALSE, 
+                     row.names = TRUE)
           
         }
-        
-        importances = as.data.frame(misty_res_slide$importances)
-        importances = importances[, -1]
-        importances$Importance[which(importances$Importance<0)] = 0
-        
-        
-        intra_imp = importances[which(importances$view == 'intra'), ]
-        intra_imp = transform_tibble_matrix(intra_imp)
-        
-        write.csv2(intra_imp, file = paste0(plot_folder, "/", slide_id, "_", segment,  
-                                            "_summary_table_intra.csv"), quote = FALSE, 
-                   row.names = TRUE)
-        
-        juxta_imp = importances[which(importances$view == 'juxta_5'), ]
-        juxta_imp = transform_tibble_matrix(juxta_imp)
-        
-        write.csv2(juxta_imp, file = paste0(plot_folder, "/", slide_id, "_", segment,  
-                                            "_summary_table_juxta5.csv"), quote = FALSE, 
-                   row.names = TRUE)
-        
-        para_imp = importances[which(importances$view == 'para_15'), ]
-        para_imp = transform_tibble_matrix(para_imp)
-        
-        write.csv2(para_imp, file = paste0(plot_folder, "/", slide_id, "_", segment,  
-                                            "_summary_table_para15.csv"), quote = FALSE, 
-                   row.names = TRUE)
-        
-        
+       
       }
      
     }

@@ -19,14 +19,6 @@ RdataDir = paste0(resDir, '/Rdata/')
 if(!dir.exists(resDir)) dir.create(resDir)
 if(!dir.exists(RdataDir)) dir.create(RdataDir)
 
-source('functions_Visium.R')
-library(pryr) # monitor the memory usage
-require(ggplot2)
-options(future.globals.maxSize = 120000 * 1024^2)
-
-mem_used()
-
-
 
 library(pryr) # monitor the memory usage
 require(ggplot2)
@@ -44,6 +36,10 @@ library(randomcoloR)
 
 source('functions_scRNAseq.R')
 source('functions_Visium.R')
+
+options(future.globals.maxSize = 120000 * 1024^2)
+
+
 dataPath_nichenet = '../data/NicheNet/'
 
 mem_used()
@@ -52,17 +48,19 @@ mem_used()
 # load processed scRNA-seq and visium data
 ##########################################
 # load ST data with additional region annotations
-load(file = paste0(RdataDir, 'seuratObject_design_variableGenes_umap.clustered_manualSegmentation', 
-                   species, '.Rdata')) # visium data
+st = readRDS(file = paste0(RdataDir, 'seuratObject_allVisiusmst_',
+              'filtered.spots_time_conditions_manualSegmentation', 
+              version.analysis, '.rds'))
+
 table(st$segmentation, st$condition)
 
+SpatialDimPlot(st, ncol = 4)
 
 ## snRNA-seq reference  
-refs = readRDS(file = paste0(RdataDir, 'RCTD_refs_subtypes_final_20221117.rds'))
+refs = readRDS(file = paste0(resDir, '/RCTD_refs_subtypes_final_20221117.rds'))
 refs$subtypes = refs$celltype_toUse # clean the special symbols
 refs$celltypes = refs$celltype_toUse
-#refs_file = '/groups/tanaka/Collaborations/Jingkui-Elad/scMultiome/aa_annotated_no_doublets_20221004_2.rds'
-#refs = readRDS(file = refs_file)
+
 
 table(refs$subtypes)
 length(table(refs$subtypes))
@@ -71,6 +69,7 @@ refs$subtypes = as.factor(refs$subtypes)
 
 refs$celltypes = gsub('CM_ven_Robo2', 'CM_Robo2', refs$celltypes)
 refs$celltypes = gsub('CM_ven_Cav3_1', 'CM_Cav3.1', refs$celltypes)
+
 
 ########################################################
 ########################################################
@@ -81,10 +80,12 @@ refs$celltypes = gsub('CM_ven_Cav3_1', 'CM_Cav3.1', refs$celltypes)
 Run_Neighborhood_Enrichment_Analysis = FALSE
 if(Run_Neighborhood_Enrichment_Analysis){
   
-  outDir = paste0(resDir, '/neighborhood_test/Run_misty_v1.8_short/')
+  outDir = paste0(resDir, '/neighborhood_test/Run_misty_v1.0/')
+  #condition.specific_celltypes = readRDS(file = 
+  #                                         paste0(resDir, '/RCTD_refs_condition_specificity_v3.rds'))
   
-  RCTD_out = paste0('../results/visium_axolotl_R12830_resequenced_20220308/',
-                    'RCTD_subtype_out_42subtypes_ref.time.specific_v4.3')
+  
+  RCTD_out = paste0(resDir, '/RCTD_allVisium_subtype_out_41subtypes_ref.time.specific_v2.0')
   
   levels(refs$subtypes)
   # condition-specific subtypes selected
@@ -96,6 +97,7 @@ if(Run_Neighborhood_Enrichment_Analysis){
                                      'Mo.Macs_SNX22', "Neu_DYSF",
                                       "CM_Cav3.1", "CM_Robo2", 'CM_IS',
                                      "Megakeryocytes","RBC"),
+                            
                             d4 = c('EC', "EC_CEMIP", "EC_LHX6", 'EC_NOS3', "EC_WNT4", 'EC_IS_IARS1',
   "EC_IS_LOX",
                                      "FB_PKD1", "FB_TNXB",
@@ -113,47 +115,43 @@ if(Run_Neighborhood_Enrichment_Analysis){
                                       "CM_Robo2", "CM_Cav3.1",  'CM_IS',
                                       "Megakeryocytes", 'RBC')
   )
-  # 
-  # condSpec_celltypes = list(d1 = c('EC', "EC_CEMIP", "EC_LHX6", 'EC_NOS3', "EC_WNT4", 'EC_IS_IARS1', "EC_Prol",
-  #                                  "FB_PKD1", "FB_TNXB",'FB_IS_TFPI2',
-  #                                  'Mo.Macs_SNX22', "Neu_DYSF", "Neu_IL1R1", 
-  #                                  "CM_Robo2", "CM_Cav3.1",  'CM_IS', "CM_Prol_1", "CM_Prol_3",
-  #                                  "Megakeryocytes", "Proliferating_Megakeryocytes", "RBC", "Proliferating_RBC"),
-  #                           
-  #                           
-  #                           d4 = c('EC', "EC_CEMIP", "EC_LHX6", 'EC_NOS3', "EC_WNT4", 'EC_IS_IARS1', "EC_IS_LOX", 
-  #                                  "EC_IS_Prol", "EC_Prol",
-  #                                  "FB_PKD1", "FB_TNXB",
-  #                                  "Mo.Macs_Prol", "Mo.Macs_resident", "Mo.Macs_FAXDC2", 'Mo.Macs_SNX22', "Neu_DYSF", 
-  #                                  "Neu_IL1R1",
-  #                                  "CM_Robo2", "CM_Cav3.1",  'CM_IS', "CM_Prol_IS", "CM_Prol_1", "CM_Prol_3",
-  #                                  "Megakeryocytes", "Proliferating_Megakeryocytes", "RBC", "Proliferating_RBC"),
-  #                           
-  #                           d7 = c('EC', "EC_CEMIP", "EC_LHX6", 'EC_NOS3', "EC_WNT4", "EC_IS_LOX", "EC_IS_Prol", 
-  #                                  "EC_Prol",
-  #                                  "FB_PKD1", "FB_TNXB",
-  #                                  "Mo.Macs_Prol", "Mo.Macs_resident", "Mo.Macs_FAXDC2", "Neu_DYSF", "Neu_IL1R1",
-  #                                  "CM_Robo2", "CM_Cav3.1",  'CM_IS', "CM_Prol_IS", "CM_Prol_1", "CM_Prol_3",
-  #                                  "Megakeryocytes", "Proliferating_Megakeryocytes", "RBC", "Proliferating_RBC"),
-  #                           
-  #                           d14 = c('EC', "EC_CEMIP", "EC_LHX6", 'EC_NOS3', "EC_WNT4", "EC_IS_LOX", "EC_IS_Prol",
-  #                                   "EC_Prol",
-  #                                   "FB_PKD1", "FB_TNXB",
-  #                                   "Mo.Macs_Prol", "Mo.Macs_resident", "Neu_DYSF", 
-  #                                   "CM_Robo2", "CM_Cav3.1",  'CM_IS', "CM_Prol_1", "CM_Prol_3",
-  #                                   "Megakeryocytes", "Proliferating_Megakeryocytes", "RBC", "Proliferating_RBC")
-  # )
+  
+  celltypes_interest = c()
+  for(n in 1:length(condSpec_celltypes))
+  {
+    celltypes_interest = unique(c(celltypes_interest, condSpec_celltypes[[n]]))
+  }
+  
+  condSpec_celltypes$d0 = celltypes_interest
+  
+  
+  st$segmentation = as.character(st$segmentation)
+  st$segmentation[which(st$segmentation == 'RZ1')] = 'RZ'
+  st$segmentation[which(st$segmentation == 'RZ2')] = 'RZ'
+  st$segmentation[which(st$segmentation == 'Intact1')] = 'Intact'
+  st$segmentation[which(st$segmentation == 'Intact2')] = 'Intact'
+  
+  st$segmentation = as.factor(st$segmentation)
+  SpatialDimPlot(st, group.by = 'segmentation', ncol = 4)
+  table(st$segmentation, st$condition)
   
   
   source('functions_Visium.R')
-  # run_neighborhood_analysis(st, 
-  #                           outDir = outDir,
-  #                           RCTD_out = RCTD_out)
   run_misty_colocalization_analysis(st, 
                                     outDir = outDir,
                                     RCTD_out = RCTD_out,
-                                    condSpec_celltypes = condSpec_celltypes
+                                    condSpec_celltypes = NULL,
+                                    segmentation_annots = c('all', 'BZ', 'RZ', 'Intact')
                                     )
+  
+  
+  
+  source('functions_Visium.R')
+  
+  run_significanceTest_misty(st, 
+                             outDir = outDir, 
+                             segmentation_annots = c('all', 'BZ', 'RZ', 'Intact'))
+  
   
   
 }
