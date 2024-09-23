@@ -175,6 +175,7 @@ Run.celltype.deconvolution.RCTD = function(st, # spatial transcriptome seurat ob
                                            mapping_ref = 'condition',
                                            condition.specific.ref = FALSE,
                                            condition.specific_celltypes = NULL,
+                                           RCTD_mode = 'doublet',
                                            RCTD_out = '../results/RCTD_out', 
                                            require_int_SpatialRNA = FALSE,
                                            max_cores = 16,
@@ -346,7 +347,8 @@ Run.celltype.deconvolution.RCTD = function(st, # spatial transcriptome seurat ob
     
     # run RCTD main function
     tic()
-    myRCTD <- run.RCTD(myRCTD, doublet_mode = "doublet")
+    cat('----RCTD running mode : ', RCTD_mode, ' ----\n')
+    myRCTD <- run.RCTD(myRCTD, doublet_mode = RCTD_mode)
     saveRDS(myRCTD, file = paste0(resultsdir, '/RCTD_out_doubletMode_', slice, '.rds'))
     toc()
     
@@ -912,6 +914,8 @@ manual_selection_spots_image_Spata2 = function(st,
   #dyn.load("/software/f2021/software/gdal/3.2.1-foss-2020b/lib/libgdal.so") 
   # outDir = '/groups/tanaka/Collaborations/Jingkui-Elad/visium_axolotl_reseq/spata2_manual_regions/'
   # st = readRDS(file = paste0(outDir, 'axolotl_visium_newRep.rds'))
+  
+  # outDir = paste0(resDir, '/manual_Ventricle_spata2/')
   require(SPATA2)
   
   # slice = cc[n]
@@ -960,19 +964,26 @@ manual_selection_spots_image_Spata2 = function(st,
     
     saveRDS(spata_obj, file = paste0(outDir, '/segemented_spata2_', slice, '.rds'))
     
-    #coord_flip() + 
-    #ggplot2::scale_y_reverse() +
-    #  ggplot2::scale_x_reverse()  # flip first and reverse x to match seurat Spatial plots
+    if(n == 1) { st$seg2 = NA }
     
-    #getFeatureVariables(spata_obj, features = "segmentation", return = "data.frame")
-    aa$segmentation = 'others'
-    aa$segmentation[match(getSegmentDf(spata_obj, segment_names = c('border_zone'))$barcodes, 
-                          colnames(aa))] = 'border_zone'
-    aa$segmentation[match(getSegmentDf(spata_obj, segment_names = c('remote_zone1'))$barcodes, 
-                          colnames(aa))] = 'remote_zone1'
-    aa$segmentation[match(getSegmentDf(spata_obj, segment_names = c('remote_zone2'))$barcodes, 
-                          colnames(aa))] = 'remote_zone2'
+    st$seg2[which(st$condition == slice)] = NA
+    st$seg2[match(getSegmentDf(spata_obj, segment_names = c('Ventricle'))$barcodes, 
+                  colnames(st))] = 'Ventricle'
+    SpatialDimPlot(st, group.by = 'seg2', ncol = 4)
     
+    #spata_obj = readRDS(file = paste0(outDir, '/segemented_spata2_', slice, '.rds'))
+    #st$seg2[match(getSegmentDf(spata_obj, segment_names = c('Ventricle'))$barcodes, 
+    #              colnames(st))] = 'Ventricle'
+    #aa$segmentation[match(getSegmentDf(spata_obj, segment_names = c('border_zone'))$barcodes, 
+    #                      colnames(aa))] = 'border_zone'
+    #aa$segmentation[match(getSegmentDf(spata_obj, segment_names = c('remote_zone1'))$barcodes, 
+    #                      colnames(aa))] = 'remote_zone1'
+    #aa$segmentation[match(getSegmentDf(spata_obj, segment_names = c('remote_zone2'))$barcodes, 
+    #                      colnames(aa))] = 'remote_zone2'
+    
+    saveRDS(st, file = paste0(RdataDir, 'seuratObject_allVisiusmst_',
+                              'filtered.spots_time_conditions_manualSegmentation_ventricleRegions', 
+                              version.analysis, '.rds'))
     
   }
 }
@@ -1615,6 +1626,245 @@ run_misty_colocalization_analysis = function(st,
      
     }
   
+  }
+}
+
+
+##########################################
+# compare the bz vs remote regions and also the control samples at day 0
+##########################################
+get_comparable_matrix = function(xx, yy)
+{
+  # xx = bz; yy = ctl1;
+  res = matrix(NA, nrow = nrow(xx), ncol = ncol(xx))
+  
+  jj1 = match(colnames(xx), colnames(yy))
+  jj2 = match(rownames(xx), rownames(yy))
+  
+  if(length(which(is.na(jj1))) == 0 & length(which(is.na(jj2))) == 0){
+    res = as.matrix(yy[jj2, jj1])
+    
+  }else{
+    for(m in 1:length(jj1))
+    {
+      if(!is.na(jj1[m])){
+        res[,m] = yy[jj2, jj1[m]]
+      }
+    }
+  }
+  
+  colnames(res) = colnames(xx)
+  rownames(res) = rownames(xx)
+  
+  
+  res[which(is.na(res))] = 0
+  return(res)
+  
+}
+
+
+summarize_colocalization = function(x1, x2, x3, x4)
+{
+  col_names = colnames(x1)
+  row_names = rownames(x1)
+  
+  res = matrix(0, ncol = ncol(x1), nrow = nrow(x1))
+  x1 = as.matrix(x1)
+  x1[which(is.na(x1))] = 0
+  x2 = as.matrix(x2)
+  x2[which(is.na(x2))] = 0
+  
+  x3 = as.matrix(x3)
+  x3[which(is.na(x3))] = 0
+  x4 = as.matrix(x4)
+  x4[which(is.na(x4))] = 0
+  
+  for(i in 1:ncol(x1))
+  {
+    for(j in 1:nrow(x1))
+    {
+      if(col_names[i] == row_names[j]){
+        res[j, i] = NA
+      }else{
+        if(x1[j, i] > 0 | x2[j, i] >0){
+          if(x3[j, i] >= 0 | x4[j, i] >=0){
+            res[j, i] = max(c(x1[j, i], x2[j, i]))
+          }
+        }
+      }
+    }
+  }
+  
+  colnames(res) = col_names
+  rownames(res) = row_names
+  
+  return(res)
+}
+
+
+run_significanceTest_misty = function(st, outDir,
+                                      time = c('d1', 'd4', 'd7', 'd14'),
+                                      cutoff = 0.2,
+                                      resolution = 1,
+                                      segmentation_annots = c('all', 'BZ', 'RZ', 'Intact'), 
+                                      controls = c('RZ', 'Intact')
+                                      )
+{
+  #  time = c('d1', 'd4', 'd7', 'd14'); segmentation_annots = c('all', 'BZ', 'RZ', 'Intact')
+  cat(' -- significance test of celltype proximity for Misty output -- \n')
+  
+  library("plyr")
+  library("reshape2")
+  library("ggplot2")
+  library(igraph)
+  library(ggraph)
+  
+  
+  testDir = paste0(outDir, '/signficant_neighborhood/')
+  if(!dir.exists(testDir)){
+    system(paste0('mkdir -p ', testDir))
+  }
+  
+  cat('-- check visium conditions -- \n')
+  st$condition = droplevels(as.factor(st$condition))
+  print(table(st$condition))
+  cc = names(table(st$condition))
+  cat('ST conditions : \n')
+  print(cc)
+  
+  tt = as.character(sapply(cc, function(x){unlist(strsplit(as.character(x), '_'))[2]}))
+  cat('ST time :\n')
+  print(tt)
+  
+  Idents(st) = st$condition
+  
+  for(n in 1:length(time))
+  {
+    # n = 2
+    kk = which(tt == time[n])
+    
+    for(k in kk)
+    {
+      # k = kk[1]
+      cat('---- condition :', cc[k], '---- \n')
+      bz = read.csv2(file = paste0(outDir, 'Plots_RCTD_propos/',
+                                   cc[k], '_BZ_summary_table_intra.csv'), row.names = c(1))
+      
+      rz = read.csv2(file = paste0(outDir, 'Plots_RCTD_propos/',
+                                   cc[k], '_RZ_summary_table_intra.csv'), row.names = c(1))
+      rz = get_comparable_matrix(bz, rz)
+      
+      ctl1 = read.csv2(file = paste0(outDir, 'Plots_RCTD_propos/',
+                                    'Amex_d0_294946_Intact_summary_table_intra.csv'), row.names = c(1))
+      ctl1 = get_comparable_matrix(bz, ctl1)
+    
+      ctl2 = read.csv2(file = paste0(outDir, 'Plots_RCTD_propos/',
+                                     'Amex_d0_294949_Intact_summary_table_intra.csv'), row.names = c(1))
+      
+      ctl2 = get_comparable_matrix(bz, ctl2)
+      ctl = (ctl1 + ctl2)/2.0
+      
+      bz_rz_intra = bz - rz
+      bz_c_intra = bz - ctl
+      
+      rm(list = c('bz', 'rz', 'ctl1', 'ctl2', 'ctl'))
+      
+      bz = read.csv2(file = paste0(outDir, 'Plots_RCTD_propos/',
+                                   cc[k], '_BZ_summary_table_juxta5.csv'), row.names = c(1))
+      
+      rz = read.csv2(file = paste0(outDir, 'Plots_RCTD_propos/',
+                                   cc[k], '_RZ_summary_table_juxta5.csv'), row.names = c(1))
+      rz = get_comparable_matrix(bz, rz)
+      
+      ctl1 = read.csv2(file = paste0(outDir, 'Plots_RCTD_propos/',
+                                     'Amex_d0_294946_Intact_summary_table_juxta5.csv'), row.names = c(1))
+      ctl1 = get_comparable_matrix(bz, ctl1)
+      
+      ctl2 = read.csv2(file = paste0(outDir, 'Plots_RCTD_propos/',
+                                     'Amex_d0_294949_Intact_summary_table_juxta5.csv'), row.names = c(1))
+      
+      ctl2 = get_comparable_matrix(bz, ctl2)
+      ctl = (ctl1 + ctl2)/2.0
+      
+      bz_rz_juxta = bz - rz
+      bz_c_juxta = bz - ctl
+      
+      rm(list = c('bz', 'rz', 'ctl1', 'ctl2', 'ctl'))
+      
+      bz_all = summarize_colocalization(bz_rz_intra, bz_rz_juxta, bz_c_intra, bz_c_juxta)
+      
+      rm(list = c('bz_rz_intra', 'bz_rz_juxta', 'bz_c_intra', 'bz_c_juxta'))
+      
+      
+      ## plot the heatmap of cell-cell colocalization
+      pdfname = paste0(testDir, 'Plot_', cc[k], '.pdf')
+      pdf(pdfname, width=12, height = 8)
+      
+      for(cutoff in seq(0, 2, by=0.1))
+      {
+        set2.blue <- "#8DA0CB"
+        
+        bz_allx = bz_all
+        bz_allx[bz_allx < cutoff] <- 0
+        plot.data = reshape2::melt(bz_allx, value.name = 'Importance')
+        colnames(plot.data)[1:2] = c('Target', 'Predictor')
+        
+        results.plot <- ggplot2::ggplot(
+          plot.data,
+          ggplot2::aes(
+            x = Predictor,
+            y = reorder(Target, desc(Target))
+          )
+        ) +
+          ggplot2::geom_tile(ggplot2::aes(fill = Importance)) + 
+          ggplot2::scale_fill_gradient2(
+            low = "white",
+            mid = "white",
+            high = set2.blue,
+            midpoint = 0.2
+          ) +
+          ggplot2::theme_classic() + 
+          ggplot2::theme(axis.text.x = ggplot2::element_text(angle = 90, hjust = 1)) +
+          ggplot2::labs(y = 'Target') +
+          ggplot2::coord_equal() +
+          ggplot2::ggtitle(paste0('colocalization heatmap with cutoff : ', cutoff))
+        
+        print(results.plot)
+        
+        . <- NULL
+        A = bz_all
+        A[A < cutoff | is.na(A)] <- 0
+        A = A[c(nrow(A):1), ]
+        
+        #A[is.na(A)] <- 0
+        G <- igraph::graph.adjacency(A, mode = "plus", weighted = TRUE) %>%
+          igraph::set.vertex.attribute("name", value = names(igraph::V(.))) %>%
+          igraph::delete.vertices(which(igraph::degree(.) == 0))
+        
+        C <- igraph::cluster_leiden(G, resolution_parameter = resolution)
+        layout <- igraph::layout_with_fr(G)
+        
+        igraph::plot.igraph(G,
+                            layout = layout, 
+                            mark.groups = C, 
+                            main = paste0('colocalization graph with cutoff : ', cutoff), 
+                            #edge.width=seq(1,10),
+                            vertex.size = 4,
+                            vertex.color = "black", 
+                            vertex.label.dist = 1,
+                            vertex.label.color = "black", 
+                            vertex.label.font = 2, 
+                            vertex.label.cex = 0.66
+        )
+        
+        
+        
+      }
+      
+      dev.off()
+      
+    }
+      
   }
   
 }

@@ -80,18 +80,25 @@ refs$celltypes = gsub('CM_ven_Cav3_1', 'CM_Cav3.1', refs$celltypes)
 Run_Neighborhood_Enrichment_Analysis = FALSE
 if(Run_Neighborhood_Enrichment_Analysis){
   
+  st$segmentation = as.character(st$segmentation)
+  st$segmentation[which(st$segmentation == 'RZ1')] = 'RZ'
+  st$segmentation[which(st$segmentation == 'RZ2')] = 'RZ'
+  st$segmentation[which(st$segmentation == 'Intact1')] = 'Intact'
+  st$segmentation[which(st$segmentation == 'Intact2')] = 'Intact'
+  
+  st$segmentation = as.factor(st$segmentation)
+  SpatialDimPlot(st, group.by = 'segmentation', ncol = 4)
+  table(st$segmentation, st$condition)
+  
   outDir = paste0(resDir, '/neighborhood_test/Run_misty_v1.0/')
-  #condition.specific_celltypes = readRDS(file = 
-  #                                         paste0(resDir, '/RCTD_refs_condition_specificity_v3.rds'))
-  
-  
+    
   RCTD_out = paste0(resDir, '/RCTD_allVisium_subtype_out_41subtypes_ref.time.specific_v2.0')
   
   levels(refs$subtypes)
+  
   # condition-specific subtypes selected
   #condSpec_celltypes = readxl::read_xlsx("../data/neighbourhood_analysis_list_short.xlsx")
   #condSpec_celltypes = as.data.frame(condSpec_celltypes)
-  
   condSpec_celltypes = list(d1 = c('EC', "EC_CEMIP", "EC_LHX6", 'EC_NOS3', "EC_WNT4", 'EC_IS_IARS1',
                                      "FB_TNXB",'FB_IS_TFPI2',
                                      'Mo.Macs_SNX22', "Neu_DYSF",
@@ -125,17 +132,6 @@ if(Run_Neighborhood_Enrichment_Analysis){
   condSpec_celltypes$d0 = celltypes_interest
   
   
-  st$segmentation = as.character(st$segmentation)
-  st$segmentation[which(st$segmentation == 'RZ1')] = 'RZ'
-  st$segmentation[which(st$segmentation == 'RZ2')] = 'RZ'
-  st$segmentation[which(st$segmentation == 'Intact1')] = 'Intact'
-  st$segmentation[which(st$segmentation == 'Intact2')] = 'Intact'
-  
-  st$segmentation = as.factor(st$segmentation)
-  SpatialDimPlot(st, group.by = 'segmentation', ncol = 4)
-  table(st$segmentation, st$condition)
-  
-  
   source('functions_Visium.R')
   run_misty_colocalization_analysis(st, 
                                     outDir = outDir,
@@ -147,10 +143,12 @@ if(Run_Neighborhood_Enrichment_Analysis){
   
   
   source('functions_Visium.R')
-  
   run_significanceTest_misty(st, 
                              outDir = outDir, 
-                             segmentation_annots = c('all', 'BZ', 'RZ', 'Intact'))
+                             time = c('d1', 'd4', 'd7', 'd14'),
+                             segmentation_annots = c('all', 'BZ', 'RZ', 'Intact'),
+                             controls = c('RZ', 'Intact'),
+                             resolution = 1)
   
   
   
