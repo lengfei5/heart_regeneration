@@ -531,8 +531,18 @@ if(Data_Exploration){
 # using the snRNA-seq annotated by Elad
 ########################################################
 ########################################################
-st = readRDS(file = paste0(RdataDir, 'seuratObject_st_filtered.spots_time_conditions', 
-                               version.analysis, '.rds'))
+#st = readRDS(file = paste0(RdataDir, 'seuratObject_st_filtered.spots_time_conditions', 
+#                               version.analysis, '.rds'))
+st = readRDS(file = paste0(RdataDir, 'seuratObject_allVisiusmst_',
+              'filtered.spots_time_conditions_manualSegmentation_ventricleRegions', 
+              version.analysis, '.rds'))
+
+Idents(st) = st$seg_ventricle
+st = subset(st, cells = colnames(st)[which(!is.na(st$seg_ventricle))])
+
+SpatialPlot(st, group.by = 'seg_ventricle', ncol = 4)
+
+
 #load(file = paste0(RdataDir, 'seuratObject_design_variableGenes_umap.clustered', species, '.Rdata'))
 #st = readRDS(file = paste0(RdataDir, 'seuratObject_st_filtered.spots', version.analysis, '.rds'))
 #st$time = design$time[match(st$sampleid, design$sampleID)]
@@ -622,6 +632,17 @@ if(Import_manually_timeSpecific_celltypes){
   
   csc[which(rownames(csc) == 'B_cells_Prol'), ] = NA
   
+  ## remove the subtypes in Atria
+  csc[which(rownames(csc) == 'EC_WNT4'), ] = NA
+  csc[which(rownames(csc) == 'EC_CEMIP'), ] = NA
+  csc[which(rownames(csc) == 'EC_LHX6'), ] = NA
+  csc[which(rownames(csc) == 'FB_VWA2'), ] = NA
+  csc[which(rownames(csc) == 'FB_TNXB'), ] = NA
+  csc[which(rownames(csc) == 'CM_PM_HCN4'), ] = NA
+  csc[which(rownames(csc) == 'CM_OFT'), ] = NA
+  csc[which(rownames(csc) == 'CM_Atria'), ] = NA
+  
+  
   condition.specific_celltypes = csc
   
   
@@ -633,28 +654,30 @@ mm = match(rownames(condition.specific_celltypes), celltypes)
 cat(length(which(is.na(mm))), ' cell types missing in the condition.specific_celltypes \n')
 
 
-# st = subset(st, condition == 'Amex_d4')
-saveRDS(st, file = paste(resDir, 'RCTD_st_axolotl_allVisium.rds'))
-
-saveRDS(refs, file = paste0(resDir, '/RCTD_refs_subtypes_final_20221117.rds'))
-
-saveRDS(condition.specific_celltypes, 
-        file = paste0(resDir, '/RCTD_refs_condition_specificity_v3.rds'))
-
-
 source('functions_Visium.R')
 ## preapre the paramters for RCTD subtypes
 DefaultAssay(refs) = 'RNA'
 DefaultAssay(st) = 'Spatial'
 require_int_SpatialRNA = FALSE
-
 condition.specific.ref = TRUE
 
-RCTD_out = paste0(resDir, '/RCTD_subtype_out_41subtypes_ref.time.specific_v1.2_testMultimode')
+RCTD_out = paste0(resDir, '/RCTD_out', 
+                  '/RCTD_subtype_out_41subtypes_ref.time.specific_v3.5_ventricleRegion')
+system(paste0('mkdir -p ', RCTD_out))
+
+
+# st = subset(st, condition == 'Amex_d4')
+saveRDS(st, file = paste(RCTD_out, '/RCTD_st_axolotl_allVisium.rds'))
+
+saveRDS(refs, file = paste0(RCTD_out, '/RCTD_refs_subtypes_final_20221117.rds'))
+
+saveRDS(condition.specific_celltypes, 
+        file = paste0(RCTD_out, '/RCTD_refs_condition_specificity_v3.rds'))
+
+
+
 max_cores = 16
-
 cc = names(table(st$condition))
-
 
 source('functions_Visium.R')
 Run.celltype.deconvolution.RCTD(st = st,
@@ -663,19 +686,22 @@ Run.celltype.deconvolution.RCTD(st = st,
                                 condition.specific.ref = condition.specific.ref,
                                 condition.specific_celltypes = condition.specific_celltypes,
                                 require_int_SpatialRNA = require_int_SpatialRNA,
-                                RCTD_mode = 'multi',
+                                RCTD_mode = 'doublet',
                                 max_cores = max_cores,
                                 RCTD_out = RCTD_out,
                                 plot.RCTD.summary = FALSE, 
                                 PLOT.scatterpie = FALSE
-                                
 )
+
 
 
 source('functions_Visium.R')
 plot.RCTD.results(st = st,
                   RCTD_out = RCTD_out,
-                  plot.RCTD.summary = FALSE)
+                  RCTD_mode = 'multi',
+                  plot.RCTD.summary = FALSE 
+                  )
+
 
 
 ## prepare the parameters for RCTD coarse cell types
@@ -837,7 +863,23 @@ if(Import.manual.spatial.domains){
                             version.analysis, '.rds'))
   
   
+  ## add the ventricle segmentation
+  st = readRDS(file = paste0(RdataDir, 'seuratObject_allVisiusmst_',
+                             'filtered.spots_time_conditions_manualSegmentation', 
+                             version.analysis, '.rds'))
+  xx = readRDS(file = paste0(RdataDir, 'seuratObject_allVisiusmst_',
+                     'filtered.spots_time_conditions_manualSegmentation_ventricleRegions', 
+                     version.analysis, '.rds'))
+ 
+  st$seg_ventricle = NA
+  st$seg_ventricle = xx$seg2[match(colnames(st), colnames(xx))]
   
+  ## all previous manual segmentation were included in ventricle annotation
+  jj = which(!is.na(st$segmentation) & is.na(st$seg_ventricle))
+  
+  saveRDS(st, file = paste0(RdataDir, 'seuratObject_allVisiusmst_',
+                            'filtered.spots_time_conditions_manualSegmentation_ventricleRegions', 
+                            version.analysis, '.rds'))
   
   
 }

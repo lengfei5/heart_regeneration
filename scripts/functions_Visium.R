@@ -355,17 +355,37 @@ Run.celltype.deconvolution.RCTD = function(st, # spatial transcriptome seurat ob
     ##########################################
     # check the result
     ##########################################
+    # myRCTD = readRDS(file = paste0(resultsdir, '/RCTD_out_doubletMode_', slice, '.rds'))
     myRCTD = readRDS(file = paste0(resultsdir, '/RCTD_out_doubletMode_', slice, '.rds'))
     results <- myRCTD@results
     
-    # normalize the cell type proportions to sum to 1.
-    norm_weights = sweep(results$weights, 1, rowSums(results$weights), '/') 
     cell_type_names <- myRCTD@cell_type_info$info[[2]] #list of cell type names
-    
     spatialRNA <- myRCTD@spatialRNA
     
+    # extract the weights
+    if(RCTD_mode == 'doublet'){
+      # normalize the cell type proportions to sum to 1
+      norm_weights = sweep(results$weights, 1, rowSums(results$weights), '/') 
+      
+    }else{
+      #cell_type_names <- myRCTD@cell_type_info$info[[2]] #list of cell type names
+      norm_weights = matrix(0, ncol = length(cell_type_names), nrow = length(results))
+      
+      colnames(norm_weights) = cell_type_names
+      for(jj in 1:nrow(norm_weights))
+      {
+        wts = results[[jj]]
+        ii_w = match(wts$cell_type_list, colnames(norm_weights))
+        norm_weights[jj, ii_w] = wts$sub_weights
+      }
+      
+      rownames(norm_weights) = colnames(stx)
+      
+    }
+    
+    
     # make the plots 
-    if(plot.RCTD.summary){
+    if(plot.RCTD.summary & RCTD_mode == 'doublet'){
       
       # Plots the confident weights for each cell type as in full_mode 
       # (saved as 'results/cell_type_weights_unthreshold.pdf')
@@ -542,8 +562,9 @@ Run.celltype.deconvolution.RCTD = function(st, # spatial transcriptome seurat ob
 
 plot.RCTD.results = function(st, 
                              species = 'axolotl',
-                             RCTD_out = '../results/RCTD_out', 
-                             plot.RCTD.summary = TRUE,
+                             RCTD_out = '../results/RCTD_out',
+                             RCTD_mode = 'multi',
+                             plot.RCTD.summary = FALSE,
                              PLOT.scatterpie = TRUE)
 {
   library(spacexr)
@@ -564,7 +585,7 @@ plot.RCTD.results = function(st,
   #RCTD_out = paste0(resDir, '/RCTD_subtype_out_v3.5')
   #RCTD_out = paste0(resDir, '/RCTD_subtype_out_v4_FBsubtypes')
   
-  cat('-- RCTD output folder -- ', RCTD_out, '\n')
+  cat('-- RCTD output folder : \n -- ', RCTD_out, '\n')
   
   for(n in 1:length(cc))
   #for(n in c(1, 2, 4))
@@ -606,12 +627,35 @@ plot.RCTD.results = function(st,
    
     results <- myRCTD@results
     
+    cell_type_names <- myRCTD@cell_type_info$info[[2]] #list of cell type names
+    spatialRNA <- myRCTD@spatialRNA
+    
+    # extract the weights
+    if(RCTD_mode == 'doublet'){
+      # normalize the cell type proportions to sum to 1
+      norm_weights = sweep(results$weights, 1, rowSums(results$weights), '/') 
+      
+    }else{
+      #cell_type_names <- myRCTD@cell_type_info$info[[2]] #list of cell type names
+      norm_weights = matrix(0, ncol = length(cell_type_names), nrow = length(results))
+      
+      colnames(norm_weights) = cell_type_names
+      for(jj in 1:nrow(norm_weights))
+      {
+        wts = results[[jj]]
+        ii_w = match(wts$cell_type_list, colnames(norm_weights))
+        norm_weights[jj, ii_w] = wts$sub_weights
+      }
+      
+      rownames(norm_weights) = colnames(stx)
+      
+    }
+    
     # normalize the cell type proportions to sum to 1.
     #norm_weights = sweep(results$weights, 1, rowSums(results$weights), '/') 
-    norm_weights = normalize_weights(results$weights) 
-    cell_type_names <- myRCTD@cell_type_info$info[[2]] #list of cell type names
-    
-    spatialRNA <- myRCTD@spatialRNA
+    #norm_weights = normalize_weights(results$weights) 
+    #cell_type_names <- myRCTD@cell_type_info$info[[2]] #list of cell type names
+    #spatialRNA <- myRCTD@spatialRNA
     
     stx$condition = as.factor(stx$condition)
     stx$condition = droplevels(stx$condition)
@@ -634,7 +678,7 @@ plot.RCTD.results = function(st,
            width = 12, height = 8)
     
     # make the plots 
-    if(plot.RCTD.summary){
+    if(plot.RCTD.summary & RCTD_mode == 'doublet'){
       # stx$condition = droplevels(stx$condition)
       # DefaultAssay(stx) = 'SCT'
       # 
