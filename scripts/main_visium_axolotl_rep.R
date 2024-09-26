@@ -1094,7 +1094,6 @@ if(Run_Neighborhood_Enrichment_Analysis){
                                     segmentation_annots = c('all', 'BZ', 'RZ', 'Intact')
   )
   
-  
   source('functions_Visium.R')
   run_significanceTest_misty(st, 
                              outDir = outDir, 
