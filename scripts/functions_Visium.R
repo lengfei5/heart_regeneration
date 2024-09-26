@@ -1791,6 +1791,8 @@ run_significanceTest_misty = function(st, outDir,
     {
       # k = kk[1]
       cat('---- condition :', cc[k], '---- \n')
+      
+      
       bz = read.csv2(file = paste0(outDir, 'Plots_RCTD_propos/',
                                    cc[k], '_BZ_summary_table_intra.csv'), row.names = c(1))
       
@@ -1828,6 +1830,8 @@ run_significanceTest_misty = function(st, outDir,
                                      'Amex_d0_294949_Intact_summary_table_juxta5.csv'), row.names = c(1))
       
       ctl2 = get_comparable_matrix(bz, ctl2)
+      
+      
       ctl = (ctl1 + ctl2)/2.0
       
       bz_rz_juxta = bz - rz

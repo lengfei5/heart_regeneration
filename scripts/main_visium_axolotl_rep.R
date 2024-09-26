@@ -633,18 +633,17 @@ if(Import_manually_timeSpecific_celltypes){
   csc[which(rownames(csc) == 'B_cells_Prol'), ] = NA
   
   ## remove the subtypes in Atria
-  csc[which(rownames(csc) == 'EC_WNT4'), ] = NA
-  csc[which(rownames(csc) == 'EC_CEMIP'), ] = NA
-  csc[which(rownames(csc) == 'EC_LHX6'), ] = NA
-  csc[which(rownames(csc) == 'FB_VWA2'), ] = NA
-  csc[which(rownames(csc) == 'FB_TNXB'), ] = NA
-  csc[which(rownames(csc) == 'CM_PM_HCN4'), ] = NA
+  #csc[which(rownames(csc) == 'EC_WNT4'), ] = NA
+  #csc[which(rownames(csc) == 'EC_CEMIP'), ] = NA
+  #csc[which(rownames(csc) == 'EC_LHX6'), ] = NA
+  #csc[which(rownames(csc) == 'FB_VWA2'), ] = NA
+  #csc[which(rownames(csc) == 'FB_TNXB'), ] = NA
+  #csc[which(rownames(csc) == 'CM_PM_HCN4'), ] = NA
   csc[which(rownames(csc) == 'CM_OFT'), ] = NA
   csc[which(rownames(csc) == 'CM_Atria'), ] = NA
-  
+  csc[which(rownames(csc) == 'CM_Atria_Tagln'), ] = NA
   
   condition.specific_celltypes = csc
-  
   
 }
 
@@ -660,14 +659,15 @@ DefaultAssay(refs) = 'RNA'
 DefaultAssay(st) = 'Spatial'
 require_int_SpatialRNA = FALSE
 condition.specific.ref = TRUE
+RCTD_mode = 'doublet'
 
 RCTD_out = paste0(resDir, '/RCTD_out', 
-                  '/RCTD_subtype_out_41subtypes_ref.time.specific_v3.5_ventricleRegion')
+                  '/RCTD_subtype_out_41subtypes_ref.time.specific_v3.5.5_ventricleRegion')
 system(paste0('mkdir -p ', RCTD_out))
 
 
 # st = subset(st, condition == 'Amex_d4')
-saveRDS(st, file = paste(RCTD_out, '/RCTD_st_axolotl_allVisium.rds'))
+saveRDS(st, file = paste0(RCTD_out, '/RCTD_st_axolotl_allVisium.rds'))
 
 saveRDS(refs, file = paste0(RCTD_out, '/RCTD_refs_subtypes_final_20221117.rds'))
 
@@ -686,7 +686,7 @@ Run.celltype.deconvolution.RCTD(st = st,
                                 condition.specific.ref = condition.specific.ref,
                                 condition.specific_celltypes = condition.specific_celltypes,
                                 require_int_SpatialRNA = require_int_SpatialRNA,
-                                RCTD_mode = 'doublet',
+                                RCTD_mode = RCTD_mode,
                                 max_cores = max_cores,
                                 RCTD_out = RCTD_out,
                                 plot.RCTD.summary = FALSE, 
@@ -698,7 +698,7 @@ Run.celltype.deconvolution.RCTD(st = st,
 source('functions_Visium.R')
 plot.RCTD.results(st = st,
                   RCTD_out = RCTD_out,
-                  RCTD_mode = 'multi',
+                  RCTD_mode = RCTD_mode,
                   plot.RCTD.summary = FALSE 
                   )
 
@@ -885,35 +885,19 @@ if(Import.manual.spatial.domains){
 }
 
 ##########################################
-# compare the injury zone, border zone, remote and intact   
+# Compare replicates from two batches 
+# the injury zone, border zone, remote and intact   
 ##########################################
 st = readRDS(file = paste0(RdataDir, 'seuratObject_allVisiusmst_',
-                           'filtered.spots_time_conditions_manualSegmentation', 
+                           'filtered.spots_time_conditions_manualSegmentation_ventricleRegions', 
                            version.analysis, '.rds'))
+
+#st = readRDS(file = paste0(RdataDir, 'seuratObject_allVisiusmst_',
+#                           'filtered.spots_time_conditions_manualSegmentation', 
+#                           version.analysis, '.rds'))
 
 Idents(st) = as.factor(st$segmentation)
 SpatialDimPlot(st, ncol = 4)
-
-outDir = paste0(resDir, '/manual_borderZones_spata2/')
-
-
-st = subset(st, cells = which(!is.na(st$segmentation)))
-
-#st <- SCTransform(st, assay = "Spatial", verbose = FALSE, variable.features.n = 3000)
-# DefaultAssay(st) <- "SCT"
-st = NormalizeData(st, normalization.method = "LogNormalize", scale.factor = 10000)
-st = FindVariableFeatures(st, selection.method = "vst", nfeatures = 2000)
-st = ScaleData(st,  
-               vars.to.regress = c('nCount_Spatial'), 
-               assay = 'Spatial')
-
-st <- RunPCA(st, verbose = FALSE)
-ElbowPlot(st)
-
-st <- FindNeighbors(st, dims = 1:20)
-st <- FindClusters(st, verbose = FALSE, resolution = 1.0)
-
-st <- RunUMAP(st, dims = 1:20, n.neighbors = 30, min.dist = 0.1)
 
 st$segmentation = as.character(st$segmentation)
 st$segmentation[which(st$segmentation == 'RZ1')] = 'RZ'
@@ -923,23 +907,66 @@ st$segmentation[which(st$segmentation == 'Intact2')] = 'Intact'
 
 st$segmentation = as.factor(st$segmentation)
 
+Idents(st) = as.factor(st$segmentation)
+SpatialDimPlot(st, ncol = 4)
+
+
+outDir = paste0(resDir, '/Replicates_comparison_with_segmentation/')
+system(paste0('mkdir -p ', outDir))
+
+Batch_correction_only_segmentation = FALSE
+if(Batch_correction_only_segmentation){
+  st = subset(st, cells = which(!is.na(st$segmentation)))
+  
+}
+
+#st <- SCTransform(st, assay = "Spatial", verbose = FALSE, variable.features.n = 3000)
+# DefaultAssay(st) <- "SCT"
+st = NormalizeData(st, normalization.method = "LogNormalize", scale.factor = 10000)
+st = FindVariableFeatures(st, selection.method = "vst", nfeatures = 5000)
+st = ScaleData(st,  
+               vars.to.regress = c('nCount_Spatial'), 
+               assay = 'Spatial')
+
+st <- RunPCA(st, verbose = FALSE)
+ElbowPlot(st, ndims = 30)
+
+st <- FindNeighbors(st, dims = 1:20)
+st <- FindClusters(st, verbose = FALSE, resolution = 1.0)
+
+st <- RunUMAP(st, dims = 1:20, n.neighbors = 30, min.dist = 0.1)
+
+
+
 p1 = DimPlot(st, reduction = "umap", group.by = c("condition"), label = TRUE, repel = TRUE) 
 p2 = DimPlot(st, reduction = "umap", group.by = c("segmentation"), label = TRUE, repel = TRUE) 
 
 p1 / p2
 
-ggsave(paste0(resDir, '/Compare_diffRegions_intact_injuried_time_logNormal_regressed.nCounts.pdf'), 
+ggsave(paste0(outDir, '/Compare_diffRegions_intact_injuried_time_logNormal_regressed.nCounts.pdf'), 
        width = 10, height = 12)
-
 
 
 st$dataset = 'batch1'
 st$dataset[grep('_2949', st$condition)] = 'batch2'
 
-source('functions_dataIntegration.R')
-st_bc = IntegrateData_Seurat_CCA(st, group.by = 'dataset', k.weight = 100)
+p0 = DimPlot(st, reduction = "umap", group.by = c("condition"), label = TRUE, repel = TRUE) 
+p1 = DimPlot(st, reduction = "umap", group.by = c("time"), label = TRUE, repel = TRUE) 
+p2 = DimPlot(st, reduction = "umap", group.by = c("dataset"), label = TRUE, repel = TRUE) 
+p3 = DimPlot(st, reduction = "umap", group.by = c("segmentation"), label = TRUE, repel = TRUE) 
 
-st_bc = IntegrateData_runFastMNN(st, group.by = 'dataset', assays = 'Spatial',
+(p0 + p2) / (p1 + p3)
+ggsave(paste0(outDir, '/Compare_Replicates_diffRegions_logNormal_regressed.nCounts.pdf'), 
+       width = 14, height = 18)
+
+
+source('functions_dataIntegration.R')
+st_bc = IntegrateData_Seurat_RPCA(st, group.by = 'dataset', k.weight = 100)
+
+
+st_bc = IntegrateData_runFastMNN(st, 
+                                 group.by = 'dataset', 
+                                 assays = 'Spatial',
                                  nfeatures = 1000,
                                  correct.all = FALSE)
 
@@ -968,16 +995,21 @@ SpatialPlot(st, group.by = 'segmentation', image.alpha = 0.5, ncol = 4)
 ggsave(filename = paste0(resDir, '/UMAP_all.timepoints_', species, '.pdf'), width = 16, height = 8)
 
 
-
 ########################################################
 ########################################################
-# Section :
+# Section VI: cell neighborhood analysis
 # 
 ########################################################
 ########################################################
 st = readRDS(file = paste0(RdataDir, 'seuratObject_allVisiusmst_',
-                           'filtered.spots_time_conditions_manualSegmentation', 
+                           'filtered.spots_time_conditions_manualSegmentation_ventricleRegions', 
                            version.analysis, '.rds'))
+
+Idents(st) = st$seg_ventricle
+st = subset(st, cells = colnames(st)[which(!is.na(st$seg_ventricle))])
+
+SpatialPlot(st, group.by = 'seg_ventricle', ncol = 4)
+
 
 table(st$segmentation, st$condition)
 
@@ -998,12 +1030,6 @@ refs$celltypes = gsub('CM_ven_Robo2', 'CM_Robo2', refs$celltypes)
 refs$celltypes = gsub('CM_ven_Cav3_1', 'CM_Cav3.1', refs$celltypes)
 
 
-########################################################
-########################################################
-# Section : cell neighborhood analysis
-# 
-########################################################
-########################################################
 Run_Neighborhood_Enrichment_Analysis = FALSE
 if(Run_Neighborhood_Enrichment_Analysis){
   
@@ -1017,9 +1043,10 @@ if(Run_Neighborhood_Enrichment_Analysis){
   SpatialDimPlot(st, group.by = 'segmentation', ncol = 4)
   table(st$segmentation, st$condition)
   
-  outDir = paste0(resDir, '/neighborhood_test/Run_misty_v1.0/')
+  outDir = paste0(resDir, '/neighborhood_test/Run_misty_v2.0/')
   
-  RCTD_out = paste0(resDir, '/RCTD_allVisium_subtype_out_41subtypes_ref.time.specific_v2.0')
+  RCTD_out = paste0(resDir, '/RCTD_out/',
+                    'RCTD_subtype_out_41subtypes_ref.time.specific_v3.5_ventricleRegion')
   
   levels(refs$subtypes)
   
@@ -1082,7 +1109,7 @@ if(Run_Neighborhood_Enrichment_Analysis){
 
 ########################################################
 ########################################################
-# Section : ligand-receptor prediction analysis with 
+# Section VII : ligand-receptor prediction analysis with 
 # LIANA and NicheNet
 # time-specifc and space-specific niches for nichenet
 ########################################################
