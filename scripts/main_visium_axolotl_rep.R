@@ -1099,12 +1099,10 @@ if(Run_Neighborhood_Enrichment_Analysis){
   source('functions_Visium.R')
   run_significanceTest_misty(st, 
                              outDir = outDir, 
-                             time = c('d1', 'd4', 'd7'),
+                             time = c('d4', 'd7'),
                              segmentation_annots = c('all', 'BZ', 'RZ', 'Intact'),
                              controls = c('RZ', 'Intact'),
-                             resolution = 1)
-  
-  
+                             resolution = 0.6)
   
 }
 

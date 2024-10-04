@@ -1708,7 +1708,7 @@ get_comparable_matrix = function(xx, yy)
 
 ##summarize_colocalization with parameters bz_rz_intra, bz_rz_juxta, bz_rz_para,
 ##bz_c_intra, bz_c_juxta, bz_c_para
-summarize_colocalization = function(x1, x2, x3, c1, c2, c3)
+summarize_colocalization = function(x1, x2, x3)
 {
   col_names = colnames(x1)
   row_names = rownames(x1)
@@ -1721,13 +1721,6 @@ summarize_colocalization = function(x1, x2, x3, c1, c2, c3)
   x3 = as.matrix(x3)
   x3[which(is.na(x3))] = 0
   
-  c1 = as.matrix(c1)
-  c1[which(is.na(c1))] = 0
-  c2 = as.matrix(c2)
-  c2[which(is.na(c2))] = 0
-  c3 = as.matrix(c3)
-  c3[which(is.na(c3))] = 0
-  
   for(i in 1:ncol(x1))
   {
     for(j in 1:nrow(x1))
@@ -1735,11 +1728,10 @@ summarize_colocalization = function(x1, x2, x3, c1, c2, c3)
       if(col_names[i] == row_names[j]){
         res[j, i] = NA
       }else{
+        
         if(x1[j, i] > 0 | x2[j, i] > 0 | x3[j, i] > 0){
-          if(c1[j, i] >= 0 | c2[j, i] >=0 | c3[j, i] >=0){
-            #res[j, i] = max(c(x1[j, i], x2[j, i], x3[j, i]))
-            res[j, i] = sum(c(x1[j, i], x2[j, i], x3[j, i]))
-          }
+          res[j, i] = max(c(x1[j, i], x2[j, i], x3[j, i]))
+          #res[j, i] = sum(c(x1[j, i], x2[j, i], x3[j, i]))
         }
       }
     }
@@ -1758,10 +1750,10 @@ summarize_colocalization = function(x1, x2, x3, c1, c2, c3)
 ##########################################
 run_significanceTest_misty = function(st, 
                                       outDir,
-                                      time = c('d1', 'd4', 'd7', 'd14'),
+                                      time = c('d4', 'd7'),
                                       misty_mode = c('propos'),
                                       cutoff = 0.2,
-                                      resolution = 1,
+                                      resolution = 0.7,
                                       segmentation_annots = c('all', 'BZ', 'RZ', 'Intact'), 
                                       controls = c('RZ', 'Intact')
                                       )
@@ -1806,6 +1798,7 @@ run_significanceTest_misty = function(st,
       
       bz = read.csv2(file = paste0(outDir, 'Plots_RCTD_', misty_mode, '/',
                                    cc[k], '_BZ_summary_table_intra', '.csv'), row.names = c(1))
+      bz = bz[c(nrow(bz):1), ]
       
       rz = read.csv2(file = paste0(outDir, 'Plots_RCTD_', misty_mode, '/',
                                    cc[k], '_RZ_summary_table_intra', '.csv'), row.names = c(1))
@@ -1823,13 +1816,14 @@ run_significanceTest_misty = function(st,
       ctl2 = get_comparable_matrix(bz, ctl2)
       ctl = (ctl1 + ctl2)/2.0
       
-      bz_rz_intra = bz - rz
-      bz_c_intra = bz - ctl
+      bz_rz_intra = (bz + t(bz)) - (rz + t(rz))
+      # bz_c_intra = bz - ctl
       
       rm(list = c('bz', 'rz', 'ctl1', 'ctl2', 'ctl'))
       
       bz = read.csv2(file = paste0(outDir, 'Plots_RCTD_propos/',
                                    cc[k], '_BZ_summary_table_juxta5.csv'), row.names = c(1))
+      bz = bz[c(nrow(bz):1), ]
       
       rz = read.csv2(file = paste0(outDir, 'Plots_RCTD_propos/',
                                    cc[k], '_RZ_summary_table_juxta5.csv'), row.names = c(1))
@@ -1846,13 +1840,14 @@ run_significanceTest_misty = function(st,
       
       ctl = (ctl1 + ctl2)/2.0
       
-      bz_rz_juxta = bz - rz
-      bz_c_juxta = bz - ctl
+      bz_rz_juxta = (bz + t(bz)) - (rz + t(rz))
+      #bz_c_juxta = bz - ctl
       
       rm(list = c('bz', 'rz', 'ctl1', 'ctl2', 'ctl'))
       
       bz = read.csv2(file = paste0(outDir, 'Plots_RCTD_propos/',
                                    cc[k], '_BZ_summary_table_para15.csv'), row.names = c(1))
+      bz = bz[c(nrow(bz):1), ]
       
       rz = read.csv2(file = paste0(outDir, 'Plots_RCTD_propos/',
                                    cc[k], '_RZ_summary_table_para15.csv'), row.names = c(1))
@@ -1868,26 +1863,23 @@ run_significanceTest_misty = function(st,
       ctl2 = get_comparable_matrix(bz, ctl2)
       ctl = (ctl1 + ctl2)/2.0
       
-      bz_rz_para = bz - rz
-      bz_c_para = bz - ctl
+      bz_rz_para = (bz + t(bz)) - (rz + t(rz))
+      # bz_c_para = bz - ctl
       
       rm(list = c('bz', 'rz', 'ctl1', 'ctl2', 'ctl'))
       
+      bz_all = summarize_colocalization(bz_rz_intra, bz_rz_juxta, bz_rz_para)
       
-      bz_all = summarize_colocalization(bz_rz_intra, bz_rz_juxta, bz_rz_para,
-                                        bz_c_intra, bz_c_juxta, bz_c_para
-                                        )
-      
-      rm(list = c('bz_rz_intra', 'bz_rz_juxta', 'bz_c_intra', 'bz_c_juxta'))
-      
+      rm(list = c('bz_rz_intra', 'bz_rz_juxta', 'bz_rz_para'))
       
       
       ## plot the heatmap of cell-cell colocalization
       pdfname = paste0(testDir, 'Plot_', cc[k], '.pdf')
       pdf(pdfname, width=12, height = 8)
       
-      for(cutoff in seq(0, 2, by=0.1))
+      for(cutoff in seq(0, 2.0, by=0.2))
       {
+        # cutoff = 1.6
         set2.blue <- "#8DA0CB"
         
         bz_allx = bz_all
@@ -1920,7 +1912,7 @@ run_significanceTest_misty = function(st,
         . <- NULL
         A = bz_all
         A[A < cutoff | is.na(A)] <- 0
-        A = A[c(nrow(A):1), ]
+        #A = A[c(nrow(A):1), ]
         
         #A[is.na(A)] <- 0
         G <- igraph::graph.adjacency(A, mode = "plus", weighted = TRUE) %>%
@@ -1934,7 +1926,8 @@ run_significanceTest_misty = function(st,
                             layout = layout, 
                             mark.groups = C, 
                             main = paste0('colocalization graph with cutoff : ', cutoff), 
-                            #edge.width=seq(1,10),
+                            edge.weight=2, 
+                            edge.width=(E(G)$weight/2),
                             vertex.size = 4,
                             vertex.color = "black", 
                             vertex.label.dist = 1,
@@ -1943,7 +1936,170 @@ run_significanceTest_misty = function(st,
                             vertex.label.cex = 0.66
         )
         
+        # # create igraph using the code from Giotto
+        # library(igraph)
+        # library(ggraph)
+        # library(tidygraph)
+        # library(graphlayouts) 
+        # library(RColorBrewer) # This is the color library
+        # 
+        # A = bz_all
+        # A[A < cutoff | is.na(A)] <- 0
+        # 
+        # igd = igraph::graph_from_adjacency_matrix(adjmatrix = A, weighted = TRUE, mode = 'upper')
+        # gorder(igd) # nb of node
+        # gsize(igd) # nb of edges
+        # 
+        # igd = igraph::simplify(graph = igd, remove.loops = TRUE, remove.multiple = FALSE)
+        # gorder(igd) # nb of node
+        # gsize(igd) # nb of edges
+        # 
+        # # node
+        # V(igd)
+        # 
+        # #3. Edgelist
+        # E(igd)
+        # 
+        # C <- igraph::cluster_leiden(igd, 
+        #                             resolution_parameter = resolution)
+        # #layout <- igraph::layout_with_fr(G)
+        # coords = igraph::layout_with_fr(graph = igd)
+        # coords = layout_with_drl(graph = igd)
+        # # compute a clustering for node colors
+        # 
+        # #V(igd)$module <- as.character(membership(cluster_louvain(graph_from_data_frame(link.list, directed = FALSE))))
+        # # compute degree as node size
+        # #V(igd)$size <- degree(igd)
+        # 
+        # ## create plot
+        # gpl = ggraph::ggraph(graph = igd, layout = coords) + 
+        #   ggraph::geom_edge_link(aes(edge_width = weight), edge_colour = "gray") +
+        #   geom_node_point(size = 6, shape = 21) + 
+        #   scale_size_continuous(range = c(1, 10)) + 
+        #   scale_edge_width_continuous(range = c(0, 5)) +
+        #   #scale_edge_color_continuous(colors=rev(brewer.pal(n=11, name="RdBu")), limits=c(0, 5)) +
+        #   ggraph::scale_edge_alpha(range = c(0.1,1)) +
+        #   ggraph::scale_edge_width(range = c(1,4)) +
+        #   ggraph::geom_node_text(ggplot2::aes(label = name), repel = TRUE, size = 4) +
+        #   ggplot2::theme_bw() + 
+        #   ggplot2::theme(panel.grid = ggplot2::element_blank(),
+        #                  panel.border = ggplot2::element_blank(),
+        #                  axis.title = ggplot2::element_blank(),
+        #                  axis.text = ggplot2::element_blank(),
+        #                  axis.ticks = ggplot2::element_blank()) 
+        # 
+        # #scale_edge_color_gradientn(colors=rev(brewer.pal(n=11, name="RdBu")), limits=c(0, 4))
+        # 
+        # #set.seed(2022)
+        # ggraph(trn, x=umap1, y=umap2) +
+        #   geom_edge_link(aes(edge_width = weight), edge_colour = "gray85" ) +
+        #   #geom_edge_diagonal(color='darkgray', width=0.2) +
+        #   geom_node_point(aes(fill = module, size = degreeOut), shape = 21) +
+        #   scale_size_continuous(range = c(1, 10)) +
+        #   #geom_node_text(aes(filter = size >= 20, label = name), family = "serif") +
+        #   geom_node_text(aes(filter = size >= 20, label=name), size=5/ggplot2::.pt, repel=T, 
+        #                  family = "serif")+
+        #   scale_edge_width_continuous(range = c(0.05, 0.2)) +
+        #   scale_edge_color_gradientn(colors=rev(brewer.pal(n=11, name="RdBu")), limits=c(0.01, 0.6)) +
+        #   #scale_edge_alpha_continuous(range=c(0.05, 0.4), limits=c(2,20)) +
+        #   scale_edge_alpha_continuous(range=c(0.01,0.8), limits=c(2,20)) + 
+        #   scale_fill_manual(values = got_palette) +
+        #   #scale_fill_viridis(option='magma') + 
+        #   #scale_fill_manual(values = pal) +
+        #   coord_fixed() +
+        #   theme_graph() +
+        #   #theme(legend.position = "bottom") 
+        #   theme(legend.position = "none") 
+        # 
+        # edges_sizes = igraph::get.edge.attribute(igd)
+        # post_edges_sizes = edges_sizes[edges_sizes > 0]
+        # neg_edges_sizes = edges_sizes[edges_sizes <= 0]
+        # 
+        # # rescale if wanted
+        # if(rescale_edge_weights == TRUE) {
+        #   pos_edges_sizes_resc = scales::rescale(x = post_edges_sizes, to = edge_weight_range_enrichment)
+        #   neg_edges_sizes_resc = scales::rescale(x = neg_edges_sizes, to = edge_weight_range_depletion)
+        #   edges_sizes_resc = c(pos_edges_sizes_resc, neg_edges_sizes_resc)
+        # } else {
+        #   edges_sizes_resc = c(post_edges_sizes, neg_edges_sizes)
+        # }
+        # 
+        # # colors
+        # edges_colors = ifelse(edges_sizes > 0, 'enriched', 'depleted')
         
+        # # create coordinates for layout
+        # if(class(layout) %in% c('data.frame', 'data.table')) {
+        #   if(ncol(layout) < 2) {
+        #     stop('custom layout needs to have at least 2 columns')
+        #   }
+        #   
+        #   if(nrow(layout) != length(igraph::E(igd))) {
+        #     stop('rows of custom layout need to be the same as number of edges')
+        #   }
+        #   
+        # } else {
+        #   layout = match.arg(arg = layout, choices = c('Fruchterman', 'DrL', 'Kamada-Kawai'))
+        # }
+        
+        # #iplot = igraph::plot.igraph(igd, edge.color = edges_colors, edge.width = edges_sizes_resc, layout = coords)
+        # 
+        # igd = igraph::set.edge.attribute(graph = igd, index = igraph::E(igd), name = 'color', 
+        #                                  value = edges_colors)
+        # 
+        # igd = igraph::set.edge.attribute(graph = igd, index = igraph::E(igd), name = 'size', 
+        #                                  value = as.numeric(edges_sizes_resc))
+        # 
+        # ## only show attractive edges
+        # if(only_show_enrichment_edges == TRUE) {
+        #   colors = igraph::get.edge.attribute(igd, name = 'color')
+        #   subvertices_ids = which(colors == 'enriched')
+        #   igd = igraph::subgraph.edges(graph = igd, eids = subvertices_ids)
+        #   
+        #   # get new rescale vector (in case vector id is lost)
+        #   edges_sizes_resc = igraph::E(igd)$size
+        # }
+        # 
+        # ## get coordinates layouts
+        # if(layout == 'Fruchterman') {
+        #   coords = igraph::layout_with_fr(graph = igd, weights = edges_sizes_resc)
+        # } else if(layout == 'DrL') {
+        #   coords = igraph::layout_with_drl(graph = igd, weights = edges_sizes_resc)
+        # } else if(layout == 'Kamada-Kawai') {
+        #   coords = igraph::layout_with_kk(graph = igd, weights = edges_sizes_resc)
+        # } else {
+        #   stop('\n Currently no other layouts have been implemented \n')
+        # }
+        
+        
+        #longDT = as.data.table(igraph::as_long_data_frame(igd))
+        #return(longDT)
+        #return(list(igd, coords))
+        
+        # ## create plot
+        # gpl = ggraph::ggraph(graph = igd, layout = coords)
+        # gpl = gpl + ggraph::geom_edge_link(ggplot2::aes(color = factor(color), edge_width = size, edge_alpha = size), show.legend = F)
+        # gpl = gpl + ggraph::geom_edge_loop(ggplot2::aes(color = factor(color), edge_width = size, edge_alpha = size, strength = self_loop_strength), show.legend = F)
+        # gpl = gpl + ggraph::scale_edge_color_manual(values = c('enriched' = color_enrichment, 'depleted' = color_depletion))
+        # gpl = gpl + ggraph::scale_edge_width(range = edge_width_range)
+        # gpl = gpl + ggraph::scale_edge_alpha(range = c(0.1,1))
+        # gpl = gpl + ggraph::geom_node_text(ggplot2::aes(label = name), repel = TRUE, size = node_text_size)
+        # gpl = gpl + ggraph::geom_node_point(size = node_size)
+        # gpl = gpl + ggplot2::theme_bw() + ggplot2::theme(panel.grid = ggplot2::element_blank(),
+        #                                                  panel.border = ggplot2::element_blank(),
+        #                                                  axis.title = ggplot2::element_blank(),
+        #                                                  axis.text = ggplot2::element_blank(),
+        #                                                  axis.ticks = ggplot2::element_blank())
+        # 
+        # 
+        # # print, return and save parameters
+        # show_plot = ifelse(is.na(show_plot), readGiottoInstructions(gobject, param = 'show_plot'), show_plot)
+        # save_plot = ifelse(is.na(save_plot), readGiottoInstructions(gobject, param = 'save_plot'), save_plot)
+        # return_plot = ifelse(is.na(return_plot), readGiottoInstructions(gobject, param = 'return_plot'), return_plot)
+        # 
+        # ## print plot
+        # if(show_plot == TRUE) {
+        #   print(gpl)
+        #}
         
       }
       
