@@ -1739,4 +1739,21 @@ if(Check_Axl_inCM){
                 '_afterFiltering_clusterPerCondition_Gas6_Axl.pdf'), 
          width = 16, height = 16)
   
+  
+  p1 = DimPlot(aa, group.by = 'celltype', label = TRUE, repel = TRUE)
+  #p2 = DimPlot(aa, group.by = 'condition',label = TRUE, repel = TRUE)
+  #p1 / p2
+  #p3 = FeaturePlot(aa, features = c('Axl', 'Gas6', 'Nppa', 'Myh6'), max.cutoff = 'q99')
+  #(p1 + p2) / p3
+  p2 = FeaturePlot(aa, features = 'Axl') +  
+    scale_colour_gradientn(colours = rev(RColorBrewer::brewer.pal(n = 11, name = "RdBu")))
+  #p2 = DimPlot(aa, group.by = 'celltype', label = TRUE, repel = TRUE)
+  p1 + p2
+  
+  ggsave(paste0(resDir, '/Ref_neonatalMice_CM.Cui2020_noCM.Wang2020_P1_integration_UMAP_',
+                '_afterFiltering_cl_Axl.pdf'), 
+         width = 14, height = 6)
+  
+  
+  
 }

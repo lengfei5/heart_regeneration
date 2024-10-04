@@ -1706,8 +1706,9 @@ get_comparable_matrix = function(xx, yy)
   
 }
 
-
-summarize_colocalization = function(x1, x2, x3, x4)
+##summarize_colocalization with parameters bz_rz_intra, bz_rz_juxta, bz_rz_para,
+##bz_c_intra, bz_c_juxta, bz_c_para
+summarize_colocalization = function(x1, x2, x3, c1, c2, c3)
 {
   col_names = colnames(x1)
   row_names = rownames(x1)
@@ -1717,11 +1718,15 @@ summarize_colocalization = function(x1, x2, x3, x4)
   x1[which(is.na(x1))] = 0
   x2 = as.matrix(x2)
   x2[which(is.na(x2))] = 0
-  
   x3 = as.matrix(x3)
   x3[which(is.na(x3))] = 0
-  x4 = as.matrix(x4)
-  x4[which(is.na(x4))] = 0
+  
+  c1 = as.matrix(c1)
+  c1[which(is.na(c1))] = 0
+  c2 = as.matrix(c2)
+  c2[which(is.na(c2))] = 0
+  c3 = as.matrix(c3)
+  c3[which(is.na(c3))] = 0
   
   for(i in 1:ncol(x1))
   {
@@ -1730,9 +1735,10 @@ summarize_colocalization = function(x1, x2, x3, x4)
       if(col_names[i] == row_names[j]){
         res[j, i] = NA
       }else{
-        if(x1[j, i] > 0 | x2[j, i] >0){
-          if(x3[j, i] >= 0 | x4[j, i] >=0){
-            res[j, i] = max(c(x1[j, i], x2[j, i]))
+        if(x1[j, i] > 0 | x2[j, i] > 0 | x3[j, i] > 0){
+          if(c1[j, i] >= 0 | c2[j, i] >=0 | c3[j, i] >=0){
+            #res[j, i] = max(c(x1[j, i], x2[j, i], x3[j, i]))
+            res[j, i] = sum(c(x1[j, i], x2[j, i], x3[j, i]))
           }
         }
       }
@@ -1743,18 +1749,25 @@ summarize_colocalization = function(x1, x2, x3, x4)
   rownames(res) = row_names
   
   return(res)
+  
 }
 
 
-run_significanceTest_misty = function(st, outDir,
+##########################################
+# summarize the misty analysis and plot the network with graph
+##########################################
+run_significanceTest_misty = function(st, 
+                                      outDir,
                                       time = c('d1', 'd4', 'd7', 'd14'),
+                                      misty_mode = c('propos'),
                                       cutoff = 0.2,
                                       resolution = 1,
                                       segmentation_annots = c('all', 'BZ', 'RZ', 'Intact'), 
                                       controls = c('RZ', 'Intact')
                                       )
 {
-  #  time = c('d1', 'd4', 'd7', 'd14'); segmentation_annots = c('all', 'BZ', 'RZ', 'Intact')
+  # time = c('d1', 'd4', 'd7'); segmentation_annots = c('all', 'BZ', 'RZ', 'Intact'); 
+  # misty_mode = c('propos')
   cat(' -- significance test of celltype proximity for Misty output -- \n')
   
   library("plyr")
@@ -1762,7 +1775,6 @@ run_significanceTest_misty = function(st, outDir,
   library("ggplot2")
   library(igraph)
   library(ggraph)
-  
   
   testDir = paste0(outDir, '/signficant_neighborhood/')
   if(!dir.exists(testDir)){
@@ -1792,20 +1804,21 @@ run_significanceTest_misty = function(st, outDir,
       # k = kk[1]
       cat('---- condition :', cc[k], '---- \n')
       
+      bz = read.csv2(file = paste0(outDir, 'Plots_RCTD_', misty_mode, '/',
+                                   cc[k], '_BZ_summary_table_intra', '.csv'), row.names = c(1))
       
-      bz = read.csv2(file = paste0(outDir, 'Plots_RCTD_propos/',
-                                   cc[k], '_BZ_summary_table_intra.csv'), row.names = c(1))
-      
-      rz = read.csv2(file = paste0(outDir, 'Plots_RCTD_propos/',
-                                   cc[k], '_RZ_summary_table_intra.csv'), row.names = c(1))
+      rz = read.csv2(file = paste0(outDir, 'Plots_RCTD_', misty_mode, '/',
+                                   cc[k], '_RZ_summary_table_intra', '.csv'), row.names = c(1))
       rz = get_comparable_matrix(bz, rz)
       
-      ctl1 = read.csv2(file = paste0(outDir, 'Plots_RCTD_propos/',
-                                    'Amex_d0_294946_Intact_summary_table_intra.csv'), row.names = c(1))
+      ctl1 = read.csv2(file = paste0(outDir, 'Plots_RCTD_', misty_mode, '/',
+                                     'Amex_d0_294946_Intact_summary_table_intra', '.csv'), 
+                       row.names = c(1))
       ctl1 = get_comparable_matrix(bz, ctl1)
-    
-      ctl2 = read.csv2(file = paste0(outDir, 'Plots_RCTD_propos/',
-                                     'Amex_d0_294949_Intact_summary_table_intra.csv'), row.names = c(1))
+      
+      ctl2 = read.csv2(file = paste0(outDir, 'Plots_RCTD_', misty_mode, '/',
+                                     'Amex_d0_294949_Intact_summary_table_intra', '.csv'), 
+                       row.names = c(1))
       
       ctl2 = get_comparable_matrix(bz, ctl2)
       ctl = (ctl1 + ctl2)/2.0
@@ -1831,7 +1844,6 @@ run_significanceTest_misty = function(st, outDir,
       
       ctl2 = get_comparable_matrix(bz, ctl2)
       
-      
       ctl = (ctl1 + ctl2)/2.0
       
       bz_rz_juxta = bz - rz
@@ -1839,9 +1851,35 @@ run_significanceTest_misty = function(st, outDir,
       
       rm(list = c('bz', 'rz', 'ctl1', 'ctl2', 'ctl'))
       
-      bz_all = summarize_colocalization(bz_rz_intra, bz_rz_juxta, bz_c_intra, bz_c_juxta)
+      bz = read.csv2(file = paste0(outDir, 'Plots_RCTD_propos/',
+                                   cc[k], '_BZ_summary_table_para15.csv'), row.names = c(1))
+      
+      rz = read.csv2(file = paste0(outDir, 'Plots_RCTD_propos/',
+                                   cc[k], '_RZ_summary_table_para15.csv'), row.names = c(1))
+      rz = get_comparable_matrix(bz, rz)
+      
+      ctl1 = read.csv2(file = paste0(outDir, 'Plots_RCTD_propos/',
+                                     'Amex_d0_294946_Intact_summary_table_para15.csv'), row.names = c(1))
+      ctl1 = get_comparable_matrix(bz, ctl1)
+      
+      ctl2 = read.csv2(file = paste0(outDir, 'Plots_RCTD_propos/',
+                                     'Amex_d0_294949_Intact_summary_table_para15.csv'), row.names = c(1))
+      
+      ctl2 = get_comparable_matrix(bz, ctl2)
+      ctl = (ctl1 + ctl2)/2.0
+      
+      bz_rz_para = bz - rz
+      bz_c_para = bz - ctl
+      
+      rm(list = c('bz', 'rz', 'ctl1', 'ctl2', 'ctl'))
+      
+      
+      bz_all = summarize_colocalization(bz_rz_intra, bz_rz_juxta, bz_rz_para,
+                                        bz_c_intra, bz_c_juxta, bz_c_para
+                                        )
       
       rm(list = c('bz_rz_intra', 'bz_rz_juxta', 'bz_c_intra', 'bz_c_juxta'))
+      
       
       
       ## plot the heatmap of cell-cell colocalization
@@ -1914,6 +1952,161 @@ run_significanceTest_misty = function(st, outDir,
     }
       
   }
+  
+}
+
+## this is a network plot function from Giotto
+## (https://github.com/RubD/Giotto/blob/master/R/spatial_interaction_visuals.R)
+cellProximityNetwork = function(gobject,
+                                CPscore,
+                                remove_self_edges = FALSE,
+                                self_loop_strength = 0.1,
+                                color_depletion = 'lightgreen',
+                                color_enrichment = 'red',
+                                rescale_edge_weights = TRUE,
+                                edge_weight_range_depletion = c(0.1, 1),
+                                edge_weight_range_enrichment = c(1, 5),
+                                layout = c('Fruchterman', 'DrL', 'Kamada-Kawai'),
+                                only_show_enrichment_edges = F,
+                                edge_width_range = c(0.1, 2),
+                                node_size = 4,
+                                node_text_size = 6,
+                                show_plot = NA,
+                                return_plot = NA,
+                                save_plot = NA,
+                                save_param =  list(),
+                                default_save_name = 'cellProximityNetwork') {
+  
+  # extract scores
+  
+  # data.table variables
+  cell_1 = cell_2 = unified_int = color = size = name = NULL
+  
+  CPscores = CPscore[['enrichm_res']]
+  CPscores[, cell_1 := strsplit(as.character(unified_int), split = '--')[[1]][1], by = 1:nrow(CPscores)]
+  CPscores[, cell_2 := strsplit(as.character(unified_int), split = '--')[[1]][2], by = 1:nrow(CPscores)]
+  
+  # create igraph with enrichm as weight edges
+  igd = igraph::graph_from_data_frame(d = CPscores[,c('cell_1', 'cell_2', 'enrichm')], directed = F)
+  
+  if(remove_self_edges == TRUE) {
+    igd = igraph::simplify(graph = igd, remove.loops = TRUE, remove.multiple = FALSE)
+  }
+  
+  edges_sizes = igraph::get.edge.attribute(igd, 'enrichm')
+  post_edges_sizes = edges_sizes[edges_sizes > 0]
+  neg_edges_sizes = edges_sizes[edges_sizes <= 0]
+  
+  # rescale if wanted
+  if(rescale_edge_weights == TRUE) {
+    pos_edges_sizes_resc = scales::rescale(x = post_edges_sizes, to = edge_weight_range_enrichment)
+    neg_edges_sizes_resc = scales::rescale(x = neg_edges_sizes, to = edge_weight_range_depletion)
+    edges_sizes_resc = c(pos_edges_sizes_resc, neg_edges_sizes_resc)
+  } else {
+    edges_sizes_resc = c(post_edges_sizes, neg_edges_sizes)
+  }
+  
+  # colors
+  edges_colors = ifelse(edges_sizes > 0, 'enriched', 'depleted')
+  
+  
+  # create coordinates for layout
+  if(class(layout) %in% c('data.frame', 'data.table')) {
+    if(ncol(layout) < 2) {
+      stop('custom layout needs to have at least 2 columns')
+    }
+    
+    if(nrow(layout) != length(igraph::E(igd))) {
+      stop('rows of custom layout need to be the same as number of edges')
+    }
+    
+  } else {
+    layout = match.arg(arg = layout, choices = c('Fruchterman', 'DrL', 'Kamada-Kawai'))
+  }
+  
+  
+  
+  
+  #iplot = igraph::plot.igraph(igd, edge.color = edges_colors, edge.width = edges_sizes_resc, layout = coords)
+  
+  igd = igraph::set.edge.attribute(graph = igd, index = igraph::E(igd), name = 'color', value = edges_colors)
+  igd = igraph::set.edge.attribute(graph = igd, index = igraph::E(igd), name = 'size', value = as.numeric(edges_sizes_resc))
+  
+  ## only show attractive edges
+  if(only_show_enrichment_edges == TRUE) {
+    colors = igraph::get.edge.attribute(igd, name = 'color')
+    subvertices_ids = which(colors == 'enriched')
+    igd = igraph::subgraph.edges(graph = igd, eids = subvertices_ids)
+    
+    # get new rescale vector (in case vector id is lost)
+    edges_sizes_resc = igraph::E(igd)$size
+  }
+  
+  ## get coordinates layouts
+  if(layout == 'Fruchterman') {
+    coords = igraph::layout_with_fr(graph = igd, weights = edges_sizes_resc)
+  } else if(layout == 'DrL') {
+    coords = igraph::layout_with_drl(graph = igd, weights = edges_sizes_resc)
+  } else if(layout == 'Kamada-Kawai') {
+    coords = igraph::layout_with_kk(graph = igd, weights = edges_sizes_resc)
+  } else {
+    stop('\n Currently no other layouts have been implemented \n')
+  }
+  
+  
+  #longDT = as.data.table(igraph::as_long_data_frame(igd))
+  #return(longDT)
+  #return(list(igd, coords))
+  
+  ## create plot
+  gpl = ggraph::ggraph(graph = igd, layout = coords)
+  gpl = gpl + ggraph::geom_edge_link(ggplot2::aes(color = factor(color), edge_width = size, edge_alpha = size), show.legend = F)
+  gpl = gpl + ggraph::geom_edge_loop(ggplot2::aes(color = factor(color), edge_width = size, edge_alpha = size, strength = self_loop_strength), show.legend = F)
+  gpl = gpl + ggraph::scale_edge_color_manual(values = c('enriched' = color_enrichment, 'depleted' = color_depletion))
+  gpl = gpl + ggraph::scale_edge_width(range = edge_width_range)
+  gpl = gpl + ggraph::scale_edge_alpha(range = c(0.1,1))
+  gpl = gpl + ggraph::geom_node_text(ggplot2::aes(label = name), repel = TRUE, size = node_text_size)
+  gpl = gpl + ggraph::geom_node_point(size = node_size)
+  gpl = gpl + ggplot2::theme_bw() + ggplot2::theme(panel.grid = ggplot2::element_blank(),
+                                                   panel.border = ggplot2::element_blank(),
+                                                   axis.title = ggplot2::element_blank(),
+                                                   axis.text = ggplot2::element_blank(),
+                                                   axis.ticks = ggplot2::element_blank())
+  
+  
+  # print, return and save parameters
+  show_plot = ifelse(is.na(show_plot), readGiottoInstructions(gobject, param = 'show_plot'), show_plot)
+  save_plot = ifelse(is.na(save_plot), readGiottoInstructions(gobject, param = 'save_plot'), save_plot)
+  return_plot = ifelse(is.na(return_plot), readGiottoInstructions(gobject, param = 'return_plot'), return_plot)
+  
+  ## print plot
+  if(show_plot == TRUE) {
+    print(gpl)
+  }
+  
+  ## save plot
+  if(save_plot == TRUE) {
+    do.call('all_plots_save_function', c(list(gobject = gobject, plot_object = gpl, default_save_name = default_save_name), save_param))
+  }
+  
+  ## return plot
+  if(return_plot == TRUE) {
+    return(gpl)
+  }
+  
+  
+}
+
+
+
+##########################################
+# test Giotto for neighborhood analysis  
+##########################################
+analyze.celltype.proximity.network_Giotto = function()
+{
+  library(Giotto)
+  installGiottoEnvironment()
+  
   
 }
 

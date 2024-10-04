@@ -26,6 +26,7 @@ options(future.globals.maxSize = 120000 * 1024^2)
 
 mem_used()
 
+
 ########################################################
 ########################################################
 # Section I: import the processed visium data by nf from Tomas and 
@@ -1043,10 +1044,10 @@ if(Run_Neighborhood_Enrichment_Analysis){
   SpatialDimPlot(st, group.by = 'segmentation', ncol = 4)
   table(st$segmentation, st$condition)
   
-  outDir = paste0(resDir, '/neighborhood_test/Run_misty_v2.0/')
+  outDir = paste0(resDir, '/neighborhood_test/Run_misty_v2.1.1/')
   
   RCTD_out = paste0(resDir, '/RCTD_out/',
-                    'RCTD_subtype_out_41subtypes_ref.time.specific_v3.5_ventricleRegion')
+                    'RCTD_subtype_out_41subtypes_ref.time.specific_v3.5.5_ventricleRegion')
   
   levels(refs$subtypes)
   
@@ -1094,10 +1095,11 @@ if(Run_Neighborhood_Enrichment_Analysis){
                                     segmentation_annots = c('all', 'BZ', 'RZ', 'Intact')
   )
   
+  ## cell-cell interaction
   source('functions_Visium.R')
   run_significanceTest_misty(st, 
                              outDir = outDir, 
-                             time = c('d1', 'd4', 'd7', 'd14'),
+                             time = c('d1', 'd4', 'd7'),
                              segmentation_annots = c('all', 'BZ', 'RZ', 'Intact'),
                              controls = c('RZ', 'Intact'),
                              resolution = 1)
@@ -1429,7 +1431,7 @@ outDir_version = paste0(resDir, '/Ligand_Receptor_analysis/DiffNicheNet_v5.1_all
 for(n in 1:length(celltypes_BZ_timeSpecific))
 {
   # n = 2
-  source('functions_cccInference.R')
+  #source('functions_cccInference.R')
   time = names(celltypes_BZ_timeSpecific)[n]
   cat(' run DiffNicheNet for time -- ', time, '\n')
   outDir = paste(outDir_version, '/', time, collapse = '')
@@ -1437,7 +1439,7 @@ for(n in 1:length(celltypes_BZ_timeSpecific))
   
   system(paste0('mkdir -p ', outDir))
   
-  source('functions_cccInference.R')
+  source('functions_cccInference_backup.R')
   
   run_Diff_NicheNet(refs = refs, 
                     timepoint_specific = TRUE,

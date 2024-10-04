@@ -1394,7 +1394,28 @@ DimPlot(refs, reduction = 'umap', group.by = 'subtype',raster = T,shuffle= T, pt
 
 saveRDS(refs, file = paste0('../data/data_examples/ref_scRNAseq_adultMice_clean.v1.rds'))
 
+
+##########################################
+# check adult mice scRNA-seq after integration  
+##########################################
 refs = readRDS(file = paste0('../data/data_examples/ref_scRNAseq_adultMice_clean.v1.rds'))
+p1 = DimPlot(refs, reduction = 'umap', group.by = 'celltype', raster = T,shuffle= T, pt.size = 2, 
+        label = TRUE, repel = TRUE)
+
+#DimPlot(refs, reduction = 'umap', group.by = 'subtype',raster = T,shuffle= T, pt.size = 2, 
+#       label = TRUE, repel = TRUE)
+p2 = FeaturePlot(refs, features = 'Axl') +  
+  scale_colour_gradientn(colours = rev(RColorBrewer::brewer.pal(n = 11, name = "RdBu")))
+
+p1 + p2
+
+outDir = paste0(resDir, '/noCM.Forte2020_CM.Ren2020_integrated_LRanalysis/')
+if(!dir.exists(outDir)) dir.create(outDir)
+
+ggsave(paste0(outDir, '/Forte2020_Ren2020_Integration_celltypes_Axl.pdf'), 
+       width = 14, height = 6)
+
+
 
 ########################################################
 ########################################################
