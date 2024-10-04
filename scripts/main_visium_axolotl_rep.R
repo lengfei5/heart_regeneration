@@ -1412,7 +1412,7 @@ for(n in 1:length(times_slice))
   
   dev.off()
   
-  
+  ## original code https://msraredon.github.io/Connectome/articles/01%20Connectome%20Workflow.html
   Test_Connectome_circoPlot = FALSE
   if(Test_Connectome_circoPlot){
     library(Seurat)
@@ -1445,7 +1445,6 @@ for(n in 1:length(times_slice))
     p3 <- ggplot(panc8.con, aes(x=percent.target)) + geom_density() + ggtitle('Percent.target')
     p4 <- ggplot(panc8.con, aes(x=percent.source)) + geom_density() + ggtitle('Percent.source')
     plot_grid(p1,p2,p3,p4)
-    
     
     panc8.con2 <- FilterConnectome(panc8.con, min.pct = 0.1,min.z = 0.25,remove.na = T)
     
