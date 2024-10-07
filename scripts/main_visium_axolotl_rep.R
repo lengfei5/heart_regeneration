@@ -1114,26 +1114,25 @@ if(Run_Neighborhood_Enrichment_Analysis){
 ########################################################
 ########################################################
 
-# subtype time-specificity 
-# condition.specific_celltypes = readRDS(paste0(RdataDir, 'RCTD_refs_condition_specificity.rds'))
-
 ##########################################
-# specific sub-populations to compare
+# Part 1) manually specific sub-populations to compare
 # sender cells, receiver cells
 # BZ-specific and Remote-specific populations (Nichenet specific)
 ##########################################
 # define a list of cell type for each time point, either manual defined or from neighborhood enrichment analysis
 #celltypes = c('EC', 'EC_NOS3', 'EC_IS_IARS1', 'FB_IS_TFPI2', 'Mo.Macs_SNX22', 'Neu_IL1R1', 
 #              'CM_IS', "RBC")
-
 version_testing_short = FALSE
 if(version_testing){
-  timepoint_specific = TRUE
   
-  celltypes_BZ_timeSpecific = list(day1 = c('EC', 'EC_NOS3', 'EC_IS_IARS1', 'FB_IS_TFPI2', 'Mo.Macs_SNX22',
+  timepoint_specific = TRUE
+  celltypes_BZ_timeSpecific = list(day1 = c('EC', 'EC_NOS3', 'EC_IS_IARS1', 'FB_IS_TFPI2', 
+                                            'Mo.Macs_SNX22',
                                             'Neu_IL1R1',
                                             'CM_IS', "RBC"),
-                                   day4 = c('EC_IS_LOX', 'EC_IS_Prol', 'Mo.Macs_SNX22', 'Neu_DYSF', 'CM_IS',
+                                   day4 = c('EC_IS_LOX', 'EC_IS_Prol', 'Mo.Macs_SNX22', 
+                                            'Neu_DYSF', 
+                                            'CM_IS',
                                             'CM_Prol_IS', 'RBC'),
                                    day7 = c('EC_IS_LOX', 'EC_IS_Prol', 'Mo.Macs_FAXDC2', 'Neu_DYSF', 'Neu_IL1R1',
                                             'CM_IS',
@@ -1221,46 +1220,11 @@ if(version_testing_long){
 #   
 # }
 
-
-### all pairs of subtypes
-version_testing_all.subtype.pairs = FALSE
-if(version_testing_all.subtype.pairs){
-  
-  # define cell subtype pairs in the border zone 
-  celltypes_BZ_timeSpecific = list(day1 = list(CM_IS = c("CM_Cav3.1", "CM_Robo2", "EC_WNT4", 
-                                                         'Mo.Macs_SNX22','Neu_IL1R1', "RBC")
-                                               #CM_Prol_IS = c("CM_Cav3.1", "CM_Robo2", "EC_WNT4", 
-                                               #           'Mo.Macs_SNX22','Neu_IL1R1', "RBC")
-  ),
-  
-  day4 = list(CM_Prol_IS = c('CM_IS',"CM_Robo2", 'EC', 'FB_TNXB',  
-                             'Mo.Macs_SNX22', "Mo.Macs_FAXDC2")
-              
-  ),
-  
-  day7 = list(CM_Prol_IS = c("CM_Robo2",'EC_IS_LOX', "EC_NOS3",
-                             "FB_PKD1", "FB_TNXB",
-                             'Mo.Macs_FAXDC2','Neu_DYSF','RBC')),
-  
-  day14 = list(CM_IS = c("CM_Prol_3", "CM_Robo2", 'EC_IS_LOX', 
-                         'FB_PKD1', "FB_TNXB", "Mo.Macs_resident", 'RBC'))
-  
-  )
-  
-  # define cell subtype pairs in the remote zone as control for NicheNet
-  celltypes_RZ_timeSpecific = list(day1 = list(CM_Robo2 = c("CM_Cav3.1", "EC_IS_IARS1", "EC_WNT4")),
-                                   day4 = list(CM_Robo2 = c('CM_Robo2',"FB_TNXB", "Megakeryocytes",
-                                                            'Mo.Macs_resident', 'RBC')),
-                                   day7 = list(CM_Robo2 = c("EC_NOS3", "EC_WNT4", "Mo.Macs_resident", "RBC")),
-                                   day14 = list(CM_Robo2 = c("CM_Cav3.1", "EC_IS_IARS1", "FB_TNXB", 
-                                                             "Mo.Macs_resident"))
-  )
-  
-}
-
-
 ##########################################
-# run LIANA for all pairs
+# Part 2) # run LR analysis for all pairs 
+##########################################
+##########################################
+
 ##########################################
 # set parameter for ligand-receptor analysis
 outDir_version = paste0(resDir, '/Ligand_Receptor_analysis/LIANA_v5.5_FB.Immue_intraOnly')
@@ -1500,14 +1464,55 @@ for(n in 1:length(times_slice))
   
 }
 
-
 ## double check the ligand and receptor expression distribution
 #FeaturePlot(refs, features = rownames(refs)[grep('EGFC|VIPR2', rownames(refs))])
 
 ########################################################
+##########################################
+# Part 3) # run LR analysis for all pairs 
+##########################################
+##########################################
 # diff Nichenet for ligand-receptor analysis
 # original code from https://github.com/saeyslab/nichenetr/blob/master/vignettes/seurat_steps.md
 ########################################################
+### all pairs of subtypes
+version_testing_all.subtype.pairs = FALSE
+if(version_testing_all.subtype.pairs){
+  
+  # define cell subtype pairs in the border zone 
+  celltypes_BZ_timeSpecific = list(day1 = list(CM_IS = c("CM_Cav3.1", "CM_Robo2", "EC_WNT4", 
+                                                         'Mo.Macs_SNX22','Neu_IL1R1', "RBC")
+                                               #CM_Prol_IS = c("CM_Cav3.1", "CM_Robo2", "EC_WNT4", 
+                                               #           'Mo.Macs_SNX22','Neu_IL1R1', "RBC")
+  ),
+  
+  day4 = list(CM_Prol_IS = c('CM_IS',"CM_Robo2", 'EC', 'FB_TNXB',  
+                             'Mo.Macs_SNX22', "Mo.Macs_FAXDC2")
+              
+  ),
+  
+  day7 = list(CM_Prol_IS = c("CM_Robo2",'EC_IS_LOX', "EC_NOS3",
+                             "FB_PKD1", "FB_TNXB",
+                             'Mo.Macs_FAXDC2','Neu_DYSF','RBC')),
+  
+  day14 = list(CM_IS = c("CM_Prol_3", "CM_Robo2", 'EC_IS_LOX', 
+                         'FB_PKD1', "FB_TNXB", "Mo.Macs_resident", 'RBC'))
+  
+  )
+  
+  # define cell subtype pairs in the remote zone as control for NicheNet
+  celltypes_RZ_timeSpecific = list(day1 = list(CM_Robo2 = c("CM_Cav3.1", "EC_IS_IARS1", "EC_WNT4")),
+                                   day4 = list(CM_Robo2 = c('CM_Robo2',"FB_TNXB", "Megakeryocytes",
+                                                            'Mo.Macs_resident', 'RBC')),
+                                   day7 = list(CM_Robo2 = c("EC_NOS3", "EC_WNT4", "Mo.Macs_resident", "RBC")),
+                                   day14 = list(CM_Robo2 = c("CM_Cav3.1", "EC_IS_IARS1", "FB_TNXB", 
+                                                             "Mo.Macs_resident"))
+  )
+  
+}
+
+
+
 outDir_version = paste0(resDir, '/Ligand_Receptor_analysis/DiffNicheNet_v5.1_allpairs_intraOnly')
 
 for(n in 1:length(celltypes_BZ_timeSpecific))
@@ -1534,6 +1539,13 @@ for(n in 1:length(celltypes_BZ_timeSpecific))
   # extract_tables_from_res_Diff_NicheNet(outDir)
   
 }
+
+########################################################
+########################################################
+# Section VIII: additional analysis and plots
+# 
+########################################################
+########################################################
 
 ##########################################
 # ## quick construction of GAS6-AXL to targets 

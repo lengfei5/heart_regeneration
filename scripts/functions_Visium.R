@@ -1942,6 +1942,7 @@ run_significanceTest_misty = function(st,
         
         
         ## try make similar plot but the cellchat circle style
+        ## original code from cellchat function netVisual_circle
         cols_C = scPalette(C$nb_clusters)[C$membership]
         names(cols_C) = C$names
         my_netVisual_circle(A,
