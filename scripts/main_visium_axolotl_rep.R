@@ -1098,10 +1098,11 @@ if(Run_Neighborhood_Enrichment_Analysis){
   source('functions_Visium.R')
   run_significanceTest_misty(st, 
                              outDir = outDir, 
-                             time = c('d4', 'd7'),
-                             segmentation_annots = c('all', 'BZ', 'RZ', 'Intact'),
-                             controls = c('RZ', 'Intact'),
+                             time = c('d4', 'd7', 'd14'),
+                             #segmentation_annots = c('all', 'BZ', 'RZ', 'Intact'),
+                             #controls = c('RZ', 'Intact'),
                              resolution = 0.6)
+  
   
 }
 
@@ -1202,23 +1203,23 @@ if(version_testing_long){
   
 }
 
-### version for Prateek
-OnlyFB_version_for_Prateek = FALSE
-if(OnlyFB_version_for_Prateek)
-{
-  timepoint_specific = TRUE
-  celltypes_BZ_timeSpecific = list(day1 = c('FB_TNXB'),
-                                   day4 = c('FB_TNXB', 'FB_PKD1'),
-                                   day7 = c('FB_TNXB', 'FB_PKD1'),
-                                   day14 = c('FB_TNXB', 'FB_PKD1')
-  )
-  receivers_BZ_timeSpecific = list(day1 = c("CM_IS"),
-                                   day4 = c('CM_Prol_IS'),
-                                   day7 = c('CM_Prol_IS'),
-                                   day14 = c("CM_IS")
-  )
-  
-}
+# ### version for Prateek
+# OnlyFB_version_for_Prateek = FALSE
+# if(OnlyFB_version_for_Prateek)
+# {
+#   timepoint_specific = TRUE
+#   celltypes_BZ_timeSpecific = list(day1 = c('FB_TNXB'),
+#                                    day4 = c('FB_TNXB', 'FB_PKD1'),
+#                                    day7 = c('FB_TNXB', 'FB_PKD1'),
+#                                    day14 = c('FB_TNXB', 'FB_PKD1')
+#   )
+#   receivers_BZ_timeSpecific = list(day1 = c("CM_IS"),
+#                                    day4 = c('CM_Prol_IS'),
+#                                    day7 = c('CM_Prol_IS'),
+#                                    day14 = c("CM_IS")
+#   )
+#   
+# }
 
 
 ### all pairs of subtypes

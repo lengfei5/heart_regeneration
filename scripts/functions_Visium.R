@@ -1759,7 +1759,7 @@ run_significanceTest_misty = function(st,
                                       )
 {
   # time = c('d1', 'd4', 'd7'); segmentation_annots = c('all', 'BZ', 'RZ', 'Intact'); 
-  # misty_mode = c('propos')
+  # misty_mode = c('propos');resolution = 0.6;
   cat(' -- significance test of celltype proximity for Misty output -- \n')
   
   library("plyr")
@@ -1767,6 +1767,7 @@ run_significanceTest_misty = function(st,
   library("ggplot2")
   library(igraph)
   library(ggraph)
+  library(CellChat)
   
   testDir = paste0(outDir, '/signficant_neighborhood/')
   if(!dir.exists(testDir)){
@@ -1872,10 +1873,13 @@ run_significanceTest_misty = function(st,
       
       rm(list = c('bz_rz_intra', 'bz_rz_juxta', 'bz_rz_para'))
       
+      write.table(bz_all, 
+                  file = paste0(testDir, 'cell_cell_colocalization_summary_', cc[k], '.txt'), 
+                  quote = FALSE, row.names = TRUE, col.names = TRUE, sep = '\t')
       
       ## plot the heatmap of cell-cell colocalization
       pdfname = paste0(testDir, 'Plot_', cc[k], '.pdf')
-      pdf(pdfname, width=12, height = 8)
+      pdf(pdfname, width=14, height = 10)
       
       for(cutoff in seq(0, 2.0, by=0.2))
       {
@@ -1936,170 +1940,17 @@ run_significanceTest_misty = function(st,
                             vertex.label.cex = 0.66
         )
         
-        # # create igraph using the code from Giotto
-        # library(igraph)
-        # library(ggraph)
-        # library(tidygraph)
-        # library(graphlayouts) 
-        # library(RColorBrewer) # This is the color library
-        # 
-        # A = bz_all
-        # A[A < cutoff | is.na(A)] <- 0
-        # 
-        # igd = igraph::graph_from_adjacency_matrix(adjmatrix = A, weighted = TRUE, mode = 'upper')
-        # gorder(igd) # nb of node
-        # gsize(igd) # nb of edges
-        # 
-        # igd = igraph::simplify(graph = igd, remove.loops = TRUE, remove.multiple = FALSE)
-        # gorder(igd) # nb of node
-        # gsize(igd) # nb of edges
-        # 
-        # # node
-        # V(igd)
-        # 
-        # #3. Edgelist
-        # E(igd)
-        # 
-        # C <- igraph::cluster_leiden(igd, 
-        #                             resolution_parameter = resolution)
-        # #layout <- igraph::layout_with_fr(G)
-        # coords = igraph::layout_with_fr(graph = igd)
-        # coords = layout_with_drl(graph = igd)
-        # # compute a clustering for node colors
-        # 
-        # #V(igd)$module <- as.character(membership(cluster_louvain(graph_from_data_frame(link.list, directed = FALSE))))
-        # # compute degree as node size
-        # #V(igd)$size <- degree(igd)
-        # 
-        # ## create plot
-        # gpl = ggraph::ggraph(graph = igd, layout = coords) + 
-        #   ggraph::geom_edge_link(aes(edge_width = weight), edge_colour = "gray") +
-        #   geom_node_point(size = 6, shape = 21) + 
-        #   scale_size_continuous(range = c(1, 10)) + 
-        #   scale_edge_width_continuous(range = c(0, 5)) +
-        #   #scale_edge_color_continuous(colors=rev(brewer.pal(n=11, name="RdBu")), limits=c(0, 5)) +
-        #   ggraph::scale_edge_alpha(range = c(0.1,1)) +
-        #   ggraph::scale_edge_width(range = c(1,4)) +
-        #   ggraph::geom_node_text(ggplot2::aes(label = name), repel = TRUE, size = 4) +
-        #   ggplot2::theme_bw() + 
-        #   ggplot2::theme(panel.grid = ggplot2::element_blank(),
-        #                  panel.border = ggplot2::element_blank(),
-        #                  axis.title = ggplot2::element_blank(),
-        #                  axis.text = ggplot2::element_blank(),
-        #                  axis.ticks = ggplot2::element_blank()) 
-        # 
-        # #scale_edge_color_gradientn(colors=rev(brewer.pal(n=11, name="RdBu")), limits=c(0, 4))
-        # 
-        # #set.seed(2022)
-        # ggraph(trn, x=umap1, y=umap2) +
-        #   geom_edge_link(aes(edge_width = weight), edge_colour = "gray85" ) +
-        #   #geom_edge_diagonal(color='darkgray', width=0.2) +
-        #   geom_node_point(aes(fill = module, size = degreeOut), shape = 21) +
-        #   scale_size_continuous(range = c(1, 10)) +
-        #   #geom_node_text(aes(filter = size >= 20, label = name), family = "serif") +
-        #   geom_node_text(aes(filter = size >= 20, label=name), size=5/ggplot2::.pt, repel=T, 
-        #                  family = "serif")+
-        #   scale_edge_width_continuous(range = c(0.05, 0.2)) +
-        #   scale_edge_color_gradientn(colors=rev(brewer.pal(n=11, name="RdBu")), limits=c(0.01, 0.6)) +
-        #   #scale_edge_alpha_continuous(range=c(0.05, 0.4), limits=c(2,20)) +
-        #   scale_edge_alpha_continuous(range=c(0.01,0.8), limits=c(2,20)) + 
-        #   scale_fill_manual(values = got_palette) +
-        #   #scale_fill_viridis(option='magma') + 
-        #   #scale_fill_manual(values = pal) +
-        #   coord_fixed() +
-        #   theme_graph() +
-        #   #theme(legend.position = "bottom") 
-        #   theme(legend.position = "none") 
-        # 
-        # edges_sizes = igraph::get.edge.attribute(igd)
-        # post_edges_sizes = edges_sizes[edges_sizes > 0]
-        # neg_edges_sizes = edges_sizes[edges_sizes <= 0]
-        # 
-        # # rescale if wanted
-        # if(rescale_edge_weights == TRUE) {
-        #   pos_edges_sizes_resc = scales::rescale(x = post_edges_sizes, to = edge_weight_range_enrichment)
-        #   neg_edges_sizes_resc = scales::rescale(x = neg_edges_sizes, to = edge_weight_range_depletion)
-        #   edges_sizes_resc = c(pos_edges_sizes_resc, neg_edges_sizes_resc)
-        # } else {
-        #   edges_sizes_resc = c(post_edges_sizes, neg_edges_sizes)
-        # }
-        # 
-        # # colors
-        # edges_colors = ifelse(edges_sizes > 0, 'enriched', 'depleted')
         
-        # # create coordinates for layout
-        # if(class(layout) %in% c('data.frame', 'data.table')) {
-        #   if(ncol(layout) < 2) {
-        #     stop('custom layout needs to have at least 2 columns')
-        #   }
-        #   
-        #   if(nrow(layout) != length(igraph::E(igd))) {
-        #     stop('rows of custom layout need to be the same as number of edges')
-        #   }
-        #   
-        # } else {
-        #   layout = match.arg(arg = layout, choices = c('Fruchterman', 'DrL', 'Kamada-Kawai'))
-        # }
+        ## try make similar plot but the cellchat circle style
+        cols_C = scPalette(C$nb_clusters)[C$membership]
+        names(cols_C) = C$names
+        my_netVisual_circle(A,
+                            color.use = cols_C,
+                            #vertex.weight = groupSize, 
+                            weight.scale = TRUE, 
+                            label.edge= FALSE, 
+                            title.name = paste0("Cell-Cell colocalization with cutoff : ", cutoff))
         
-        # #iplot = igraph::plot.igraph(igd, edge.color = edges_colors, edge.width = edges_sizes_resc, layout = coords)
-        # 
-        # igd = igraph::set.edge.attribute(graph = igd, index = igraph::E(igd), name = 'color', 
-        #                                  value = edges_colors)
-        # 
-        # igd = igraph::set.edge.attribute(graph = igd, index = igraph::E(igd), name = 'size', 
-        #                                  value = as.numeric(edges_sizes_resc))
-        # 
-        # ## only show attractive edges
-        # if(only_show_enrichment_edges == TRUE) {
-        #   colors = igraph::get.edge.attribute(igd, name = 'color')
-        #   subvertices_ids = which(colors == 'enriched')
-        #   igd = igraph::subgraph.edges(graph = igd, eids = subvertices_ids)
-        #   
-        #   # get new rescale vector (in case vector id is lost)
-        #   edges_sizes_resc = igraph::E(igd)$size
-        # }
-        # 
-        # ## get coordinates layouts
-        # if(layout == 'Fruchterman') {
-        #   coords = igraph::layout_with_fr(graph = igd, weights = edges_sizes_resc)
-        # } else if(layout == 'DrL') {
-        #   coords = igraph::layout_with_drl(graph = igd, weights = edges_sizes_resc)
-        # } else if(layout == 'Kamada-Kawai') {
-        #   coords = igraph::layout_with_kk(graph = igd, weights = edges_sizes_resc)
-        # } else {
-        #   stop('\n Currently no other layouts have been implemented \n')
-        # }
-        
-        
-        #longDT = as.data.table(igraph::as_long_data_frame(igd))
-        #return(longDT)
-        #return(list(igd, coords))
-        
-        # ## create plot
-        # gpl = ggraph::ggraph(graph = igd, layout = coords)
-        # gpl = gpl + ggraph::geom_edge_link(ggplot2::aes(color = factor(color), edge_width = size, edge_alpha = size), show.legend = F)
-        # gpl = gpl + ggraph::geom_edge_loop(ggplot2::aes(color = factor(color), edge_width = size, edge_alpha = size, strength = self_loop_strength), show.legend = F)
-        # gpl = gpl + ggraph::scale_edge_color_manual(values = c('enriched' = color_enrichment, 'depleted' = color_depletion))
-        # gpl = gpl + ggraph::scale_edge_width(range = edge_width_range)
-        # gpl = gpl + ggraph::scale_edge_alpha(range = c(0.1,1))
-        # gpl = gpl + ggraph::geom_node_text(ggplot2::aes(label = name), repel = TRUE, size = node_text_size)
-        # gpl = gpl + ggraph::geom_node_point(size = node_size)
-        # gpl = gpl + ggplot2::theme_bw() + ggplot2::theme(panel.grid = ggplot2::element_blank(),
-        #                                                  panel.border = ggplot2::element_blank(),
-        #                                                  axis.title = ggplot2::element_blank(),
-        #                                                  axis.text = ggplot2::element_blank(),
-        #                                                  axis.ticks = ggplot2::element_blank())
-        # 
-        # 
-        # # print, return and save parameters
-        # show_plot = ifelse(is.na(show_plot), readGiottoInstructions(gobject, param = 'show_plot'), show_plot)
-        # save_plot = ifelse(is.na(save_plot), readGiottoInstructions(gobject, param = 'save_plot'), save_plot)
-        # return_plot = ifelse(is.na(return_plot), readGiottoInstructions(gobject, param = 'return_plot'), return_plot)
-        # 
-        # ## print plot
-        # if(show_plot == TRUE) {
-        #   print(gpl)
-        #}
         
       }
       
@@ -2110,6 +1961,152 @@ run_significanceTest_misty = function(st,
   }
   
 }
+
+my_netVisual_circle <-function(net, color.use = NULL,title.name = NULL, 
+                               sources.use = NULL, targets.use = NULL, idents.use = NULL, 
+                               remove.isolate = FALSE, top = 1,
+                               weight.scale = FALSE, 
+                               vertex.weight = 20, vertex.weight.max = NULL, 
+                               vertex.size.max = NULL, vertex.label.cex=1,vertex.label.color= "black",
+                               edge.weight.max = NULL, edge.width.max=8, alpha.edge = 0.6, 
+                               label.edge = FALSE,edge.label.color='black',edge.label.cex=0.8,
+                               edge.curved=0.2, shape='circle', layout=in_circle(), 
+                               margin=0.2, vertex.size = NULL,
+                               arrow.width=1,arrow.size = 0.2,
+                               text.x = 0, text.y = 1.5)
+{
+  # net = A; color.use = cols_C; weight.scale = TRUE; label.edge= FALSE
+  if (!is.null(vertex.size)) {
+    warning("'vertex.size' is deprecated. Use `vertex.weight`")
+  }
+  if (is.null(vertex.size.max)) {
+    if (length(unique(vertex.weight)) == 1) {
+      vertex.size.max <- 5
+    } else {
+      vertex.size.max <- 15
+    }
+  }
+  options(warn = -1)
+  thresh <- stats::quantile(net, probs = 1-top)
+  net[net < thresh] <- 0
+  
+  if ((!is.null(sources.use)) | (!is.null(targets.use)) | (!is.null(idents.use)) ) {
+    if (is.null(rownames(net))) {
+      stop("The input weighted matrix should have rownames!")
+    }
+    cells.level <- rownames(net)
+    df.net <- reshape2::melt(net, value.name = "value")
+    colnames(df.net)[1:2] <- c("source","target")
+    # keep the interactions associated with sources and targets of interest
+    if (!is.null(sources.use)){
+      if (is.numeric(sources.use)) {
+        sources.use <- cells.level[sources.use]
+      }
+      df.net <- subset(df.net, source %in% sources.use)
+    }
+    if (!is.null(targets.use)){
+      if (is.numeric(targets.use)) {
+        targets.use <- cells.level[targets.use]
+      }
+      df.net <- subset(df.net, target %in% targets.use)
+    }
+    if (!is.null(idents.use)) {
+      if (is.numeric(idents.use)) {
+        idents.use <- cells.level[idents.use]
+      }
+      df.net <- filter(df.net, (source %in% idents.use) | (target %in% idents.use))
+    }
+    df.net$source <- factor(df.net$source, levels = cells.level)
+    df.net$target <- factor(df.net$target, levels = cells.level)
+    df.net$value[is.na(df.net$value)] <- 0
+    net <- tapply(df.net[["value"]], list(df.net[["source"]], df.net[["target"]]), sum)
+  }
+  net[is.na(net)] <- 0
+  
+  if (is.null(color.use)) {
+    color.use = scPalette(nrow(net))
+    names(color.use) <- rownames(net)
+  } else {
+    if (is.null(names(color.use))) {
+      stop("The input `color.use` should be a named vector! \n")
+    }
+  }
+  if (remove.isolate) {
+    idx1 <- which(Matrix::rowSums(net) == 0)
+    idx2 <- which(Matrix::colSums(net) == 0)
+    idx.isolate <- intersect(idx1, idx2)
+    if (length(idx.isolate) > 0) {
+      net <- net[-idx.isolate, ]
+      net <- net[, -idx.isolate]
+      color.use = color.use[-idx.isolate]
+      if (length(unique(vertex.weight)) > 1) {
+        vertex.weight <- vertex.weight[-idx.isolate]
+      }
+    }
+  }
+  
+  g <- graph_from_adjacency_matrix(net, mode = "lower", weighted = TRUE)
+  edge.start <- igraph::ends(g, es=igraph::E(g), names=FALSE)
+  coords<-layout_(g,layout)
+  if(nrow(coords)!=1){
+    coords_scale=scale(coords)
+  }else{
+    coords_scale<-coords
+  }
+  
+  if (is.null(vertex.weight.max)) {
+    vertex.weight.max <- max(vertex.weight)
+  }
+  vertex.weight <- vertex.weight/vertex.weight.max*vertex.size.max+5
+  
+  loop.angle<-ifelse(coords_scale[igraph::V(g),1]>0,-atan(coords_scale[igraph::V(g),2]/coords_scale[igraph::V(g),1]),pi-atan(coords_scale[igraph::V(g),2]/coords_scale[igraph::V(g),1]))
+  igraph::V(g)$size<-vertex.weight
+  igraph::V(g)$color<-color.use[igraph::V(g)]
+  igraph::V(g)$frame.color <- color.use[igraph::V(g)]
+  igraph::V(g)$label.color <- vertex.label.color
+  igraph::V(g)$label.cex<-vertex.label.cex
+  if(label.edge){
+    igraph::E(g)$label<-igraph::E(g)$weight
+    igraph::E(g)$label <- round(igraph::E(g)$label, digits = 1)
+  }
+  if (is.null(edge.weight.max)) {
+    edge.weight.max <- max(igraph::E(g)$weight)
+  }
+  if (weight.scale == TRUE) {
+    #E(g)$width<-0.3+edge.width.max/(max(E(g)$weight)-min(E(g)$weight))*(E(g)$weight-min(E(g)$weight))
+    igraph::E(g)$width<- 0.3+igraph::E(g)$weight/edge.weight.max*edge.width.max
+  }else{
+    igraph::E(g)$width<-0.3+edge.width.max*igraph::E(g)$weight
+  }
+  
+  igraph::E(g)$arrow.width<-arrow.width
+  igraph::E(g)$arrow.size<-arrow.size
+  igraph::E(g)$label.color<-edge.label.color
+  igraph::E(g)$label.cex<-edge.label.cex
+  igraph::E(g)$color<- grDevices::adjustcolor(igraph::V(g)$color[edge.start[,1]],alpha.edge)
+  igraph::E(g)$loop.angle <- rep(0, length(igraph::E(g)))
+  
+  if(sum(edge.start[,2]==edge.start[,1])!=0){
+    igraph::E(g)$loop.angle[which(edge.start[,2]==edge.start[,1])]<-loop.angle[edge.start[which(edge.start[,2]==edge.start[,1]),1]]
+  }
+  radian.rescale <- function(x, start=0, direction=1) {
+    c.rotate <- function(x) (x + start) %% (2 * pi) * direction
+    c.rotate(scales::rescale(x, c(0, 2 * pi), range(x)))
+  }
+  label.locs <- radian.rescale(x=1:length(igraph::V(g)), direction=-1, start=0)
+  label.dist <- vertex.weight/max(vertex.weight)+2
+  plot(g,edge.curved=edge.curved,vertex.shape=shape,layout=coords_scale,margin=margin, vertex.label.dist=label.dist,
+       vertex.label.degree=label.locs, vertex.label.family="Helvetica", edge.label.family="Helvetica") # "sans"
+  if (!is.null(title.name)) {
+    text(text.x,text.y,title.name, cex = 1.1)
+  }
+  # https://www.andrewheiss.com/blog/2016/12/08/save-base-graphics-as-pseudo-objects-in-r/
+  # grid.echo()
+  # gg <-  grid.grab()
+  gg <- recordPlot()
+  return(gg)
+}
+
 
 ## this is a network plot function from Giotto
 ## (https://github.com/RubD/Giotto/blob/master/R/spatial_interaction_visuals.R)
