@@ -1113,6 +1113,34 @@ if(Run_Neighborhood_Enrichment_Analysis){
 # time-specifc and space-specific niches for nichenet
 ########################################################
 ########################################################
+st = readRDS(file = paste0(RdataDir, 'seuratObject_allVisiusmst_',
+                           'filtered.spots_time_conditions_manualSegmentation_ventricleRegions', 
+                           version.analysis, '.rds'))
+
+Idents(st) = st$seg_ventricle
+st = subset(st, cells = colnames(st)[which(!is.na(st$seg_ventricle))])
+
+SpatialPlot(st, group.by = 'seg_ventricle', ncol = 4)
+
+
+table(st$segmentation, st$condition)
+
+SpatialDimPlot(st, ncol = 4)
+
+## snRNA-seq reference  
+refs = readRDS(file = paste0(resDir, '/RCTD_refs_subtypes_final_20221117.rds'))
+refs$subtypes = refs$celltype_toUse # clean the special symbols
+refs$celltypes = refs$celltype_toUse
+
+
+table(refs$subtypes)
+length(table(refs$subtypes))
+
+refs$subtypes = as.factor(refs$subtypes) 
+
+refs$celltypes = gsub('CM_ven_Robo2', 'CM_Robo2', refs$celltypes)
+refs$celltypes = gsub('CM_ven_Cav3_1', 'CM_Cav3.1', refs$celltypes)
+
 
 ##########################################
 # Part 1) manually specific sub-populations to compare
@@ -1223,30 +1251,24 @@ if(version_testing_long){
 ##########################################
 # Part 2) # run LR analysis for all pairs 
 ##########################################
-##########################################
-
-##########################################
 # set parameter for ligand-receptor analysis
-outDir_version = paste0(resDir, '/Ligand_Receptor_analysis/LIANA_v5.5_FB.Immue_intraOnly')
-if(!dir.exists(outDir_version)) dir.create(outDir_version)
+outDir_version = paste0(resDir, '/Ligand_Receptor_analysis/LIANA_allPairs_test_v1.0')
+if(!dir.exists(outDir_version)) system(paste0('mkdir -p ', outDir_version))
+out_misty =  paste0(resDir, "/neighborhood_test/Run_misty_v2.1.1/")
 
-out_misty = paste0('../results/visium_axolotl_R12830_resequenced_20220308/neighborhood_test/',
-                   'Run_misty_v1.8_short/Plots_RCTD_density')
+refs$celltypes = refs$celltype_toUse
+subtypes = unique(refs$celltypes)
 
-misty_cutoff = 0.2
-
-# run LIANA day by day
-timepoint_specific = TRUE
+Select_specificPairs = TRUE
 
 #times_slice = c('d1', 'd4', 'd7', 'd14')
-times_slice = c('d7')
-
-subtypes = unique(refs$celltypes)
+times_slice = c('d4_294947')
 
 for(n in 1:length(times_slice))
 {
   # n = 1
   source('functions_cccInference.R')
+  
   time = times_slice[n]
   cat(' run LIANA for time -- ', time, '\n')
   
@@ -1254,26 +1276,33 @@ for(n in 1:length(times_slice))
   outDir = gsub(' ', '', outDir)
   
   ## select the interacting subtype pairs  
-  intra = read.csv2(paste0(out_misty, '/Amex_', time, '_all_summary_table_intra.csv'), row.names = 1)
-  juxta = read.csv2(paste0(out_misty, '/Amex_', time, '_all_summary_table_juxta5.csv'), row.names = 1)
-  
-  intra = intra > misty_cutoff
-  juxta = juxta > misty_cutoff
-  
-  intra[which(is.na(intra))] = FALSE
-  juxta[which(is.na(juxta))] = FALSE
-  
-  pairs = intra + juxta > 0
-  pairs = pairs[which(rownames(pairs) != 'RBC'), which(colnames(pairs) != 'RBC')]
+  pairs = read.table(file = paste0(out_misty, 'signficant_neighborhood/',
+                                   'cell_cell_colocalization_summary_Amex_', time, '.txt'),
+                     sep = '\t', row.names = c(1), header = TRUE)
+  pairs[is.na(pairs)] = 10
+  pairs = pairs > 1.6
+  # intra = read.csv2(paste0(out_misty, '/Amex_', time, '_all_summary_table_intra.csv'), row.names = 1)
+  # juxta = read.csv2(paste0(out_misty, '/Amex_', time, '_all_summary_table_juxta5.csv'), row.names = 1)
+  # 
+  # intra = intra > misty_cutoff
+  # juxta = juxta > misty_cutoff
+  # 
+  # intra[which(is.na(intra))] = FALSE
+  # juxta[which(is.na(juxta))] = FALSE
+  # 
+  # pairs = intra + juxta > 0
+  # pairs = pairs[which(rownames(pairs) != 'RBC'), which(colnames(pairs) != 'RBC')]
   ss_row = apply(pairs, 1, sum)
   ss_col = apply(pairs, 2, sum)
   
-  Select_specificPairs = TRUE
+  
   if(Select_specificPairs){
     
-    FB_Immune = c('FB.TNXB', 'FB.PKD1', 'Mo.Macs,FAXDC2', 'Mo.Macs.SNX22', 'Neu.DYSF')
-    ii1 = which(!is.na(match(colnames(pairs), FB_Immune)))
-    jj1 = which(!is.na(match(rownames(pairs), FB_Immune)))
+    subtypes_sel = c("CM.Prol.IS", 'FB.PKD1',  'Mo.Macs.SNX22', 'Neu.DYSF', 'T.cells', 
+                     "EC.IS.Prol", "CM.ven.Robo2")
+    
+    ii1 = which(!is.na(match(colnames(pairs), subtypes_sel)))
+    jj1 = which(!is.na(match(rownames(pairs), subtypes_sel)))
     
     pairs = pairs[jj1, ii1] 
     
@@ -1286,10 +1315,9 @@ for(n in 1:length(times_slice))
   }else{
     
     pairs = pairs[ ,which(ss_col >= 1)] # at least interacting with 1 receivers
-    pairs = pairs[which(ss_row >= 3), ] # at least have 3 senders 
+    pairs = pairs[which(ss_row >= 1), ] # at least have 3 senders 
     
   }
-  
   
   colnames(pairs) = gsub("Cav3_1", "Cav3.1", gsub('Mo_Macs', 'Mo.Macs', gsub('[.]','_', colnames(pairs))))
   rownames(pairs) = gsub("Cav3_1", "Cav3.1", gsub('Mo_Macs', 'Mo.Macs', gsub('[.]','_', rownames(pairs))))
@@ -1318,63 +1346,92 @@ for(n in 1:length(times_slice))
   source("functions_cccInference.R")
   res = aggregate_output_LIANA(liana_out = paste(outDir))
   
-  require(cellcall)
+  #require(cellcall)
+  library(SeuratData)
+  library(Connectome)
+  library(cowplot)
   
-  subtypes = unique(c(res$sender, res$receiver))
-  cell_color = data.frame(color = distinctColorPalette(length(subtypes)), stringsAsFactors = FALSE)
-  rownames(cell_color) <- subtypes
+  res = res[order(-res$sca.LRscore), ]
   
-  # ViewInterCircos(object = mt, font = 2, cellColor = cell_color, 
-  #                 lrColor = c("#F16B6F", "#84B1ED"),
-  #                 arr.type = "big.arrow",arr.length = 0.04,
-  #                 trackhight1 = 0.05, 
-  #                 slot="expr_l_r_log2_scale",
-  #                 linkcolor.from.sender = TRUE,
-  #                 linkcolor = NULL, 
-  #                 gap.degree = 2,
-  #                 order.vector=c('ST', "SSC", "SPGing", "SPGed"),
-  #                 trackhight2 = 0.032, 
-  #                 track.margin2 = c(0.01,0.12), 
-  #                 DIY = FALSE)
+  which(res$ligand == 'GAS6' & res$receptor == 'AXL')
   
-  ## test celltalker
-  library(celltalker)
-  #xx = readRDS(file = paste0(resDir, '/test_LianaOut_for_circoPlot.rds'))
-  xx = res
-  xx$sender = gsub('_', '.', xx$sender)
-  xx$receiver = gsub('_', '.', xx$receiver)
-  xx$interaction_pairs = paste0(xx$sender, '_', xx$receiver)
-  xx$interaction = paste0(xx$ligand, '_', xx$receptor)
-  xx = xx[,c(8, 9, 7, 1:5)]
-  colnames(xx)[3:5] = c('value', 'cell_type1', 'cell_type2')
+  colnames(res)[1:2] = c('source', 'target')
+  res$weight_norm = res$sca.LRscore
+  res$pair = paste0(res$ligand, ' - ', res$receptor)
+  res$vector = paste0(res$source, ' - ', res$target)
+  res$edge = paste0(res$source, ' - ', res$ligand, ' - ', res$receptor, ' - ', res$target)
+  res$source.ligand = paste0(res$source, ' - ', res$ligand)
+  res$receptor.target = paste0(res$receptor, ' - ', res$target)
   
-  top_stats_xx <- xx %>% as_tibble() %>%
-    #mutate(fdr=p.adjust(p_val,method="fdr")) %>%
-    #filter(fdr<0.05) %>%
-    group_by(cell_type2) %>%
-    top_n(-50, aggregate_rank) %>%
-    ungroup()
+  write.table(res, 
+              file = paste0(outDir, '/LR_interactions_allPairs_LIANA.txt'), 
+              quote = FALSE, row.names = TRUE, col.names = TRUE, sep = '\t')
   
-  cat(nrow(top_stats_xx), ' top pairs \n')
-  #top_stats_xx = as_tibble(xx)
-  subtypes = unique(c(top_stats_xx$cell_type1, top_stats_xx$cell_type2))
-  colors_use <- distinctColorPalette(length(subtypes))
+  ## plot the heatmap of cell-cell colocalization
+  source('functions_cccInference.R')
   
-  svg(paste0(outDir, "/ligand_target_circos_", time, "_test.svg"), width = 6, height = 6)
+  pdfname = paste0(outDir, '/LR_interactions_allPairs_LIANA_tops.pdf')
+  pdf(pdfname, width=12, height = 8)
   
-  source("functions_cccInference.R")
-  circos_plot_customized(ligand_receptor_frame=top_stats_xx,
-                         cell_group_colors=colors_use,
-                         ligand_color="#84B1ED",
-                         receptor_color="#F16B6F",
-                         cex_outer=0.5,
-                         cex_inner=0.2,
-                         link.lwd=0.1, 
-                         arr.length=0., 
-                         arr.width=0.05
-  )
+  for(ntop in c(100, 200, 300))
+  {
+    test = res[c(1:ntop), ]
+    
+    cells.of.interest = unique(c(test$source, test$target))
+    cell_color = randomcoloR::distinctColorPalette(length(cells.of.interest))
+    names(cell_color) <- cells.of.interest
+    
+    my_CircosPlot(test, 
+                  weight.attribute = 'weight_norm',
+                  cols.use = cell_color,
+                  sources.include = cells.of.interest,
+                  targets.include = cells.of.interest,
+                  lab.cex = 0.4,
+                  title = paste('LR scores top :', ntop))
+    
+  }
   
   dev.off()
+  
+  
+  # ## test celltalker
+  # library(celltalker)
+  # #xx = readRDS(file = paste0(resDir, '/test_LianaOut_for_circoPlot.rds'))
+  # xx = res
+  # xx$sender = gsub('_', '.', xx$sender)
+  # xx$receiver = gsub('_', '.', xx$receiver)
+  # xx$interaction_pairs = paste0(xx$sender, '_', xx$receiver)
+  # xx$interaction = paste0(xx$ligand, '_', xx$receptor)
+  # xx = xx[,c(8, 9, 7, 1:5)]
+  # colnames(xx)[3:5] = c('value', 'cell_type1', 'cell_type2')
+  # 
+  # top_stats_xx <- xx %>% as_tibble() %>%
+  #   #mutate(fdr=p.adjust(p_val,method="fdr")) %>%
+  #   #filter(fdr<0.05) %>%
+  #   group_by(cell_type2) %>%
+  #   top_n(-50, aggregate_rank) %>%
+  #   ungroup()
+  # 
+  # cat(nrow(top_stats_xx), ' top pairs \n')
+  # #top_stats_xx = as_tibble(xx)
+  # subtypes = unique(c(top_stats_xx$cell_type1, top_stats_xx$cell_type2))
+  # colors_use <- distinctColorPalette(length(subtypes))
+  # 
+  # svg(paste0(outDir, "/ligand_target_circos_", time, "_test.svg"), width = 6, height = 6)
+  
+  # source("functions_cccInference.R")
+  # circos_plot_customized(ligand_receptor_frame=top_stats_xx,
+  #                        cell_group_colors=colors_use,
+  #                        ligand_color="#84B1ED",
+  #                        receptor_color="#F16B6F",
+  #                        cex_outer=0.5,
+  #                        cex_inner=0.2,
+  #                        link.lwd=0.1, 
+  #                        arr.length=0., 
+  #                        arr.width=0.05
+  # )
+  # 
+  
   
   ## original code https://msraredon.github.io/Connectome/articles/01%20Connectome%20Workflow.html
   Test_Connectome_circoPlot = FALSE
