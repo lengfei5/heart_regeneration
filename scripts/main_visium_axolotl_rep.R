@@ -704,7 +704,6 @@ plot.RCTD.results(st = st,
                   )
 
 
-
 ## prepare the parameters for RCTD coarse cell types
 Run.RCTD.coarse.celltypes = FALSE
 if(Run.RCTD.coarse.celltypes){
