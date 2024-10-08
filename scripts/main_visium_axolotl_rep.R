@@ -543,16 +543,6 @@ st = subset(st, cells = colnames(st)[which(!is.na(st$seg_ventricle))])
 
 SpatialPlot(st, group.by = 'seg_ventricle', ncol = 4)
 
-
-#load(file = paste0(RdataDir, 'seuratObject_design_variableGenes_umap.clustered', species, '.Rdata'))
-#st = readRDS(file = paste0(RdataDir, 'seuratObject_st_filtered.spots', version.analysis, '.rds'))
-#st$time = design$time[match(st$sampleid, design$sampleID)]
-
-#saveRDS(st, file = paste0(RdataDir, 'seuratObject_st_filtered.spots_time_conditions', 
-#                          version.analysis, '.rds'))
-
-#st$condition = factor(st$condition, levels = design$condition)
-
 table(st$condition)
 
 # refined subtypes by Elad
@@ -1433,90 +1423,89 @@ for(n in 1:length(times_slice))
   # 
   
   
-  ## original code https://msraredon.github.io/Connectome/articles/01%20Connectome%20Workflow.html
-  Test_Connectome_circoPlot = FALSE
-  if(Test_Connectome_circoPlot){
-    library(Seurat)
-    library(SeuratData)
-    library(Connectome)
-    library(ggplot2)
-    library(cowplot)
-    
-    InstallData('panc8')
-    data('panc8')
-    
-    table(Idents(panc8))
-    
-    Idents(panc8) <- panc8[['celltype']]
-    table(Idents(panc8))
-    
-    panc8 <- NormalizeData(panc8)
-    connectome.genes <- union(Connectome::ncomms8866_human$Ligand.ApprovedSymbol,
-                              Connectome::ncomms8866_human$Receptor.ApprovedSymbol)
-    genes <- connectome.genes[connectome.genes %in% rownames(panc8)]
-    panc8 <- ScaleData(panc8,features = genes)
-    panc8.con <- CreateConnectome(panc8, species = 'human', 
-                                  min.cells.per.ident = 75, 
-                                  p.values = F, 
-                                  calculate.DOR = F)
-    
-    # Change density plot line colors by groups
-    p1 <- ggplot(panc8.con, aes(x=ligand.scale)) + geom_density() + ggtitle('Ligand.scale')
-    p2 <- ggplot(panc8.con, aes(x=recept.scale)) + geom_density() + ggtitle('Recept.scale')
-    p3 <- ggplot(panc8.con, aes(x=percent.target)) + geom_density() + ggtitle('Percent.target')
-    p4 <- ggplot(panc8.con, aes(x=percent.source)) + geom_density() + ggtitle('Percent.source')
-    plot_grid(p1,p2,p3,p4)
-    
-    panc8.con2 <- FilterConnectome(panc8.con, min.pct = 0.1,min.z = 0.25,remove.na = T)
-    
-    
-    p1 <- NetworkPlot(panc8.con2,features = 'VEGFA',
-                      min.pct = 0.1, 
-                      weight.attribute = 'weight_sc', 
-                      include.all.nodes = T)
-    p2 <- NetworkPlot(panc8.con2,features = 'VEGFA', 
-                      min.pct = 0.75, 
-                      weight.attribute = 'weight_sc',
-                      include.all.nodes = T)
-    
-    plot_grid(p1,p2,nrow=1)
-    
-    test <- panc8.con2
-    test <- data.frame(test %>% group_by(vector) %>% top_n(5,weight_sc))
-    
-    
-    cells.of.interest <- c('endothelial','activated_stellate','quiescent_stellate','macrophage')
-    
-    # Using edgeweights from normalized slot:
-    CircosPlot(test, 
-               weight.attribute = 'weight_norm', 
-               sources.include = cells.of.interest,
-               targets.include = cells.of.interest,
-               lab.cex = 0.4,
-               title = 'Edgeweights from normalized slot')
-    
-    # Using edgeweights from scaled slot:
-    CircosPlot(test,weight.attribute = 'weight_sc',
-               sources.include = cells.of.interest,
-               targets.include = cells.of.interest,
-               lab.cex = 0.6,
-               title = 'Edgeweights from scaled slot')
-    # Using separate ligand and receptor expression (from normalized slot)
-    CircosPlot(test, weight.attribute = 'weight_norm',
-               sources.include = cells.of.interest,
-               targets.include = cells.of.interest,
-               balanced.edges = F,lab.cex = 0.6,
-               title = 'Ligand vs. receptor expression (from normalized slot)')
-    # Using separate ligand and receptor expression (from scaled slot)
-    CircosPlot(test,weight.attribute = 'weight_sc',sources.include = cells.of.interest,targets.include = cells.of.interest,balanced.edges = F,lab.cex = 0.6,title = 'Ligand vs. receptor expression (from scaled slot)')
-    
-    CircosPlot(test,targets.include = 'endothelial',lab.cex = 0.6)
-    
-    CircosPlot(test,sources.include = 'endothelial',lab.cex = 0.6)
-    
-    
-  }
-  
+  # ## original code https://msraredon.github.io/Connectome/articles/01%20Connectome%20Workflow.html
+  # Test_Connectome_circoPlot = FALSE
+  # if(Test_Connectome_circoPlot){
+  #   library(Seurat)
+  #   library(SeuratData)
+  #   library(Connectome)
+  #   library(ggplot2)
+  #   library(cowplot)
+  #   
+  #   InstallData('panc8')
+  #   data('panc8')
+  #   
+  #   table(Idents(panc8))
+  #   
+  #   Idents(panc8) <- panc8[['celltype']]
+  #   table(Idents(panc8))
+  #   
+  #   panc8 <- NormalizeData(panc8)
+  #   connectome.genes <- union(Connectome::ncomms8866_human$Ligand.ApprovedSymbol,
+  #                             Connectome::ncomms8866_human$Receptor.ApprovedSymbol)
+  #   genes <- connectome.genes[connectome.genes %in% rownames(panc8)]
+  #   panc8 <- ScaleData(panc8,features = genes)
+  #   panc8.con <- CreateConnectome(panc8, species = 'human', 
+  #                                 min.cells.per.ident = 75, 
+  #                                 p.values = F, 
+  #                                 calculate.DOR = F)
+  #   
+  #   # Change density plot line colors by groups
+  #   p1 <- ggplot(panc8.con, aes(x=ligand.scale)) + geom_density() + ggtitle('Ligand.scale')
+  #   p2 <- ggplot(panc8.con, aes(x=recept.scale)) + geom_density() + ggtitle('Recept.scale')
+  #   p3 <- ggplot(panc8.con, aes(x=percent.target)) + geom_density() + ggtitle('Percent.target')
+  #   p4 <- ggplot(panc8.con, aes(x=percent.source)) + geom_density() + ggtitle('Percent.source')
+  #   plot_grid(p1,p2,p3,p4)
+  #   
+  #   panc8.con2 <- FilterConnectome(panc8.con, min.pct = 0.1,min.z = 0.25,remove.na = T)
+  #   
+  #   
+  #   p1 <- NetworkPlot(panc8.con2,features = 'VEGFA',
+  #                     min.pct = 0.1, 
+  #                     weight.attribute = 'weight_sc', 
+  #                     include.all.nodes = T)
+  #   p2 <- NetworkPlot(panc8.con2,features = 'VEGFA', 
+  #                     min.pct = 0.75, 
+  #                     weight.attribute = 'weight_sc',
+  #                     include.all.nodes = T)
+  #   
+  #   plot_grid(p1,p2,nrow=1)
+  #   
+  #   test <- panc8.con2
+  #   test <- data.frame(test %>% group_by(vector) %>% top_n(5,weight_sc))
+  #   
+  #   
+  #   cells.of.interest <- c('endothelial','activated_stellate','quiescent_stellate','macrophage')
+  #   
+  #   # Using edgeweights from normalized slot:
+  #   CircosPlot(test, 
+  #              weight.attribute = 'weight_norm', 
+  #              sources.include = cells.of.interest,
+  #              targets.include = cells.of.interest,
+  #              lab.cex = 0.4,
+  #              title = 'Edgeweights from normalized slot')
+  #   
+  #   # Using edgeweights from scaled slot:
+  #   CircosPlot(test,weight.attribute = 'weight_sc',
+  #              sources.include = cells.of.interest,
+  #              targets.include = cells.of.interest,
+  #              lab.cex = 0.6,
+  #              title = 'Edgeweights from scaled slot')
+  #   # Using separate ligand and receptor expression (from normalized slot)
+  #   CircosPlot(test, weight.attribute = 'weight_norm',
+  #              sources.include = cells.of.interest,
+  #              targets.include = cells.of.interest,
+  #              balanced.edges = F,lab.cex = 0.6,
+  #              title = 'Ligand vs. receptor expression (from normalized slot)')
+  #   # Using separate ligand and receptor expression (from scaled slot)
+  #   CircosPlot(test,weight.attribute = 'weight_sc',sources.include = cells.of.interest,targets.include = cells.of.interest,balanced.edges = F,lab.cex = 0.6,title = 'Ligand vs. receptor expression (from scaled slot)')
+  #   
+  #   CircosPlot(test,targets.include = 'endothelial',lab.cex = 0.6)
+  #   
+  #   CircosPlot(test,sources.include = 'endothelial',lab.cex = 0.6)
+  #   
+  #   
+  # }
   
   
 }
@@ -1526,7 +1515,7 @@ for(n in 1:length(times_slice))
 
 ########################################################
 ##########################################
-# Part 3) # run LR analysis for all pairs 
+# Part 3) # run NicheNet analysis for all pairs 
 ##########################################
 ##########################################
 # diff Nichenet for ligand-receptor analysis
