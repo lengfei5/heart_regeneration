@@ -615,7 +615,7 @@ if(Import_manually_timeSpecific_celltypes){
   csc[which(rownames(csc) == 'Mo.Macs_Prol'), ] = NA
   
   csc[which(rownames(csc) == 'EC_Prol'), ] = NA
-  #csc[which(rownames(csc) == 'EC_IS_Prol'), ] = NA
+  csc[which(rownames(csc) == 'EC_IS_Prol'), ] = NA
   
   csc[which(rownames(csc) == 'CM_Prol_3'), ] = NA
   csc[which(rownames(csc) == 'CM_Prol_2'), ] = NA
@@ -624,12 +624,12 @@ if(Import_manually_timeSpecific_celltypes){
   csc[which(rownames(csc) == 'B_cells_Prol'), ] = NA
   
   ## remove the subtypes in Atria
-  #csc[which(rownames(csc) == 'EC_WNT4'), ] = NA
-  #csc[which(rownames(csc) == 'EC_CEMIP'), ] = NA
-  #csc[which(rownames(csc) == 'EC_LHX6'), ] = NA
-  #csc[which(rownames(csc) == 'FB_VWA2'), ] = NA
-  #csc[which(rownames(csc) == 'FB_TNXB'), ] = NA
-  #csc[which(rownames(csc) == 'CM_PM_HCN4'), ] = NA
+  csc[which(rownames(csc) == 'EC_WNT4'), ] = NA
+  csc[which(rownames(csc) == 'EC_CEMIP'), ] = NA
+  csc[which(rownames(csc) == 'EC_LHX6'), ] = NA
+  csc[which(rownames(csc) == 'FB_VWA2'), ] = NA
+  csc[which(rownames(csc) == 'FB_TNXB'), ] = NA
+  csc[which(rownames(csc) == 'CM_PM_HCN4'), ] = NA
   csc[which(rownames(csc) == 'CM_OFT'), ] = NA
   csc[which(rownames(csc) == 'CM_Atria'), ] = NA
   csc[which(rownames(csc) == 'CM_Atria_Tagln'), ] = NA
@@ -653,7 +653,7 @@ condition.specific.ref = TRUE
 RCTD_mode = 'doublet'
 
 RCTD_out = paste0(resDir, '/RCTD_out', 
-                  '/RCTD_subtype_out_41subtypes_ref.time.specific_v3.5.5_ventricleRegion')
+                  '/RCTD_subtype_out_41subtypes_ref.time.specific_v3.6_ventricleRegion_test')
 system(paste0('mkdir -p ', RCTD_out))
 
 
@@ -663,7 +663,7 @@ saveRDS(st, file = paste0(RCTD_out, '/RCTD_st_axolotl_allVisium.rds'))
 saveRDS(refs, file = paste0(RCTD_out, '/RCTD_refs_subtypes_final_20221117.rds'))
 
 saveRDS(condition.specific_celltypes, 
-        file = paste0(RCTD_out, '/RCTD_refs_condition_specificity_v3.rds'))
+        file = paste0(RCTD_out, '/RCTD_refs_condition_specificity.rds'))
 
 
 
@@ -687,6 +687,7 @@ Run.celltype.deconvolution.RCTD(st = st,
 
 
 source('functions_Visium.R')
+
 plot.RCTD.results(st = st,
                   RCTD_out = RCTD_out,
                   RCTD_mode = RCTD_mode,
@@ -789,9 +790,10 @@ if(Import.manual.spatial.domains){
       #st$segmentation[mm[jj]] = aa$segmentation[jj]
       
     }else{
-      cat('no manual segmentation found for -- ', slice, '\n' )
+      cat('no manual segmentation found for -- ', slice, '\n')
+      
     }
-        
+    
   }
   
   st$segmentation = as.factor(st$segmentation)
@@ -1033,10 +1035,14 @@ if(Run_Neighborhood_Enrichment_Analysis){
   SpatialDimPlot(st, group.by = 'segmentation', ncol = 4)
   table(st$segmentation, st$condition)
   
-  outDir = paste0(resDir, '/neighborhood_test/Run_misty_v2.1.1/')
   
-  RCTD_out = paste0(resDir, '/RCTD_out/',
-                    'RCTD_subtype_out_41subtypes_ref.time.specific_v3.5.5_ventricleRegion')
+  RCTD_out = paste0(resDir, '/RCTD_out', 
+                    '/RCTD_subtype_out_41subtypes_ref.time.specific_v3.5_ventricleRegion')
+  
+  outDir = paste0(resDir, '/neighborhood_test/',  basename(RCTD_out), '/')
+  
+  #RCTD_out = paste0(resDir, '/RCTD_out/',
+  #                  'RCTD_subtype_out_41subtypes_ref.time.specific_v3.5.5_ventricleRegion')
   
   levels(refs$subtypes)
   
@@ -1088,10 +1094,12 @@ if(Run_Neighborhood_Enrichment_Analysis){
   source('functions_Visium.R')
   run_significanceTest_misty(st, 
                              outDir = outDir, 
-                             time = c('d4', 'd7', 'd14'),
+                             time = c('d1', 'd4', 'd7', 'd14'),
+                             #misty_mode = c('density'),
                              #segmentation_annots = c('all', 'BZ', 'RZ', 'Intact'),
                              #controls = c('RZ', 'Intact'),
                              resolution = 0.6)
+  
   
   
 }

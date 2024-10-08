@@ -1761,7 +1761,7 @@ run_significanceTest_misty = function(st,
   # time = c('d1', 'd4', 'd7'); segmentation_annots = c('all', 'BZ', 'RZ', 'Intact'); 
   # misty_mode = c('propos');resolution = 0.6;
   cat(' -- significance test of celltype proximity for Misty output -- \n')
-  
+  cat(paste0('--- misty mode : ', misty_mode, '\n'))
   library("plyr")
   library("reshape2")
   library("ggplot2")
@@ -1769,7 +1769,7 @@ run_significanceTest_misty = function(st,
   library(ggraph)
   library(CellChat)
   
-  testDir = paste0(outDir, '/signficant_neighborhood/')
+  testDir = paste0(outDir, '/signficant_neighborhood_', misty_mode, '/')
   if(!dir.exists(testDir)){
     system(paste0('mkdir -p ', testDir))
   }
@@ -1822,19 +1822,19 @@ run_significanceTest_misty = function(st,
       
       rm(list = c('bz', 'rz', 'ctl1', 'ctl2', 'ctl'))
       
-      bz = read.csv2(file = paste0(outDir, 'Plots_RCTD_propos/',
+      bz = read.csv2(file = paste0(outDir, 'Plots_RCTD_',  misty_mode, '/',
                                    cc[k], '_BZ_summary_table_juxta5.csv'), row.names = c(1))
       bz = bz[c(nrow(bz):1), ]
       
-      rz = read.csv2(file = paste0(outDir, 'Plots_RCTD_propos/',
+      rz = read.csv2(file = paste0(outDir, 'Plots_RCTD_', misty_mode, '/',
                                    cc[k], '_RZ_summary_table_juxta5.csv'), row.names = c(1))
       rz = get_comparable_matrix(bz, rz)
       
-      ctl1 = read.csv2(file = paste0(outDir, 'Plots_RCTD_propos/',
+      ctl1 = read.csv2(file = paste0(outDir, 'Plots_RCTD_', misty_mode, '/',
                                      'Amex_d0_294946_Intact_summary_table_juxta5.csv'), row.names = c(1))
       ctl1 = get_comparable_matrix(bz, ctl1)
       
-      ctl2 = read.csv2(file = paste0(outDir, 'Plots_RCTD_propos/',
+      ctl2 = read.csv2(file = paste0(outDir, 'Plots_RCTD_', misty_mode, '/',
                                      'Amex_d0_294949_Intact_summary_table_juxta5.csv'), row.names = c(1))
       
       ctl2 = get_comparable_matrix(bz, ctl2)
@@ -1846,19 +1846,19 @@ run_significanceTest_misty = function(st,
       
       rm(list = c('bz', 'rz', 'ctl1', 'ctl2', 'ctl'))
       
-      bz = read.csv2(file = paste0(outDir, 'Plots_RCTD_propos/',
+      bz = read.csv2(file = paste0(outDir, 'Plots_RCTD_', misty_mode, '/',
                                    cc[k], '_BZ_summary_table_para15.csv'), row.names = c(1))
       bz = bz[c(nrow(bz):1), ]
       
-      rz = read.csv2(file = paste0(outDir, 'Plots_RCTD_propos/',
+      rz = read.csv2(file = paste0(outDir, 'Plots_RCTD_', misty_mode, '/',
                                    cc[k], '_RZ_summary_table_para15.csv'), row.names = c(1))
       rz = get_comparable_matrix(bz, rz)
       
-      ctl1 = read.csv2(file = paste0(outDir, 'Plots_RCTD_propos/',
+      ctl1 = read.csv2(file = paste0(outDir, 'Plots_RCTD_', misty_mode, '/',
                                      'Amex_d0_294946_Intact_summary_table_para15.csv'), row.names = c(1))
       ctl1 = get_comparable_matrix(bz, ctl1)
       
-      ctl2 = read.csv2(file = paste0(outDir, 'Plots_RCTD_propos/',
+      ctl2 = read.csv2(file = paste0(outDir, 'Plots_RCTD_', misty_mode, '/',
                                      'Amex_d0_294949_Intact_summary_table_para15.csv'), row.names = c(1))
       
       ctl2 = get_comparable_matrix(bz, ctl2)
