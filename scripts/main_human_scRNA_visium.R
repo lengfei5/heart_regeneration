@@ -194,9 +194,11 @@ aa$cell.id = paste0(aa$patient_region_id, '_', aa$cell.id)
 
 # ax = readRDS(file = paste0())
 
-DimPlot(aa, reduction = 'umap', group.by = 'cell_type_original', raster=FALSE, label = TRUE, repel = TRUE)
+DimPlot(aa, reduction = 'umap', group.by = 'cell_type_original', 
+        raster=FALSE, label = TRUE, repel = TRUE)
 
-annot_file = list.files(path = '../published_dataset/human/Kuppe_et_al_2022/processed_data_Robj/subtype_annot',
+annot_file = list.files(path = paste0('../published_dataset/human/Kuppe_et_al_2022/',
+                        'processed_data_Robj/subtype_annot'),
                         pattern = '*.Rds', full.names = TRUE)
 
 aa$annotation = NA
@@ -317,6 +319,7 @@ for(n in 1:length(annot_file))
 
 saveRDS(aa, file = paste0(RdataDir, '/Kuppe2022_heart_donorSelected_subtypes.added.rds'))
 
+
 ########################################################
 ########################################################
 # Section IV: double check the subtypes  
@@ -325,7 +328,8 @@ saveRDS(aa, file = paste0(RdataDir, '/Kuppe2022_heart_donorSelected_subtypes.add
 ########################################################
 aa = readRDS(file = paste0(RdataDir, '/Kuppe2022_heart_donorSelected_subtypes.added.rds'))
 
-annot_file = list.files(path = '../published_dataset/human/Kuppe_et_al_2022/processed_data_Robj/subtype_annot',
+annot_file = list.files(path = paste0('../published_dataset/human/Kuppe_et_al_2022/',
+                        'processed_data_Robj/subtype_annot'),
                         pattern = '*.Rds', full.names = TRUE)
 
 ##########################################
@@ -333,7 +337,7 @@ annot_file = list.files(path = '../published_dataset/human/Kuppe_et_al_2022/proc
 ##########################################
 aa$sample = droplevels(aa$sample)
 aa$batch = 'B'
-aa$batch[grep('CK1', aa$sample)] = 'A' 
+aa$batch[grep('CK1', aa$sample)] = 'A'
 
 jj = which(aa$cell_type_original == 'Mast'| aa$cell_type_original == 'Cycling cells' |
              aa$cell_type_original == 'Adipocyte')

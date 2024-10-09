@@ -1090,12 +1090,13 @@ if(Run_Neighborhood_Enrichment_Analysis){
                                     segmentation_annots = c('all', 'BZ', 'RZ', 'Intact')
   )
   
-  ## cell-cell interaction
+  
+  ## cell-cell co-localization
   source('functions_Visium.R')
   run_significanceTest_misty(st, 
                              outDir = outDir, 
                              time = c('d1', 'd4', 'd7', 'd14'),
-                             #misty_mode = c('density'),
+                             misty_mode = c('density'),
                              #segmentation_annots = c('all', 'BZ', 'RZ', 'Intact'),
                              #controls = c('RZ', 'Intact'),
                              resolution = 0.6)
