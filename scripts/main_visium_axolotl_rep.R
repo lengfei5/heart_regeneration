@@ -568,7 +568,34 @@ refs$celltype_toUse = gsub("[)]", '', refs$celltype_toUse)
 table(refs$celltype_toUse)
 length(table(refs$celltype_toUse))
 
+##########################################
+# double check the subtype similarity used by RCTD 
+##########################################
+Assess_subtypes_similarity_for_RCTD = FALSE
+if(Assess_subtypes_similarity_for_RCTD){
+  
+  ## preapre the paramters for RCTD subtypes
+  DefaultAssay(refs) = 'RNA'
+  DefaultAssay(st) = 'Spatial'
+  require_int_SpatialRNA = FALSE
+  
+  RCTD_out = paste0(resDir, '/RCTD_out', 
+                    '/subtype_similarity/')
+  system(paste0('mkdir -p ', RCTD_out))
+  
+  source('functions_Visium.R')
+  assess_sutypes_similarity_for_RCTD(st, refs, 
+                                  mapping_ref = 'time',
+                                  require_int_SpatialRNA = require_int_SpatialRNA,
+                                  RCTD_out = RCTD_out)
+  
+  
+  
+}
 
+##########################################
+# manually set time-specifici subtypes used for RCTD
+##########################################
 Import_manually_timeSpecific_celltypes = FALSE
 if(Import_manually_timeSpecific_celltypes){
   
@@ -608,11 +635,14 @@ if(Import_manually_timeSpecific_celltypes){
   csc[which(csc<=0.25)] = NA
   #csc[which(!is.na(csc))] = 
   
+  csc[which(rownames(csc) == 'Neu_IL1R1'), ] = NA
+  
   ## further removing the proliferating cells
   csc[which(rownames(csc) == 'Proliferating_RBC'), ] = NA
   csc[which(rownames(csc) == 'Proliferating_Megakeryocytes'), ] = NA
   csc[which(rownames(csc) == 'Neuronal'), ] = NA
   csc[which(rownames(csc) == 'Mo.Macs_Prol'), ] = NA
+  csc[which(rownames(csc) == 'B_cells_Prol'), ] = NA
   
   csc[which(rownames(csc) == 'EC_Prol'), ] = NA
   csc[which(rownames(csc) == 'EC_IS_Prol'), ] = NA
@@ -620,8 +650,9 @@ if(Import_manually_timeSpecific_celltypes){
   csc[which(rownames(csc) == 'CM_Prol_3'), ] = NA
   csc[which(rownames(csc) == 'CM_Prol_2'), ] = NA
   csc[which(rownames(csc) == 'CM_Prol_1'), ] = NA
+  csc[which(rownames(csc) == 'CM_Prol_1'), ] = NA
   
-  csc[which(rownames(csc) == 'B_cells_Prol'), ] = NA
+  csc[which(rownames(csc) == 'FB_Prol'), ] = NA
   
   ## remove the subtypes in Atria
   csc[which(rownames(csc) == 'EC_WNT4'), ] = NA
@@ -643,7 +674,6 @@ celltypes = unique(refs$celltype_toUse)
 mm = match(rownames(condition.specific_celltypes), celltypes)
 cat(length(which(is.na(mm))), ' cell types missing in the condition.specific_celltypes \n')
 
-
 source('functions_Visium.R')
 ## preapre the paramters for RCTD subtypes
 DefaultAssay(refs) = 'RNA'
@@ -653,7 +683,7 @@ condition.specific.ref = TRUE
 RCTD_mode = 'doublet'
 
 RCTD_out = paste0(resDir, '/RCTD_out', 
-                  '/RCTD_subtype_out_41subtypes_ref.time.specific_v3.6_ventricleRegion_test')
+                  '/RCTD_subtype_out_41subtypes_ref.time.specific_v3.7_ventricleRegion')
 system(paste0('mkdir -p ', RCTD_out))
 
 

@@ -162,6 +162,123 @@ make_SeuratObj_visium = function(topdir = './', saveDir = './results', changeGen
 # 
 ########################################################
 ########################################################
+assess_sutypes_similarity_for_RCTD = function(st, refs, 
+                                              require_int_SpatialRNA = FALSE,
+                                              RCTD_out)
+{
+  library(spacexr)
+  require(Matrix)
+  
+  ## remove the subtypes in Atria
+  sutypes_atria = c('EC_WNT4', 'EC_CEMIP', 'EC_LHX6', 'FB_VWA2', 'FB_TNXB', 'CM_PM_HCN4', 'CM_OFT',
+                    'CM_Atria', 'CM_Atria_Tagln', 'Neuronal', 'Proliferating_RBC'
+                    )
+  
+  ## remove the proliferating cells
+  #csc[which(rownames(csc) == 'EC_IS_Prol'), ] = NA
+  sutypes_atria = c('EC_WNT4', 'EC_CEMIP', 'EC_LHX6', 'FB_VWA2', 'FB_TNXB', 'CM_PM_HCN4', 'CM_OFT',
+                    'CM_Atria', 'CM_Atria_Tagln', 'Neuronal', 'Proliferating_RBC',
+                    'Proliferating_Megakeryocytes', 'Mo.Macs_Prol', 'EC_Prol', 'CM_Prol_1',
+                    'CM_Prol_2', 'CM_Prol_3', 'FB_Prol', 'B_cells_Prol',
+                    'Neu_IL1R1', 'EC_IS_Prol'
+  )
+  
+  
+  mm = match(refs$celltype_toUse, sutypes_atria)
+  refs = subset(refs, cells = colnames(refs)[which(is.na(mm))])
+  
+  cat('-- prepare global reference for all conditions --\n')
+  E_refs = GetAssayData(object = refs, slot = "data")
+  E_refs = expm1(E_refs) # linear scale of corrected gene expression
+  
+  ### Create the Reference object for major cell types
+  cell_types <- refs@meta.data$celltype_toUse
+  names(cell_types) <- colnames(refs) # create cell_types named list
+  cell_types <- as.factor(cell_types) # convert to factor data type
+  reference <- Reference(E_refs, cell_types, nUMI = NULL, require_int = FALSE)
+  
+  rm(E_refs, cell_types)
+  
+  ## Examine reference object (optional)
+  print(dim(reference@counts)) #observe Digital Gene Expression matrix
+  #> [1] 384 475
+  table(reference@cell_types) #number of occurences for each cell type
+  
+  
+  cat('-- check visium conditions -- \n')
+  st$condition = droplevels(factor(st$condition))
+  print(table(st$condition))
+  cc = names(table(st$condition))
+  
+  n = 1
+  slice = cc[n]
+  stx = st[, which(st$condition == slice)]
+  
+  ##########################################
+  # prepare ST data for RTCD
+  # original code from https://raw.githack.com/dmcable/RCTD/dev/vignettes/spatial-transcriptomics.html
+  ##########################################
+  counts = GetAssayData(object = stx, slot = "counts")
+  #counts <- stx@assays$Spatial@counts
+  
+  coords <- eval(parse(text = paste0('stx@images$',  slice, '@coordinates')))
+  coords = coords[, c(4, 5)]
+  
+  nUMI <- colSums(counts) # In this case, total counts per pixel is nUMI
+  
+  ### Create SpatialRNA object, require_int = FALSE, because of kallisto output
+  puck <- SpatialRNA(coords, as.matrix(counts), nUMI, require_int = require_int_SpatialRNA)
+  
+  ## Examine SpatialRNA object (optional)
+  print(dim(puck@counts)) # observe Digital Gene Expression matrix
+  hist(log(puck@nUMI, 2)) # histogram of log_2 nUMI
+  
+  print(head(puck@coords)) # start of coordinate data.frame
+  barcodes <- colnames(puck@counts) # pixels to be used (a list of barcode names). 
+  
+  # This list can be restricted if you want to crop the puck e.g. 
+  # puck <- restrict_puck(puck, barcodes) provides a basic plot of the nUMI of each pixel
+  # on the plot:
+  plot_puck_continuous(puck, barcodes, puck@nUMI, ylimit = c(0, round(quantile(puck@nUMI,0.9))), 
+                       title ='plot of nUMI') 
+  
+  # make RCTD object
+  myRCTD <- create.RCTD(puck, reference, max_cores = 1, 
+                        gene_cutoff = 0.000125, fc_cutoff = 0.5, 
+                        gene_cutoff_reg = 2e-04,  
+                        fc_cutoff_reg = 0.75,
+                        UMI_min = 20, UMI_max = 2e+07, 
+                        CELL_MIN_INSTANCE = 30)
+  
+  markers = myRCTD@cell_type_info$info[[1]]
+  ggs = myRCTD@internal_vars$gene_list_reg
+  
+  mm = match(ggs, rownames(markers))
+  
+  markers = markers[mm, ]
+  sampleDists <- dist(t(markers))
+  
+  library("RColorBrewer")
+  library(pheatmap)
+  sampleDistMatrix <- as.matrix(sampleDists, method = "euclidean")
+  
+  #rownames(sampleDistMatrix) <- paste(vsd$condition, vsd$type, sep="-")
+  colnames(sampleDistMatrix) <- NULL
+  colors <- colorRampPalette(rev(brewer.pal(9, "RdBu")) )(255)
+  
+  pdfname = paste0(RCTD_out, '/Similarity_subtypes_atria.proliferatingExcluded_v2.pdf')
+  pdf(pdfname, width=10, height = 7)
+  
+  pheatmap(sampleDistMatrix,
+           clustering_distance_rows=sampleDists,
+           clustering_distance_cols=sampleDists,
+           col=colors)
+  
+  dev.off()
+  
+  
+}
+
 
 ##########################################
 # Run cell type deconvolution with RCTD for all slices
@@ -296,7 +413,7 @@ Run.celltype.deconvolution.RCTD = function(st, # spatial transcriptome seurat ob
     # prepare ST data for RTCD
     # original code from https://raw.githack.com/dmcable/RCTD/dev/vignettes/spatial-transcriptomics.html
     ##########################################
-    counts = GetAssayData(object = st, slot = "counts")
+    counts = GetAssayData(object = stx, slot = "counts")
     #counts <- stx@assays$Spatial@counts
     
     coords <- eval(parse(text = paste0('stx@images$',  slice, '@coordinates')))
