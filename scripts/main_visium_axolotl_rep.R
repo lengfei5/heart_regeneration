@@ -1158,7 +1158,6 @@ refs = readRDS(file = paste0(resDir, '/RCTD_refs_subtypes_final_20221117.rds'))
 refs$subtypes = refs$celltype_toUse # clean the special symbols
 refs$celltypes = refs$celltype_toUse
 
-
 table(refs$subtypes)
 length(table(refs$subtypes))
 
@@ -1278,9 +1277,11 @@ if(version_testing_long){
 # Part 2) # run LR analysis for all pairs 
 ##########################################
 # set parameter for ligand-receptor analysis
-outDir_version = paste0(resDir, '/Ligand_Receptor_analysis/LIANA_allPairs_test_v1.0')
+out_misty =  paste0(resDir, "/neighborhood_test/RCTD_subtype_out_41subtypes_",
+                    "ref.time.specific_v3.7_ventricleRegion/signficant_neighborhood_density/")
+
+outDir_version = paste0(resDir, '/Ligand_Receptor_analysis/LIANA_allPairs_ventricleRegion_v3.7/')
 if(!dir.exists(outDir_version)) system(paste0('mkdir -p ', outDir_version))
-out_misty =  paste0(resDir, "/neighborhood_test/Run_misty_v2.1.1/")
 
 refs$celltypes = refs$celltype_toUse
 subtypes = unique(refs$celltypes)
@@ -1302,25 +1303,8 @@ for(n in 1:length(times_slice))
   outDir = gsub(' ', '', outDir)
   
   ## select the interacting subtype pairs  
-  pairs = read.table(file = paste0(out_misty, 'signficant_neighborhood/',
-                                   'cell_cell_colocalization_summary_Amex_', time, '.txt'),
+  pairs = read.table(file = paste0(out_misty, 'cell_cell_colocalization_summary_Amex_', time, '.txt'),
                      sep = '\t', row.names = c(1), header = TRUE)
-  pairs[is.na(pairs)] = 10
-  pairs = pairs > 1.6
-  # intra = read.csv2(paste0(out_misty, '/Amex_', time, '_all_summary_table_intra.csv'), row.names = 1)
-  # juxta = read.csv2(paste0(out_misty, '/Amex_', time, '_all_summary_table_juxta5.csv'), row.names = 1)
-  # 
-  # intra = intra > misty_cutoff
-  # juxta = juxta > misty_cutoff
-  # 
-  # intra[which(is.na(intra))] = FALSE
-  # juxta[which(is.na(juxta))] = FALSE
-  # 
-  # pairs = intra + juxta > 0
-  # pairs = pairs[which(rownames(pairs) != 'RBC'), which(colnames(pairs) != 'RBC')]
-  ss_row = apply(pairs, 1, sum)
-  ss_col = apply(pairs, 2, sum)
-  
   
   if(Select_specificPairs){
     
@@ -1332,6 +1316,9 @@ for(n in 1:length(times_slice))
     
     pairs = pairs[jj1, ii1] 
     
+    pairs[pairs < 0 ] = 0
+    pairs = pairs > 0.1
+    
     ss_col = apply(pairs, 2, sum)
     ss_row = apply(pairs, 1, sum)
     
@@ -1339,6 +1326,11 @@ for(n in 1:length(times_slice))
     
     
   }else{
+    pairs[is.na(pairs)] = 10
+    pairs = pairs > 1.6
+    
+    ss_row = apply(pairs, 1, sum)
+    ss_col = apply(pairs, 2, sum)
     
     pairs = pairs[ ,which(ss_col >= 1)] # at least interacting with 1 receivers
     pairs = pairs[which(ss_row >= 1), ] # at least have 3 senders 
@@ -1412,7 +1404,7 @@ for(n in 1:length(times_slice))
                   cols.use = cell_color,
                   sources.include = cells.of.interest,
                   targets.include = cells.of.interest,
-                  lab.cex = 0.4,
+                  lab.cex = 0.5,
                   title = paste('LR scores top :', ntop))
     
   }
@@ -1420,131 +1412,8 @@ for(n in 1:length(times_slice))
   dev.off()
   
   
-  # ## test celltalker
-  # library(celltalker)
-  # #xx = readRDS(file = paste0(resDir, '/test_LianaOut_for_circoPlot.rds'))
-  # xx = res
-  # xx$sender = gsub('_', '.', xx$sender)
-  # xx$receiver = gsub('_', '.', xx$receiver)
-  # xx$interaction_pairs = paste0(xx$sender, '_', xx$receiver)
-  # xx$interaction = paste0(xx$ligand, '_', xx$receptor)
-  # xx = xx[,c(8, 9, 7, 1:5)]
-  # colnames(xx)[3:5] = c('value', 'cell_type1', 'cell_type2')
-  # 
-  # top_stats_xx <- xx %>% as_tibble() %>%
-  #   #mutate(fdr=p.adjust(p_val,method="fdr")) %>%
-  #   #filter(fdr<0.05) %>%
-  #   group_by(cell_type2) %>%
-  #   top_n(-50, aggregate_rank) %>%
-  #   ungroup()
-  # 
-  # cat(nrow(top_stats_xx), ' top pairs \n')
-  # #top_stats_xx = as_tibble(xx)
-  # subtypes = unique(c(top_stats_xx$cell_type1, top_stats_xx$cell_type2))
-  # colors_use <- distinctColorPalette(length(subtypes))
-  # 
-  # svg(paste0(outDir, "/ligand_target_circos_", time, "_test.svg"), width = 6, height = 6)
-  
-  # source("functions_cccInference.R")
-  # circos_plot_customized(ligand_receptor_frame=top_stats_xx,
-  #                        cell_group_colors=colors_use,
-  #                        ligand_color="#84B1ED",
-  #                        receptor_color="#F16B6F",
-  #                        cex_outer=0.5,
-  #                        cex_inner=0.2,
-  #                        link.lwd=0.1, 
-  #                        arr.length=0., 
-  #                        arr.width=0.05
-  # )
-  # 
-  
-  
-  # ## original code https://msraredon.github.io/Connectome/articles/01%20Connectome%20Workflow.html
-  # Test_Connectome_circoPlot = FALSE
-  # if(Test_Connectome_circoPlot){
-  #   library(Seurat)
-  #   library(SeuratData)
-  #   library(Connectome)
-  #   library(ggplot2)
-  #   library(cowplot)
-  #   
-  #   InstallData('panc8')
-  #   data('panc8')
-  #   
-  #   table(Idents(panc8))
-  #   
-  #   Idents(panc8) <- panc8[['celltype']]
-  #   table(Idents(panc8))
-  #   
-  #   panc8 <- NormalizeData(panc8)
-  #   connectome.genes <- union(Connectome::ncomms8866_human$Ligand.ApprovedSymbol,
-  #                             Connectome::ncomms8866_human$Receptor.ApprovedSymbol)
-  #   genes <- connectome.genes[connectome.genes %in% rownames(panc8)]
-  #   panc8 <- ScaleData(panc8,features = genes)
-  #   panc8.con <- CreateConnectome(panc8, species = 'human', 
-  #                                 min.cells.per.ident = 75, 
-  #                                 p.values = F, 
-  #                                 calculate.DOR = F)
-  #   
-  #   # Change density plot line colors by groups
-  #   p1 <- ggplot(panc8.con, aes(x=ligand.scale)) + geom_density() + ggtitle('Ligand.scale')
-  #   p2 <- ggplot(panc8.con, aes(x=recept.scale)) + geom_density() + ggtitle('Recept.scale')
-  #   p3 <- ggplot(panc8.con, aes(x=percent.target)) + geom_density() + ggtitle('Percent.target')
-  #   p4 <- ggplot(panc8.con, aes(x=percent.source)) + geom_density() + ggtitle('Percent.source')
-  #   plot_grid(p1,p2,p3,p4)
-  #   
-  #   panc8.con2 <- FilterConnectome(panc8.con, min.pct = 0.1,min.z = 0.25,remove.na = T)
-  #   
-  #   
-  #   p1 <- NetworkPlot(panc8.con2,features = 'VEGFA',
-  #                     min.pct = 0.1, 
-  #                     weight.attribute = 'weight_sc', 
-  #                     include.all.nodes = T)
-  #   p2 <- NetworkPlot(panc8.con2,features = 'VEGFA', 
-  #                     min.pct = 0.75, 
-  #                     weight.attribute = 'weight_sc',
-  #                     include.all.nodes = T)
-  #   
-  #   plot_grid(p1,p2,nrow=1)
-  #   
-  #   test <- panc8.con2
-  #   test <- data.frame(test %>% group_by(vector) %>% top_n(5,weight_sc))
-  #   
-  #   
-  #   cells.of.interest <- c('endothelial','activated_stellate','quiescent_stellate','macrophage')
-  #   
-  #   # Using edgeweights from normalized slot:
-  #   CircosPlot(test, 
-  #              weight.attribute = 'weight_norm', 
-  #              sources.include = cells.of.interest,
-  #              targets.include = cells.of.interest,
-  #              lab.cex = 0.4,
-  #              title = 'Edgeweights from normalized slot')
-  #   
-  #   # Using edgeweights from scaled slot:
-  #   CircosPlot(test,weight.attribute = 'weight_sc',
-  #              sources.include = cells.of.interest,
-  #              targets.include = cells.of.interest,
-  #              lab.cex = 0.6,
-  #              title = 'Edgeweights from scaled slot')
-  #   # Using separate ligand and receptor expression (from normalized slot)
-  #   CircosPlot(test, weight.attribute = 'weight_norm',
-  #              sources.include = cells.of.interest,
-  #              targets.include = cells.of.interest,
-  #              balanced.edges = F,lab.cex = 0.6,
-  #              title = 'Ligand vs. receptor expression (from normalized slot)')
-  #   # Using separate ligand and receptor expression (from scaled slot)
-  #   CircosPlot(test,weight.attribute = 'weight_sc',sources.include = cells.of.interest,targets.include = cells.of.interest,balanced.edges = F,lab.cex = 0.6,title = 'Ligand vs. receptor expression (from scaled slot)')
-  #   
-  #   CircosPlot(test,targets.include = 'endothelial',lab.cex = 0.6)
-  #   
-  #   CircosPlot(test,sources.include = 'endothelial',lab.cex = 0.6)
-  #   
-  #   
-  # }
-  
-  
 }
+
 
 ## double check the ligand and receptor expression distribution
 #FeaturePlot(refs, features = rownames(refs)[grep('EGFC|VIPR2', rownames(refs))])
