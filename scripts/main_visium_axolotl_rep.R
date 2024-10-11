@@ -1065,14 +1065,9 @@ if(Run_Neighborhood_Enrichment_Analysis){
   SpatialDimPlot(st, group.by = 'segmentation', ncol = 4)
   table(st$segmentation, st$condition)
   
-  
   RCTD_out = paste0(resDir, '/RCTD_out', 
-                    '/RCTD_subtype_out_41subtypes_ref.time.specific_v3.5_ventricleRegion')
-  
+                    '/RCTD_subtype_out_41subtypes_ref.time.specific_v3.7_ventricleRegion')
   outDir = paste0(resDir, '/neighborhood_test/',  basename(RCTD_out), '/')
-  
-  #RCTD_out = paste0(resDir, '/RCTD_out/',
-  #                  'RCTD_subtype_out_41subtypes_ref.time.specific_v3.5.5_ventricleRegion')
   
   levels(refs$subtypes)
   
@@ -1113,7 +1108,7 @@ if(Run_Neighborhood_Enrichment_Analysis){
   
   
   source('functions_Visium.R')
-  run_misty_colocalization_analysis(st, 
+  run_misty_colocalization_analysis(st,
                                     outDir = outDir,
                                     RCTD_out = RCTD_out,
                                     condSpec_celltypes = NULL,
@@ -1123,13 +1118,15 @@ if(Run_Neighborhood_Enrichment_Analysis){
   
   ## cell-cell co-localization
   source('functions_Visium.R')
-  run_significanceTest_misty(st, 
+  summarize_cell_neighborhood_misty(st, 
                              outDir = outDir, 
                              time = c('d1', 'd4', 'd7', 'd14'),
                              misty_mode = c('density'),
+                             summary_method = 'median'
                              #segmentation_annots = c('all', 'BZ', 'RZ', 'Intact'),
-                             #controls = c('RZ', 'Intact'),
-                             resolution = 0.6)
+                             #controls = c('RZ', 'Intact')
+                             )
+  
   
   
   
@@ -1327,8 +1324,8 @@ for(n in 1:length(times_slice))
   
   if(Select_specificPairs){
     
-    subtypes_sel = c("CM.Prol.IS", 'FB.PKD1',  'Mo.Macs.SNX22', 'Neu.DYSF', 'T.cells', 
-                     "EC.IS.Prol", "CM.ven.Robo2")
+    subtypes_sel = c("CM.Prol.IS", "CM.ven.Robo2", 'FB.PKD1', 'Mo.Macs.FAXDC2',  
+                     "EC.IS.LOX")
     
     ii1 = which(!is.na(match(colnames(pairs), subtypes_sel)))
     jj1 = which(!is.na(match(rownames(pairs), subtypes_sel)))

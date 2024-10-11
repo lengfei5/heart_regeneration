@@ -1825,7 +1825,7 @@ get_comparable_matrix = function(xx, yy)
 
 ##summarize_colocalization with parameters bz_rz_intra, bz_rz_juxta, bz_rz_para,
 ##bz_c_intra, bz_c_juxta, bz_c_para
-summarize_colocalization = function(x1, x2, x3)
+summarize_misty_mode = function(x1, x2, x3, method = c('median', 'max', 'mean', 'sum'))
 {
   col_names = colnames(x1)
   row_names = rownames(x1)
@@ -1842,14 +1842,13 @@ summarize_colocalization = function(x1, x2, x3)
   {
     for(j in 1:nrow(x1))
     {
-      if(col_names[i] == row_names[j]){
-        res[j, i] = NA
-      }else{
+      if(col_names[i] != row_names[j]){
+        #if(x1[j, i] > 0 | x2[j, i] > 0 | x3[j, i] > 0){
+        if(method == 'max'){res[j, i] = max(c(x1[j, i], x2[j, i], x3[j, i]));}  
+        if(method == 'sum'){res[j, i] = sum(c(x1[j, i], x2[j, i], x3[j, i]));}
+        if(method == 'median') {res[j, i] = median(c(x1[j, i], x2[j, i], x3[j, i]));}
+        if(method == 'mean') {res[j, i] = mean(c(x1[j, i], x2[j, i], x3[j, i]));}
         
-        if(x1[j, i] > 0 | x2[j, i] > 0 | x3[j, i] > 0){
-          res[j, i] = max(c(x1[j, i], x2[j, i], x3[j, i]))
-          #res[j, i] = sum(c(x1[j, i], x2[j, i], x3[j, i]))
-        }
       }
     }
   }
@@ -1861,22 +1860,52 @@ summarize_colocalization = function(x1, x2, x3)
   
 }
 
+convert_tibble_for_save = function(sample = 'Amex_d0_294946', region = 'Intact', xx)
+{
+  xx = data.frame(sample = rep(sample, nrow(xx)), 
+                  region = region,
+                  source = rownames(xx), 
+                  xx, stringsAsFactors = FALSE)
+  
+  xx = pivot_longer(xx, cols = colnames(xx)[-c(1:3)],
+                    names_to = "target", 
+                    values_to = "importance")
+  
+  return(xx)
+}
+
+transform_zscore = function(x)
+{
+  # x = ctl_intra
+  x = (x + t(x))/2.0
+  
+  xx = as.numeric(as.matrix(x))
+  xx = (xx - mean(xx, na.rm = TRUE))/sd(xx, na.rm = TRUE)
+  xx = matrix(xx, nrow = nrow(x), ncol = ncol(x), byrow = FALSE)
+  colnames(xx) = colnames(x)
+  rownames(xx) = rownames(x)
+  
+  return(xx)
+  
+}
+
 
 ##########################################
 # summarize the misty analysis and plot the network with graph
 ##########################################
-run_significanceTest_misty = function(st, 
+summarize_cell_neighborhood_misty = function(st, 
                                       outDir,
                                       time = c('d4', 'd7'),
                                       misty_mode = c('propos'),
+                                      summary_method = 'median',
                                       cutoff = 0.2,
                                       resolution = 0.7,
                                       segmentation_annots = c('all', 'BZ', 'RZ', 'Intact'), 
                                       controls = c('RZ', 'Intact')
                                       )
 {
-  # time = c('d1', 'd4', 'd7'); segmentation_annots = c('all', 'BZ', 'RZ', 'Intact'); 
-  # misty_mode = c('propos');resolution = 0.6;
+  # time = c('d1', 'd4', 'd7', 'd14'); segmentation_annots = c('all', 'BZ', 'RZ', 'Intact'); 
+  # misty_mode = c('density'); resolution = 0.6;
   cat(' -- significance test of celltype proximity for Misty output -- \n')
   cat(paste0('--- misty mode : ', misty_mode, '\n'))
   library("plyr")
@@ -1885,6 +1914,7 @@ run_significanceTest_misty = function(st,
   library(igraph)
   library(ggraph)
   library(CellChat)
+  library(tidyr)
   
   testDir = paste0(outDir, '/signficant_neighborhood_', misty_mode, '/')
   if(!dir.exists(testDir)){
@@ -1909,86 +1939,109 @@ run_significanceTest_misty = function(st,
     # n = 2
     kk = which(tt == time[n])
     
+    ctl_intra = read.csv2(file = paste0(outDir, 'Plots_RCTD_', misty_mode, '/',
+                                   'Amex_d0_294946_Intact_summary_table_intra', '.csv'), row.names = c(1))
+    ctl_intra = transform_zscore(ctl_intra)
+    
+    ctl_juxta = read.csv2(file = paste0(outDir, 'Plots_RCTD_', misty_mode, '/',
+                                   'Amex_d0_294946_Intact_summary_table_juxta5.csv'), row.names = c(1))
+    ctl_juxta = get_comparable_matrix(ctl_intra, ctl_juxta)
+    ctl_juxta = transform_zscore(ctl_juxta)
+    
+    ctl_para = read.csv2(file = paste0(outDir, 'Plots_RCTD_', misty_mode, '/',
+                                   'Amex_d0_294946_Intact_summary_table_para15.csv'), row.names = c(1))
+    ctl_para = get_comparable_matrix(ctl_intra, ctl_para)
+    ctl_para = transform_zscore(ctl_para)
+    
+    ctl1 = summarize_misty_mode(ctl_intra, ctl_juxta, ctl_para, method = summary_method)
+    rm(list = c('ctl_intra', 'ctl_juxta', 'ctl_para'))
+    
+    prox_all = convert_tibble_for_save(sample = 'd0_294946', region = 'Intact', ctl1)
+    
+    ctl2 = read.csv2(file = paste0(outDir, 'Plots_RCTD_', misty_mode, '/',
+                                   'Amex_d0_294949_Intact_summary_table_intra', '.csv'), 
+                     row.names = c(1))
+    
+    ctl_intra = read.csv2(file = paste0(outDir, 'Plots_RCTD_', misty_mode, '/',
+                                        'Amex_d0_294949_Intact_summary_table_intra', '.csv'), 
+                          row.names = c(1))
+    ctl_intra = transform_zscore(ctl_intra)
+    
+    ctl_juxta = read.csv2(file = paste0(outDir, 'Plots_RCTD_', misty_mode, '/',
+                                        'Amex_d0_294949_Intact_summary_table_juxta5.csv'), 
+                          row.names = c(1))
+    ctl_juxta = get_comparable_matrix(ctl_intra, ctl_juxta)
+    ctl_juxta = transform_zscore(ctl_juxta)
+    
+    ctl_para = read.csv2(file = paste0(outDir, 'Plots_RCTD_', misty_mode, '/',
+                                       'Amex_d0_294949_Intact_summary_table_para15.csv'), 
+                         row.names = c(1))
+    ctl_para = get_comparable_matrix(ctl_intra, ctl_para)
+    ctl_para = transform_zscore(ctl_para)
+    
+    ctl2 = summarize_misty_mode(ctl_intra, ctl_juxta, ctl_para, method = summary_method)
+    rm(list = c('ctl_intra', 'ctl_juxta', 'ctl_para'))
+    
+    prox_all = bind_rows(prox_all, 
+                         convert_tibble_for_save(sample = 'd0_294949', region = 'Intact', ctl2))
+    
+    
     for(k in kk)
     {
       # k = kk[1]
       cat('---- condition :', cc[k], '---- \n')
       
-      bz = read.csv2(file = paste0(outDir, 'Plots_RCTD_', misty_mode, '/',
+      intra = read.csv2(file = paste0(outDir, 'Plots_RCTD_', misty_mode, '/',
                                    cc[k], '_BZ_summary_table_intra', '.csv'), row.names = c(1))
-      bz = bz[c(nrow(bz):1), ]
+      intra = intra[c(nrow(intra):1), ]
+      intra = transform_zscore(intra)
       
-      rz = read.csv2(file = paste0(outDir, 'Plots_RCTD_', misty_mode, '/',
-                                   cc[k], '_RZ_summary_table_intra', '.csv'), row.names = c(1))
-      rz = get_comparable_matrix(bz, rz)
-      
-      ctl1 = read.csv2(file = paste0(outDir, 'Plots_RCTD_', misty_mode, '/',
-                                     'Amex_d0_294946_Intact_summary_table_intra', '.csv'), 
-                       row.names = c(1))
-      ctl1 = get_comparable_matrix(bz, ctl1)
-      
-      ctl2 = read.csv2(file = paste0(outDir, 'Plots_RCTD_', misty_mode, '/',
-                                     'Amex_d0_294949_Intact_summary_table_intra', '.csv'), 
-                       row.names = c(1))
-      
-      ctl2 = get_comparable_matrix(bz, ctl2)
-      ctl = (ctl1 + ctl2)/2.0
-      
-      bz_rz_intra = (bz + t(bz)) - (rz + t(rz))
-      # bz_c_intra = bz - ctl
-      
-      rm(list = c('bz', 'rz', 'ctl1', 'ctl2', 'ctl'))
-      
-      bz = read.csv2(file = paste0(outDir, 'Plots_RCTD_',  misty_mode, '/',
+      juxta = read.csv2(file = paste0(outDir, 'Plots_RCTD_',  misty_mode, '/',
                                    cc[k], '_BZ_summary_table_juxta5.csv'), row.names = c(1))
-      bz = bz[c(nrow(bz):1), ]
+      juxta = get_comparable_matrix(intra, juxta)
+      juxta = transform_zscore(juxta)
       
-      rz = read.csv2(file = paste0(outDir, 'Plots_RCTD_', misty_mode, '/',
-                                   cc[k], '_RZ_summary_table_juxta5.csv'), row.names = c(1))
-      rz = get_comparable_matrix(bz, rz)
-      
-      ctl1 = read.csv2(file = paste0(outDir, 'Plots_RCTD_', misty_mode, '/',
-                                     'Amex_d0_294946_Intact_summary_table_juxta5.csv'), row.names = c(1))
-      ctl1 = get_comparable_matrix(bz, ctl1)
-      
-      ctl2 = read.csv2(file = paste0(outDir, 'Plots_RCTD_', misty_mode, '/',
-                                     'Amex_d0_294949_Intact_summary_table_juxta5.csv'), row.names = c(1))
-      
-      ctl2 = get_comparable_matrix(bz, ctl2)
-      
-      ctl = (ctl1 + ctl2)/2.0
-      
-      bz_rz_juxta = (bz + t(bz)) - (rz + t(rz))
-      #bz_c_juxta = bz - ctl
-      
-      rm(list = c('bz', 'rz', 'ctl1', 'ctl2', 'ctl'))
-      
-      bz = read.csv2(file = paste0(outDir, 'Plots_RCTD_', misty_mode, '/',
+      para = read.csv2(file = paste0(outDir, 'Plots_RCTD_', misty_mode, '/',
                                    cc[k], '_BZ_summary_table_para15.csv'), row.names = c(1))
-      bz = bz[c(nrow(bz):1), ]
+      para = get_comparable_matrix(intra, para)
+      para = transform_zscore(para)
       
-      rz = read.csv2(file = paste0(outDir, 'Plots_RCTD_', misty_mode, '/',
-                                   cc[k], '_RZ_summary_table_para15.csv'), row.names = c(1))
+      bz = summarize_misty_mode(intra, juxta, para, method = summary_method)
+      
+      rm(list = c('intra', 'juxta', 'para'))
+      
+      prox_all = bind_rows(prox_all, 
+                           convert_tibble_for_save(sample = cc[k], 
+                                                   region = 'BZ', 
+                                                   bz))
+      
+      intra = read.csv2(file = paste0(outDir, 'Plots_RCTD_', misty_mode, '/',
+                                      cc[k], '_RZ_summary_table_intra', '.csv'), row.names = c(1))
+      intra = intra[c(nrow(intra):1), ]
+      intra = transform_zscore(intra)
+      
+      juxta = read.csv2(file = paste0(outDir, 'Plots_RCTD_',  misty_mode, '/',
+                                      cc[k], '_RZ_summary_table_juxta5.csv'), row.names = c(1))
+      juxta = get_comparable_matrix(intra, juxta)
+      juxta = transform_zscore(juxta)
+      
+      para = read.csv2(file = paste0(outDir, 'Plots_RCTD_', misty_mode, '/',
+                                     cc[k], '_RZ_summary_table_para15.csv'), row.names = c(1))
+      para = get_comparable_matrix(intra, para)
+      para = transform_zscore(para)
+      
+      rz = summarize_misty_mode(intra, juxta, para, method = summary_method)
+      
+      rm(list = c('intra', 'juxta', 'para'))
+      
+      prox_all = bind_rows(prox_all, 
+                           convert_tibble_for_save(sample = cc[k], 
+                                                   region = 'RZ', 
+                                                   rz))
       rz = get_comparable_matrix(bz, rz)
       
-      ctl1 = read.csv2(file = paste0(outDir, 'Plots_RCTD_', misty_mode, '/',
-                                     'Amex_d0_294946_Intact_summary_table_para15.csv'), row.names = c(1))
-      ctl1 = get_comparable_matrix(bz, ctl1)
-      
-      ctl2 = read.csv2(file = paste0(outDir, 'Plots_RCTD_', misty_mode, '/',
-                                     'Amex_d0_294949_Intact_summary_table_para15.csv'), row.names = c(1))
-      
-      ctl2 = get_comparable_matrix(bz, ctl2)
-      ctl = (ctl1 + ctl2)/2.0
-      
-      bz_rz_para = (bz + t(bz)) - (rz + t(rz))
-      # bz_c_para = bz - ctl
-      
-      rm(list = c('bz', 'rz', 'ctl1', 'ctl2', 'ctl'))
-      
-      bz_all = summarize_colocalization(bz_rz_intra, bz_rz_juxta, bz_rz_para)
-      
-      rm(list = c('bz_rz_intra', 'bz_rz_juxta', 'bz_rz_para'))
+      bz_all = bz - rz
+      #bz_all[bz_all<0] = 0
       
       write.table(bz_all, 
                   file = paste0(testDir, 'cell_cell_colocalization_summary_', cc[k], '.txt'), 
@@ -1998,9 +2051,9 @@ run_significanceTest_misty = function(st,
       pdfname = paste0(testDir, 'Plot_', cc[k], '.pdf')
       pdf(pdfname, width=14, height = 10)
       
-      for(cutoff in seq(0, 2.0, by=0.2))
+      for(cutoff in seq(0, max(bz_all, na.rm = TRUE)*0.6, by=0.1))
       {
-        # cutoff = 1.6
+        # cutoff = 0.2
         set2.blue <- "#8DA0CB"
         
         bz_allx = bz_all
@@ -2040,28 +2093,28 @@ run_significanceTest_misty = function(st,
           igraph::set.vertex.attribute("name", value = names(igraph::V(.))) %>%
           igraph::delete.vertices(which(igraph::degree(.) == 0))
         
-        C <- igraph::cluster_leiden(G, resolution_parameter = resolution)
-        layout <- igraph::layout_with_fr(G)
-        
-        igraph::plot.igraph(G,
-                            layout = layout, 
-                            mark.groups = C, 
-                            main = paste0('colocalization graph with cutoff : ', cutoff), 
-                            edge.weight=2, 
-                            edge.width=(E(G)$weight/2),
-                            vertex.size = 4,
-                            vertex.color = "black", 
-                            vertex.label.dist = 1,
-                            vertex.label.color = "black", 
-                            vertex.label.font = 2, 
-                            vertex.label.cex = 0.66
-        )
-        
+        #C <- igraph::cluster_leiden(G, resolution_parameter = resolution)
+        # layout <- igraph::layout_with_fr(G)
+        # 
+        # igraph::plot.igraph(G,
+        #                     layout = layout, 
+        #                     #mark.groups = C, 
+        #                     main = paste0('colocalization graph with cutoff : ', cutoff), 
+        #                     edge.weight=4, 
+        #                     edge.width=(E(G)$weight/2),
+        #                     vertex.size = 4,
+        #                     vertex.color = "black", 
+        #                     vertex.label.dist = 1,
+        #                     vertex.label.color = "black", 
+        #                     vertex.label.font = 2, 
+        #                     vertex.label.cex = 0.66
+        # )
+        # 
         
         ## try make similar plot but the cellchat circle style
         ## original code from cellchat function netVisual_circle
-        cols_C = scPalette(C$nb_clusters)[C$membership]
-        names(cols_C) = C$names
+        cols_C = scPalette(nrow(A))
+        names(cols_C) = colnames(A)
         my_netVisual_circle(A,
                             color.use = cols_C,
                             #vertex.weight = groupSize, 
@@ -2075,6 +2128,57 @@ run_significanceTest_misty = function(st,
       dev.off()
       
     }
+    
+    ## barpot to compare the replicates, BZ, RZ and also Intact
+    prox_all = prox_all %>% mutate(segment = paste0(region, '_', sample)) 
+    
+    pdfname = paste0(testDir, 'Plot_neighborhood_rep_regions_', time[n], '.pdf')
+    pdf(pdfname, width=16, height = 8)
+    
+    if(length(kk) == 2){
+      
+      bz1 = read.table(file = paste0(testDir, 'cell_cell_colocalization_summary_', cc[kk[1]], '.txt'), 
+                  row.names = c(1),  header = TRUE, sep = '\t')
+      
+      bz2 = read.table(file = paste0(testDir, 'cell_cell_colocalization_summary_', cc[kk[2]], '.txt'), 
+                       row.names = c(1),  header = TRUE, sep = '\t')
+      
+      bz2 = get_comparable_matrix(bz1, bz2)
+      
+      bz1 = as.numeric(as.matrix(bz1))
+      #bz1[which(bz1<0)] = 0
+      bz2 = as.numeric(as.matrix(bz2))
+      #bz2[which(bz2<0)] = 0
+      plot(bz1, bz2, xlab = cc[kk[1]], ylab = cc[kk[2]]);
+      abline(0, 1, col = 'red', lwd =1.0)
+      cat(time[n],  'correlation between two reps -- ', cor(bz1, bz2), '\n')
+      
+    }
+    
+    
+    for(s in unique(prox_all$source))
+    {
+      # s = "CM.Prol.IS"
+      #cat(s, '\n')
+      p1 = prox_all %>% filter(source == s) %>% #filter(target == "T.cells")
+        ggplot(aes(x=target, y=importance, fill=segment)) +
+        geom_bar(stat="identity", position= position_dodge(), width = 0.7) +
+        scale_x_discrete(drop = FALSE) + 
+        scale_fill_brewer(palette="Paired", direction = -1) +
+        theme_minimal() + 
+        #ylim(-1, 2) +
+        theme(axis.text.x = element_text(size = 8, angle = 90, hjust = 1, vjust = 1)) + 
+        ggtitle(paste0("cell types colocalizing with ", s))
+        
+      plot(p1)
+    }
+    
+    
+    dev.off()
+    
+              
+    
+    
       
   }
   
