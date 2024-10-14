@@ -1026,6 +1026,27 @@ if(Test_Data_Integration){
 Test_Spatial_alignment = FALSE
 if(Test_Spatial_alignment){
   
+  SpatialDimPlot(st, ncol = 4)
+  
+  SpatialDimPlot(st, group.by = 'seg_ventricle',  ncol = 4)
+  mm = which(is.na(st$segmentation) & !is.na(st$seg_ventricle))
+  st$segmentation = as.character(st$segmentation)
+  st$segmentation[mm] = 'ventricle'
+  
+  SpatialDimPlot(st, group.by =  'segmentation', ncol = 4)
+  
+  mm = which(is.na(st$segmentation))
+  st$segmentation[mm] = 'others'
+  
+  SpatialDimPlot(st, group.by =  'segmentation', ncol = 4)
+  
+  saveRDS(st, file = paste0(outDir, 'seuratObject_allVisiusmst_',
+                             'filtered.spots_time_conditions_manualSegmentation_for_scSLAT.rds'))
+  
+  st = readRDS(file = paste0(outDir, 'seuratObject_allVisiusmst_',
+                             'filtered.spots_time_conditions_manualSegmentation_for_scSLAT.rds'))
+  
+  
   library(SeuratDisk)
   
   cc = names(table(st$condition))
@@ -1036,16 +1057,19 @@ if(Test_Spatial_alignment){
   print(tt)
   
   
-  for(n in c(6, 7))
+  for(n in c(4, 5))
   {
-    # n = 7
+    # n = 5
     cat(n, '  slice -- ', cc[n], '\n')
     slice = cc[n]
     Idents(st) = factor(st$condition)
     stx = subset(st, condition == slice)
     DefaultAssay(stx) = 'Spatial'
     
-    coordinates = data.frame(stx@images$Amex_d7_183625@coordinates)[, c(2, 3)]
+    coordinates = eval(parse(text = paste0("data.frame(stx@images$", 
+                                           slice, 
+                                           "@coordinates)[, c(2, 3)]")))
+    
     write.csv(coordinates, file = paste0(outDir, 'image_coordinates_', slice, '.csv'), 
               row.names = TRUE, quote = FALSE)
     
@@ -1074,10 +1098,8 @@ if(Test_Spatial_alignment){
     SaveH5Seurat(mnt, filename = paste0(outDir, saveFile), overwrite = TRUE)
     Convert(paste0(outDir, saveFile), dest = "h5ad", overwrite = TRUE)
     
-        
   }
   
-    
 }
 
 ########################################################

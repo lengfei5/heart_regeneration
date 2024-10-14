@@ -1087,7 +1087,7 @@ manual_selection_spots_image_Spata2 = function(st,
   
   for(n in 1:length(cc))
   {
-    # n = 2
+    # n = 4
     cat('slice -- ', cc[n], '\n')
     slice = cc[n]
     aa = st[, which(st$condition == slice)]
@@ -1119,6 +1119,7 @@ manual_selection_spots_image_Spata2 = function(st,
     
     #setActiveExpressionMatrix(spata_obj, 'data')
     spata_obj <- createSegmentation(object = spata_obj)
+    
     
     plotSegmentation(object = spata_obj, pt_size = 1.9) +
       ggplot2::scale_y_reverse()
