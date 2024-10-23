@@ -1111,14 +1111,23 @@ manual_selection_spots_image_Spata2 = function(st,
     
     aa <- ScaleData(aa, features = rownames(aa), assay = 'Spatial')
     aa <- RunPCA(aa, features = VariableFeatures(object = aa), verbose = FALSE)
-    
-    spata_obj = transformSeuratToSpata(aa, sample_name = slice, method = 'spatial', 
-                                       assay_name = 'Spatial', 
-                                       assay_slot = 'scale.data', 
-                                       image_name = slice)
+    aa = RunUMAP(aa, dims = 1:20, n.neighbors = 30, min.dist = 0.1)
+    # spata_obj = asSPATA2(aa, 
+    #                      sample_name = slice, 
+    #                      platform = "Undefined",
+    #                      assay_name = 'Spatial', 
+    #                      img_name = slice,
+    #                      img_scale_fct = "lowres", 
+    #                      assay_modality = 'gene')
+    spata_obj = transformSeuratToSpata(aa, 
+                                       sample_name = slice, method = 'spatial',
+                           assay_name = 'Spatial',
+                           assay_slot = 'scale.data',
+                           image_name = slice)
     
     #setActiveExpressionMatrix(spata_obj, 'data')
     spata_obj <- createSegmentation(object = spata_obj)
+    
     
     
     plotSegmentation(object = spata_obj, pt_size = 1.9) +

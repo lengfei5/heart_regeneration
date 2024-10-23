@@ -1026,6 +1026,9 @@ if(Test_Data_Integration){
 Test_Spatial_alignment = FALSE
 if(Test_Spatial_alignment){
   
+  outDir = paste0(resDir, '/Replicates_comparison_with_segmentation/')
+  system(paste0('mkdir -p ', outDir))
+  
   SpatialDimPlot(st, ncol = 4)
   
   SpatialDimPlot(st, group.by = 'seg_ventricle',  ncol = 4)
@@ -1047,6 +1050,10 @@ if(Test_Spatial_alignment){
                              'filtered.spots_time_conditions_manualSegmentation_for_scSLAT.rds'))
   
   
+  SpatialDimPlot(st, group.by =  'segmentation', ncol = 4)
+  
+  
+  
   library(SeuratDisk)
   
   cc = names(table(st$condition))
@@ -1056,6 +1063,7 @@ if(Test_Spatial_alignment){
   cat('ST time :\n')
   print(tt)
   
+  Manually_modifying_segmentAnnot = FALSE
   
   for(n in c(4, 5))
   {
@@ -1065,6 +1073,204 @@ if(Test_Spatial_alignment){
     Idents(st) = factor(st$condition)
     stx = subset(st, condition == slice)
     DefaultAssay(stx) = 'Spatial'
+    
+    if(Manually_modifying_segmentAnnot){
+      if(slice == 'Amex_d4_294947'){
+        p1 = SpatialDimPlot(stx, group.by =  'segmentation', images = slice)
+        
+        features = rownames(stx)[grep('MYH7-AMEX60DD009525|NPPA-AMEX60DD051098', rownames(stx))]
+                
+        p2 = SpatialFeaturePlot(st, features = features, images = slice)
+        
+        p1 + p2
+        # now remove additional cells, use SpatialDimPlots to visualize what to remove
+        stx$image_row = stx@images$Amex_d4_294947@coordinates$imagerow
+        stx$image_col = stx@images$Amex_d4_294947@coordinates$imagecol
+        
+        SpatialDimPlot(stx, 
+                       cells.highlight = WhichCells(stx, expression = segmentation == "ventricle" &
+                                                      `MYH6;MYH7-AMEX60DD009525` < 30 & 
+                                                      (image_row > 9000 & image_row < 12000) & 
+                                                      image_col < 11000),
+                       images = slice)
+                                                    
+        cell_sels = WhichCells(stx, expression = segmentation == "ventricle" &
+                                   `MYH6;MYH7-AMEX60DD009525` < 30 & 
+                                   (image_row > 9000 & image_row < 12000) & 
+                                   image_col < 11000)
+        
+        stx$segmentation[match(cell_sels, colnames(stx))] = 'Injury'  
+        
+        SpatialDimPlot(stx, 
+                       cells.highlight = WhichCells(stx, expression = segmentation == "others" &
+                                                      `MYH6;MYH7-AMEX60DD009525` < 30 & 
+                                                      (image_row > 9000 & image_row < 12000) & 
+                                                      image_col < 11000),
+                       images = slice)
+        
+        cell_sels = WhichCells(stx, expression = segmentation == "others" &
+                     `MYH6;MYH7-AMEX60DD009525` < 30 & 
+                     (image_row > 9000 & image_row < 12000) & 
+                     image_col < 11000)
+        stx$segmentation[match(cell_sels, colnames(stx))] = 'Injury'  
+        
+        p1 = SpatialDimPlot(stx, group.by =  'segmentation', images = slice)
+        
+        SpatialDimPlot(stx, 
+                       cells.highlight = WhichCells(stx, expression = segmentation == "others" &
+                                                      (image_row < 9000 ) & 
+                                                      image_col < 12500),
+                       images = slice)
+        cell_sels = WhichCells(stx, expression = segmentation == "others" &
+                                 (image_row < 9000 ) & 
+                                 image_col < 12500)
+        
+        stx$segmentation[match(cell_sels, colnames(stx))] = 'ventricle'  
+        
+        SpatialDimPlot(stx, 
+                       cells.highlight = WhichCells(stx, expression = segmentation == "others" &
+                                                      image_col > 15500),
+                       images = slice)
+        
+        cell_sels = WhichCells(stx, expression = segmentation == "others" &
+                                 image_col > 15500)
+        
+        stx$segmentation[match(cell_sels, colnames(stx))] = 'OFT'
+        
+        SpatialDimPlot(stx, 
+                       cells.highlight = WhichCells(stx, expression = segmentation == "others" &
+                                                      image_col < 15500),
+                       images = slice)
+        
+        cell_sels = WhichCells(stx, expression = segmentation == "others" &
+                                 image_col < 15500)
+        
+        stx$segmentation[match(cell_sels, colnames(stx))] = 'Atria'
+        
+        
+        saveRDS(stx, file = paste0(outDir, 'ST_visium_manaulSegementaiton_Atria_OFT_', slice, '.rds'))
+        
+        
+        stx = readRDS(file = paste0(outDir, 'ST_visium_manaulSegementaiton_Atria_OFT_', slice, '.rds'))
+        SpatialDimPlot(stx, group.by =  'segmentation', images = slice)
+        ggsave(paste0(outDir, '/ST_visium_manaulSegementaiton_Atria_OFT_', slice, '.pdf'),
+               width = 12, height = 8)
+        
+        cell_sels = WhichCells(stx, expression = segmentation == "Atria")
+        stx$segmentation[match(cell_sels, colnames(stx))] = 'OFT'
+        
+        cell_sels = WhichCells(stx, expression = segmentation == "others")
+        stx$segmentation[match(cell_sels, colnames(stx))] = 'Atria'
+        
+        cell_sels = WhichCells(stx, expression = segmentation == "RZ")
+        stx$segmentation[match(cell_sels, colnames(stx))] = 'ventricle'
+        
+        SpatialDimPlot(stx, group.by =  'segmentation', images = slice)
+        ggsave(paste0(outDir, '/ST_visium_manaulSegementaiton_Atria_OFT_', slice, '.pdf'),
+               width = 12, height = 8)
+        
+        saveRDS(stx, file = paste0(outDir, 'ST_visium_manaulSegementaiton_Atria_OFT_', slice, '_v2.rds'))
+        
+        
+      }
+      
+      if(slice == 'Amex_d4_183624'){
+        p1 = SpatialDimPlot(stx, group.by =  'segmentation', images = slice)
+        
+        features = rownames(stx)[grep('MYH7-AMEX60DD009525|NPPA-AMEX60DD051098', rownames(stx))]
+        
+        p2 = SpatialFeaturePlot(st, features = features, images = slice)
+        
+        p1 + p2
+        
+        # now remove additional cells, use SpatialDimPlots to visualize what to remove
+        stx$image_row = stx@images$Amex_d4_183624@coordinates$imagerow
+        stx$image_col = stx@images$Amex_d4_183624@coordinates$imagecol
+        
+        SpatialDimPlot(stx, 
+                       cells.highlight = WhichCells(stx, expression = segmentation == "others" &
+                                                      (image_row < 9000) & 
+                                                      image_col > 11000),
+                       images = slice)
+        
+        cell_sels = WhichCells(stx, expression = segmentation == "others" &
+                                 (image_row < 9000) & 
+                                 image_col > 11000)
+        
+        stx$segmentation[match(cell_sels, colnames(stx))] = 'ventricle'  
+        
+        SpatialDimPlot(stx, group.by =  'segmentation', images = slice)
+        
+        
+        SpatialDimPlot(stx, 
+                       cells.highlight = WhichCells(stx, expression = segmentation == "others" &
+                                                      (image_row < 11000) & 
+                                                      image_col < 11000),
+                       images = slice)
+        
+        cell_sels = WhichCells(stx, expression = segmentation == "others" &
+                                 (image_row < 11000) & 
+                                 image_col < 11000)
+        
+        stx$segmentation[match(cell_sels, colnames(stx))] = 'OFT'  
+        
+        p1 = SpatialDimPlot(stx, group.by =  'segmentation', images = slice)
+        
+        SpatialDimPlot(stx, 
+                       cells.highlight = WhichCells(stx, expression = segmentation == "OFT" &
+                                                      (image_row > 10000 ) & 
+                                                      image_col > 9500),
+                       images = slice)
+        
+        cell_sels = WhichCells(stx, expression = segmentation == "OFT" &
+                                 (image_row > 10000 ) & 
+                                 image_col > 9500)
+        
+        stx$segmentation[match(cell_sels, colnames(stx))] = 'others'  
+        
+        SpatialDimPlot(stx, 
+                       cells.highlight = WhichCells(stx, expression = segmentation == "others"),
+                       images = slice)
+        
+        cell_sels =  WhichCells(stx, expression = segmentation == "others")
+        
+        stx$segmentation[match(cell_sels, colnames(stx))] = 'Atria'
+        
+        SpatialDimPlot(stx, 
+                       cells.highlight = WhichCells(stx, expression = segmentation == "others" &
+                                                      image_col < 15500),
+                       images = slice)
+        
+        cell_sels = WhichCells(stx, expression = segmentation == "others" &
+                                 image_col < 15500)
+        
+        stx$segmentation[match(cell_sels, colnames(stx))] = 'Atria'
+        
+        SpatialDimPlot(stx, group.by =  'segmentation', images = slice)
+        
+        ggsave(paste0(outDir, '/ST_visium_manaulSegementaiton_Atria_OFT_', slice, '.pdf'),
+               width = 12, height = 8)
+        
+        
+        saveRDS(stx, file = paste0(outDir, 'ST_visium_manaulSegementaiton_Atria_OFT_', slice, '.rds'))
+        
+        stx = readRDS(file = paste0(outDir, 'ST_visium_manaulSegementaiton_Atria_OFT_', slice, '.rds'))
+        SpatialDimPlot(stx, group.by =  'segmentation', images = slice)
+                
+                
+        cell_sels = WhichCells(stx, expression = segmentation == "RZ")
+        stx$segmentation[match(cell_sels, colnames(stx))] = 'ventricle'
+        
+        SpatialDimPlot(stx, group.by =  'segmentation', images = slice)
+        ggsave(paste0(outDir, '/ST_visium_manaulSegementaiton_Atria_OFT_', slice, '.pdf'),
+               width = 12, height = 8)
+        
+        saveRDS(stx, file = paste0(outDir, 'ST_visium_manaulSegementaiton_Atria_OFT_', slice, '_v2.rds'))
+        
+        
+      }
+      
+    }
     
     coordinates = eval(parse(text = paste0("data.frame(stx@images$", 
                                            slice, 
