@@ -940,10 +940,10 @@ Test_Data_Integration = FALSE
 if(Test_Data_Integration){
   
   Batch_correction_only_segmentation = TRUE
-  
   if(Batch_correction_only_segmentation){
     st = subset(st, cells = which(!is.na(st$segmentation)))
-    
+    st = subset(st, cells = which(st$condition != 'Amex_d1_183623' & st$condition != 'Amex_d14_183626'))
+    st$condition = droplevels(st$condition)
   }
   
   #st <- SCTransform(st, assay = "Spatial", verbose = FALSE, variable.features.n = 3000)
@@ -951,7 +951,7 @@ if(Test_Data_Integration){
   st = NormalizeData(st, normalization.method = "LogNormalize", scale.factor = 10000)
   st = FindVariableFeatures(st, selection.method = "vst", nfeatures = 5000)
   st = ScaleData(st,  
-                 vars.to.regress = c('nCount_Spatial'), 
+                 vars.to.regress = c('nCount_Spatial', 'percent.mt'), 
                  assay = 'Spatial')
   
   st <- RunPCA(st, verbose = FALSE)
@@ -962,14 +962,12 @@ if(Test_Data_Integration){
   
   st <- RunUMAP(st, dims = 1:20, n.neighbors = 30, min.dist = 0.1)
   
-  
-  
   p1 = DimPlot(st, reduction = "umap", group.by = c("condition"), label = TRUE, repel = TRUE) 
   p2 = DimPlot(st, reduction = "umap", group.by = c("segmentation"), label = TRUE, repel = TRUE) 
   
   p1 / p2
   
-  ggsave(paste0(outDir, '/Compare_diffRegions_intact_injuried_time_logNormal_regressed.nCounts.pdf'), 
+  ggsave(paste0(outDir, '/Compare_diffRegions_intact_injuried_time_logNormal_regressed.nCounts_reps.pdf'), 
          width = 10, height = 12)
   
   
@@ -982,35 +980,43 @@ if(Test_Data_Integration){
   p3 = DimPlot(st, reduction = "umap", group.by = c("segmentation"), label = TRUE, repel = TRUE) 
   
   (p0 + p2) / (p1 + p3)
-  ggsave(paste0(outDir, '/Compare_Replicates_diffRegions_logNormal_regressed.nCounts.pdf'), 
+  ggsave(paste0(outDir, '/Compare_Replicates_diffRegions_logNormal_regressed.nCounts_reps.pdf'), 
          width = 14, height = 18)
   
   
   source('functions_dataIntegration.R')
-  st_bc = IntegrateData_Seurat_RPCA(st, group.by = 'dataset', k.weight = 100)
-  
+  #st_bc = IntegrateData_Seurat_RPCA(st, group.by = 'dataset', k.weight = 50)
   
   st_bc = IntegrateData_runFastMNN(st, 
                                    group.by = 'dataset', 
                                    assays = 'Spatial',
-                                   nfeatures = 1000,
+                                   nfeatures = 2000,
                                    correct.all = FALSE)
   
   st_bc <- RunUMAP(st_bc, reduction = "mnn", dims = 1:20, 
-                   n.neighbors = 30, min.dist = 0.1)
+                   n.neighbors = 30, min.dist = 0.3)
   
   st_bc$condition = factor(st_bc$condition, levels = c('Amex_d0_294946', 'Amex_d0_294949',
-                                                       'Amex_d1_183623', 'Amex_d4_294947', 
-                                                       'Amex_d4_183624', 'Amex_d7_294948', 
-                                                       'Amex_d7_183625', 'Amex_d14_183626'))
+                                                       'Amex_d4_294947', 'Amex_d4_183624', 
+                                                       'Amex_d7_294948', 'Amex_d7_183625'))
   
   p1 = DimPlot(st_bc, reduction = "umap", group.by = c("condition"), label = TRUE, repel = TRUE) 
   p2 = DimPlot(st_bc, reduction = "umap", group.by = c("segmentation"), label = TRUE, repel = TRUE) 
+  p3 = DimPlot(st_bc, reduction = "umap", group.by = c("time"), label = TRUE, repel = TRUE) 
+  p4 = DimPlot(st_bc, reduction = "umap", group.by = c("dataset"), label = TRUE, repel = TRUE) 
   
   p1 / p2
   
-  ggsave(paste0(resDir, '/Compare_diffRegions_intact_injuried_time_logNormal_seurat.RunfastMNN.pdf'), 
+  ggsave(paste0(resDir, '/Compare_diffRegions_intact_injuried_time_logNormal_seurat.RunfastMNN_rep.pdf'), 
          width = 10, height = 12)
+  
+  
+  (p2 + p4) / (p3 + p1) 
+  ggsave(paste0(outDir, '/Compare_Replicates_diffRegions_logNormal_regressed.nCounts_fastMNN_reps.pdf'), 
+         width = 14, height = 18)
+  
+  
+  
   #st$time = gsub('Amex_', '', st$time)
   #st$cc = paste0(st$time, '_', st$segmentation)
   #p3 = DimPlot(st, reduction = "umap", group.by = c("cc"), label = TRUE, repel = TRUE) 
