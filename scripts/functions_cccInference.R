@@ -310,7 +310,7 @@ aggregate_output_LIANA = function(liana_out)
 {
   cat('liana output folder --- ', liana_out, '\n')
   xlist = list.files(path = liana_out, pattern = '*.txt', full.names = TRUE)
-  
+  xlist = xlist[grep('allPairs_LIANA', xlist, invert = TRUE)]
   # for(n in 1:length(xlist))
   # {
   #   # n = 2

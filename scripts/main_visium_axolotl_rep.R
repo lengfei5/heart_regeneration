@@ -1550,24 +1550,6 @@ if(version_testing_long){
   
 }
 
-# ### version for Prateek
-# OnlyFB_version_for_Prateek = FALSE
-# if(OnlyFB_version_for_Prateek)
-# {
-#   timepoint_specific = TRUE
-#   celltypes_BZ_timeSpecific = list(day1 = c('FB_TNXB'),
-#                                    day4 = c('FB_TNXB', 'FB_PKD1'),
-#                                    day7 = c('FB_TNXB', 'FB_PKD1'),
-#                                    day14 = c('FB_TNXB', 'FB_PKD1')
-#   )
-#   receivers_BZ_timeSpecific = list(day1 = c("CM_IS"),
-#                                    day4 = c('CM_Prol_IS'),
-#                                    day7 = c('CM_Prol_IS'),
-#                                    day14 = c("CM_IS")
-#   )
-#   
-# }
-
 ##########################################
 # Part 2) # run LR analysis for all pairs 
 ##########################################
@@ -1584,11 +1566,11 @@ subtypes = unique(refs$celltypes)
 Select_specificPairs = TRUE
 
 #times_slice = c('d1', 'd4', 'd7', 'd14')
-times_slice = c('d4_294947', 'd7_183625')
+times_slice = c('d4_294947', 'd7_183625', "d14_183626")
 
 for(n in 1:length(times_slice))
 {
-  # n = 2
+  # n = 3
   source('functions_cccInference.R')
   
   time = times_slice[n]
@@ -1627,7 +1609,7 @@ for(n in 1:length(times_slice))
     
     pairs = pairs[which(ss_row>=1), which(ss_col >= 1)] # at least interacting with 1 receivers
     
-    
+  }
   # }else{
   #   pairs[is.na(pairs)] = 10
   #   pairs = pairs > 1.6
@@ -1665,7 +1647,7 @@ for(n in 1:length(times_slice))
   )
   
   source("functions_cccInference.R")
-  res = aggregate_output_LIANA(liana_out = paste(outDir))
+  res = aggregate_output_LIANA(liana_out = outDir)
   
   #require(cellcall)
   library(SeuratData)
@@ -1713,6 +1695,7 @@ for(n in 1:length(times_slice))
   }
   
   dev.off()
+  
   
   
 }
