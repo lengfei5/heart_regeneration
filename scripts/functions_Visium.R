@@ -1906,7 +1906,7 @@ transform_zscore = function(x)
 summarize_cell_neighborhood_misty = function(st, 
                                       outDir,
                                       time = c('d4', 'd7'),
-                                      misty_mode = c('propos'),
+                                      misty_mode = c('density'),
                                       summary_method = 'median',
                                       cutoff = 0.2,
                                       resolution = 0.7,

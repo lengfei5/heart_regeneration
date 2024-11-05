@@ -981,7 +981,7 @@ if(Test_Data_Integration){
   
   (p0 + p2) / (p1 + p3)
   ggsave(paste0(outDir, '/Compare_Replicates_diffRegions_logNormal_regressed.nCounts_reps.pdf'), 
-         width = 14, height = 18)
+         width = 14, height = 10)
   
   
   source('functions_dataIntegration.R')
@@ -1007,13 +1007,13 @@ if(Test_Data_Integration){
   
   p1 / p2
   
-  ggsave(paste0(resDir, '/Compare_diffRegions_intact_injuried_time_logNormal_seurat.RunfastMNN_rep.pdf'), 
-         width = 10, height = 12)
+  ggsave(paste0(outDir, '/Compare_diffRegions_intact_injuried_time_logNormal_seurat.RunfastMNN_rep.pdf'), 
+         width = 10, height = 8)
   
   
   (p2 + p4) / (p3 + p1) 
   ggsave(paste0(outDir, '/Compare_Replicates_diffRegions_logNormal_regressed.nCounts_fastMNN_reps.pdf'), 
-         width = 14, height = 18)
+         width = 14, height = 10)
   
   
   
@@ -1415,7 +1415,7 @@ if(Run_Neighborhood_Enrichment_Analysis){
   
   ## cell-cell co-localization
   source('functions_Visium.R')
-  summarize_cell_neighborhood_misty(st, 
+  summarize_cell_neighborhood_misty(st,
                              outDir = outDir, 
                              time = c('d1', 'd4', 'd7', 'd14'),
                              misty_mode = c('density'),
@@ -1423,8 +1423,6 @@ if(Run_Neighborhood_Enrichment_Analysis){
                              #segmentation_annots = c('all', 'BZ', 'RZ', 'Intact'),
                              #controls = c('RZ', 'Intact')
                              )
-  
-  
   
   
 }
@@ -1586,27 +1584,34 @@ subtypes = unique(refs$celltypes)
 Select_specificPairs = TRUE
 
 #times_slice = c('d1', 'd4', 'd7', 'd14')
-times_slice = c('d4_294947')
+times_slice = c('d4_294947', 'd7_183625')
 
 for(n in 1:length(times_slice))
 {
-  # n = 1
+  # n = 2
   source('functions_cccInference.R')
   
   time = times_slice[n]
   cat(' run LIANA for time -- ', time, '\n')
   
-  outDir = paste(outDir_version, '/', time, collapse = '')
+  outDir = paste(outDir_version, time, collapse = '')
   outDir = gsub(' ', '', outDir)
   
   ## select the interacting subtype pairs  
   pairs = read.table(file = paste0(out_misty, 'cell_cell_colocalization_summary_Amex_', time, '.txt'),
                      sep = '\t', row.names = c(1), header = TRUE)
   
+  
   if(Select_specificPairs){
     
-    subtypes_sel = c("CM.Prol.IS", "CM.ven.Robo2", 'FB.PKD1', 'Mo.Macs.FAXDC2',  
-                     "EC.IS.LOX")
+    if(time == 'd4_294947') {
+      subtypes_sel = c("CM.Prol.IS", "CM.ven.Robo2", 'FB.PKD1', 'Mo.Macs.FAXDC2',  "EC.IS.LOX")
+    }
+    
+    if(time == 'd7_183625'){
+      subtypes_sel = c("CM.Prol.IS", "CM.ven.Robo2", 'FB.IS.TNC', 'Mo.Macs.SNX22',  'B.cells.FOXO1',
+                        "EC.NOS3")
+    }
     
     ii1 = which(!is.na(match(colnames(pairs), subtypes_sel)))
     jj1 = which(!is.na(match(rownames(pairs), subtypes_sel)))
@@ -1614,6 +1619,7 @@ for(n in 1:length(times_slice))
     pairs = pairs[jj1, ii1] 
     
     pairs[pairs < 0 ] = 0
+    #pairs[which(rownames(pairs) == 'CM.Prol.IS'), which(rownames(pairs) == 'EC.IS.LOX')] = 1
     pairs = pairs > 0.1
     
     ss_col = apply(pairs, 2, sum)
@@ -1622,17 +1628,17 @@ for(n in 1:length(times_slice))
     pairs = pairs[which(ss_row>=1), which(ss_col >= 1)] # at least interacting with 1 receivers
     
     
-  }else{
-    pairs[is.na(pairs)] = 10
-    pairs = pairs > 1.6
-    
-    ss_row = apply(pairs, 1, sum)
-    ss_col = apply(pairs, 2, sum)
-    
-    pairs = pairs[ ,which(ss_col >= 1)] # at least interacting with 1 receivers
-    pairs = pairs[which(ss_row >= 1), ] # at least have 3 senders 
-    
-  }
+  # }else{
+  #   pairs[is.na(pairs)] = 10
+  #   pairs = pairs > 1.6
+  #   
+  #   ss_row = apply(pairs, 1, sum)
+  #   ss_col = apply(pairs, 2, sum)
+  #   
+  #   pairs = pairs[ ,which(ss_col >= 1)] # at least interacting with 1 receivers
+  #   pairs = pairs[which(ss_row >= 1), ] # at least have 3 senders 
+  #   
+  # }
   
   colnames(pairs) = gsub("Cav3_1", "Cav3.1", gsub('Mo_Macs', 'Mo.Macs', gsub('[.]','_', colnames(pairs))))
   rownames(pairs) = gsub("Cav3_1", "Cav3.1", gsub('Mo_Macs', 'Mo.Macs', gsub('[.]','_', rownames(pairs))))
