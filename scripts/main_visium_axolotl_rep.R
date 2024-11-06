@@ -1564,11 +1564,11 @@ subtypes = unique(refs$celltypes)
 Select_specificPairs = TRUE
 
 #times_slice = c('d1', 'd4', 'd7', 'd14')
-times_slice = c('d4_294947', 'd7_183625', "d14_183626")
+times_slice = c('d0_294946', 'd4_294947', 'd7_183625', "d14_183626")
 
 for(n in 1:length(times_slice))
 {
-  # n = 3
+  # n = 4
   source('functions_cccInference.R')
   
   time = times_slice[n]
@@ -1583,6 +1583,10 @@ for(n in 1:length(times_slice))
   
   
   if(Select_specificPairs){
+    
+    if(time == 'd0_294946'){
+      subtypes_sel = c("CM.ven.Robo2", "CM.ven.Cav3.1", "RBC",  "Mo.Macs.resident")
+    }
     
     if(time == 'd4_294947') {
       subtypes_sel = c("CM.Prol.IS", "CM.ven.Robo2", 'FB.PKD1', 'Mo.Macs.FAXDC2',  "EC.IS.LOX")
@@ -1602,8 +1606,8 @@ for(n in 1:length(times_slice))
     jj1 = which(!is.na(match(rownames(pairs), subtypes_sel)))
     
     pairs = pairs[jj1, ii1] 
-    
     pairs[pairs < 0 ] = 0
+    
     #pairs[which(rownames(pairs) == 'CM.Prol.IS'), which(rownames(pairs) == 'EC.IS.LOX')] = 1
     pairs = pairs > 0.1
     
@@ -1625,11 +1629,11 @@ for(n in 1:length(times_slice))
   #   
   # }
   
-  colnames(pairs) = gsub("Cav3_1", "Cav3.1", gsub('Mo_Macs', 'Mo.Macs', gsub('[.]','_', colnames(pairs))))
-  rownames(pairs) = gsub("Cav3_1", "Cav3.1", gsub('Mo_Macs', 'Mo.Macs', gsub('[.]','_', rownames(pairs))))
+  subtypes_names = gsub('Mo_Macs', 'Mo.Macs', gsub('[.]','_', colnames(pairs)))
+  cat(match(subtypes_names, subtypes), '\n')
   
-  cat(match(colnames(pairs), subtypes), '\n')
-  cat(match(rownames(pairs), subtypes), '\n')
+  colnames(pairs) = subtypes_names
+  rownames(pairs) = subtypes_names
   
   celltypes_BZ_timeSpecific = vector("list", nrow(pairs))
   
@@ -1660,6 +1664,7 @@ for(n in 1:length(times_slice))
   res = res[order(-res$sca.LRscore), ]
   
   which(res$ligand == 'GAS6' & res$receptor == 'AXL')
+  res[which(res$ligand == 'GAS6' & res$receptor == 'AXL'), ]
   
   colnames(res)[1:2] = c('source', 'target')
   res$weight_norm = res$sca.LRscore
@@ -1681,8 +1686,9 @@ for(n in 1:length(times_slice))
   
   for(ntop in c(100, 200, 300))
   {
-    # ntop = 100
+    # ntop = 300
     test = res[c(1:ntop), ]
+    test = test[-which(test$ligand == 'SPON1'), ] ## for unknow reason this ligand making problem for plots
     
     cells.of.interest = unique(c(test$source, test$target))
     cell_color = randomcoloR::distinctColorPalette(length(cells.of.interest))

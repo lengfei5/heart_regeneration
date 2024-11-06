@@ -308,6 +308,7 @@ run_LIANA_defined_celltype = function(subref,
 ##########################################
 aggregate_output_LIANA = function(liana_out)
 {
+  # liana_out = outDir
   cat('liana output folder --- ', liana_out, '\n')
   xlist = list.files(path = liana_out, pattern = '*.txt', full.names = TRUE)
   xlist = xlist[grep('allPairs_LIANA', xlist, invert = TRUE)]
@@ -334,17 +335,20 @@ aggregate_output_LIANA = function(liana_out)
   res = c()
   for(n in 1:length(xlist))
   {
-    # n = 3
+    # n = 1
     test = read.table(file = xlist[n])
     test = test[, c(1:5, which(colnames(test) == 'natmi.edge_specificity'), 
                     which(colnames(test) == 'sca.LRscore'))]
     colnames(test)[1:4] = c('sender', 'receiver', 'ligand', 'receptor')
     
     kk = which(test$ligand == 'GAS6' & test$receptor == 'AXL')[1]
-    cat('receiver: ', unique(test$receiver), '--',
-        'sender: ', test$sender[kk], 
-        'rank :', kk, '\n')
-    #test = test[1:ntop, c(1:5)]
+    if(!is.na(kk)){
+      cat('receiver: ', unique(test$receiver), '--',
+          'sender: ', test$sender[kk], 
+          'rank :', kk, '\n')
+      #test = test[1:ntop, c(1:5)]
+    }
+    
     res = rbind(res, test)
   }
   

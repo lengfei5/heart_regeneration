@@ -1947,6 +1947,7 @@ summarize_cell_neighborhood_misty = function(st,
   ## process first the intact samples
   ctl_intra = read.csv2(file = paste0(outDir, 'Plots_RCTD_', misty_mode, '/',
                                       'Amex_d0_294946_Intact_summary_table_intra', '.csv'), row.names = c(1))
+  ctl_intra = ctl_intra[c(nrow(ctl_intra):1), ]
   ctl_intra = transform_zscore(ctl_intra)
   
   ctl_juxta = read.csv2(file = paste0(outDir, 'Plots_RCTD_', misty_mode, '/',
@@ -2039,6 +2040,7 @@ summarize_cell_neighborhood_misty = function(st,
   ctl_intra = read.csv2(file = paste0(outDir, 'Plots_RCTD_', misty_mode, '/',
                                       'Amex_d0_294949_Intact_summary_table_intra', '.csv'), 
                         row.names = c(1))
+  ctl_intra = ctl_intra[c(nrow(ctl_intra):1), ]
   ctl_intra = transform_zscore(ctl_intra)
   
   ctl_juxta = read.csv2(file = paste0(outDir, 'Plots_RCTD_', misty_mode, '/',
