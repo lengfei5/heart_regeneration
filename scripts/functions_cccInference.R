@@ -480,7 +480,7 @@ my_CircosPlot <- function(connectome,
 {
   # connectome = test; weight.attribute = 'weight_norm'; sources.include = cells.of.interest;
   # targets.include = cells.of.interest;min.z = NULL;cols.use = NULL;edge.color.by.source = T;
-  # balanced.edges = T;small.gap = 1;big.gap = 10;
+  # balanced.edges = T;small.gap = 1;big.gap = 10;lab.cex = 1;
   
   library(tidyverse)
   library(circlize)
@@ -661,7 +661,8 @@ my_CircosPlot <- function(connectome,
     xlim = get.cell.meta.data("xlim")
     ylim = get.cell.meta.data("ylim")
     sector.name = get.cell.meta.data("sector.index")
-    circos.text(mean(xlim), ylim[1] + .01, sector.name, facing = "clockwise", niceFacing = TRUE, adj = c(0, 0.5),cex = lab.cex)
+    circos.text(mean(xlim), ylim[1] + .01, sector.name, facing = "clockwise", niceFacing = TRUE,
+                adj = c(0, 0.5),cex = lab.cex)
     #circos.axis(h = "top", labels.cex = 0.5, major.tick.percentage = 0.2, sector.index = sector.name, track.index = 2)
   }, bg.border = NA)
   # Make and add legend
@@ -675,6 +676,7 @@ my_CircosPlot <- function(connectome,
   
   p1.base <- recordPlot()
   return(p1.base)
+  
 }
 
 

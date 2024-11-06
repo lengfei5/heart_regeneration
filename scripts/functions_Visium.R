@@ -2057,13 +2057,14 @@ summarize_cell_neighborhood_misty = function(st,
                   file = paste0(testDir, 'cell_cell_colocalization_summary_', cc[k], '.txt'), 
                   quote = FALSE, row.names = TRUE, col.names = TRUE, sep = '\t')
       
+      # bz_all = pairs
       ## plot the heatmap of cell-cell colocalization
       pdfname = paste0(testDir, 'Plot_', cc[k], '.pdf')
       pdf(pdfname, width=14, height = 10)
       
       for(cutoff in seq(0, max(bz_all, na.rm = TRUE)*0.6, by=0.1))
       {
-        # cutoff = 0.2
+        # cutoff = 0.
         set2.blue <- "#8DA0CB"
         
         bz_allx = bz_all

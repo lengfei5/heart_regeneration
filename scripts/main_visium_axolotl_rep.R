@@ -26,7 +26,6 @@ options(future.globals.maxSize = 120000 * 1024^2)
 
 mem_used()
 
-
 ########################################################
 ########################################################
 # Section I: import the processed visium data by nf from Tomas and 
@@ -1329,7 +1328,6 @@ st = subset(st, cells = colnames(st)[which(!is.na(st$seg_ventricle))])
 
 SpatialPlot(st, group.by = 'seg_ventricle', ncol = 4)
 
-
 table(st$segmentation, st$condition)
 
 SpatialDimPlot(st, ncol = 4)
@@ -1348,60 +1346,62 @@ refs$subtypes = as.factor(refs$subtypes)
 refs$celltypes = gsub('CM_ven_Robo2', 'CM_Robo2', refs$celltypes)
 refs$celltypes = gsub('CM_ven_Cav3_1', 'CM_Cav3.1', refs$celltypes)
 
+st$segmentation = as.character(st$segmentation)
+st$segmentation[which(st$segmentation == 'RZ1')] = 'RZ'
+st$segmentation[which(st$segmentation == 'RZ2')] = 'RZ'
+st$segmentation[which(st$segmentation == 'Intact1')] = 'Intact'
+st$segmentation[which(st$segmentation == 'Intact2')] = 'Intact'
+
+st$segmentation = as.factor(st$segmentation)
+SpatialDimPlot(st, group.by = 'segmentation', ncol = 4)
+table(st$segmentation, st$condition)
+
+RCTD_out = paste0(resDir, '/RCTD_out', 
+                  '/RCTD_subtype_out_41subtypes_ref.time.specific_v3.7_ventricleRegion')
+outDir = paste0(resDir, '/neighborhood_test/',  basename(RCTD_out), '_test/')
+
+levels(refs$subtypes)
+
 
 Run_Neighborhood_Enrichment_Analysis = FALSE
 if(Run_Neighborhood_Enrichment_Analysis){
   
-  st$segmentation = as.character(st$segmentation)
-  st$segmentation[which(st$segmentation == 'RZ1')] = 'RZ'
-  st$segmentation[which(st$segmentation == 'RZ2')] = 'RZ'
-  st$segmentation[which(st$segmentation == 'Intact1')] = 'Intact'
-  st$segmentation[which(st$segmentation == 'Intact2')] = 'Intact'
   
-  st$segmentation = as.factor(st$segmentation)
-  SpatialDimPlot(st, group.by = 'segmentation', ncol = 4)
-  table(st$segmentation, st$condition)
   
-  RCTD_out = paste0(resDir, '/RCTD_out', 
-                    '/RCTD_subtype_out_41subtypes_ref.time.specific_v3.7_ventricleRegion')
-  outDir = paste0(resDir, '/neighborhood_test/',  basename(RCTD_out), '/')
-  
-  levels(refs$subtypes)
-  
-  # condition-specific subtypes selected
-  #condSpec_celltypes = readxl::read_xlsx("../data/neighbourhood_analysis_list_short.xlsx")
-  #condSpec_celltypes = as.data.frame(condSpec_celltypes)
-  condSpec_celltypes = list(d1 = c('EC', "EC_CEMIP", "EC_LHX6", 'EC_NOS3', "EC_WNT4", 'EC_IS_IARS1',
-                                   "FB_TNXB",'FB_IS_TFPI2',
-                                   'Mo.Macs_SNX22', "Neu_DYSF",
-                                   "CM_Cav3.1", "CM_Robo2", 'CM_IS',
-                                   "Megakeryocytes","RBC"),
-                            
-                            d4 = c('EC', "EC_CEMIP", "EC_LHX6", 'EC_NOS3', "EC_WNT4", 'EC_IS_IARS1',
-                                   "EC_IS_LOX",
-                                   "FB_PKD1", "FB_TNXB",
-                                   "Mo.Macs_resident",  "Mo.Macs_FAXDC2", 'Mo.Macs_SNX22', 'Neu_DYSF',
-                                   "CM_Cav3.1", "CM_Robo2", 'CM_IS',  'CM_Prol_IS',
-                                   "Megakeryocytes", 'RBC'),
-                            d7 = c('EC', "EC_CEMIP", "EC_LHX6", 'EC_NOS3', "EC_WNT4", "EC_IS_LOX",
-                                   "FB_PKD1", "FB_TNXB", "FB_VWA2",
-                                   "Mo.Macs_resident", "Mo.Macs_FAXDC2", 'Neu_DYSF',
-                                   "CM_Robo2", "CM_Cav3.1",  'CM_IS',  'CM_Prol_IS',
-                                   "Megakeryocytes", 'RBC'),
-                            d14 = c('EC', "EC_CEMIP", "EC_LHX6", 'EC_NOS3', "EC_WNT4", "EC_IS_LOX",
-                                    "FB_PKD1", "FB_TNXB", "FB_VWA2",
-                                    "Mo.Macs_resident", 'Neu_DYSF',
-                                    "CM_Robo2", "CM_Cav3.1",  'CM_IS',
-                                    "Megakeryocytes", 'RBC')
-  )
-  
-  celltypes_interest = c()
-  for(n in 1:length(condSpec_celltypes))
-  {
-    celltypes_interest = unique(c(celltypes_interest, condSpec_celltypes[[n]]))
-  }
-  
-  condSpec_celltypes$d0 = celltypes_interest
+  # # condition-specific subtypes selected
+  # #condSpec_celltypes = readxl::read_xlsx("../data/neighbourhood_analysis_list_short.xlsx")
+  # #condSpec_celltypes = as.data.frame(condSpec_celltypes)
+  # condSpec_celltypes = list(d1 = c('EC', "EC_CEMIP", "EC_LHX6", 'EC_NOS3', "EC_WNT4", 'EC_IS_IARS1',
+  #                                  "FB_TNXB",'FB_IS_TFPI2',
+  #                                  'Mo.Macs_SNX22', "Neu_DYSF",
+  #                                  "CM_Cav3.1", "CM_Robo2", 'CM_IS',
+  #                                  "Megakeryocytes","RBC"),
+  #                           
+  #                           d4 = c('EC', "EC_CEMIP", "EC_LHX6", 'EC_NOS3', "EC_WNT4", 'EC_IS_IARS1',
+  #                                  "EC_IS_LOX",
+  #                                  "FB_PKD1", "FB_TNXB",
+  #                                  "Mo.Macs_resident",  "Mo.Macs_FAXDC2", 'Mo.Macs_SNX22', 'Neu_DYSF',
+  #                                  "CM_Cav3.1", "CM_Robo2", 'CM_IS',  'CM_Prol_IS',
+  #                                  "Megakeryocytes", 'RBC'),
+  #                           d7 = c('EC', "EC_CEMIP", "EC_LHX6", 'EC_NOS3', "EC_WNT4", "EC_IS_LOX",
+  #                                  "FB_PKD1", "FB_TNXB", "FB_VWA2",
+  #                                  "Mo.Macs_resident", "Mo.Macs_FAXDC2", 'Neu_DYSF',
+  #                                  "CM_Robo2", "CM_Cav3.1",  'CM_IS',  'CM_Prol_IS',
+  #                                  "Megakeryocytes", 'RBC'),
+  #                           d14 = c('EC', "EC_CEMIP", "EC_LHX6", 'EC_NOS3', "EC_WNT4", "EC_IS_LOX",
+  #                                   "FB_PKD1", "FB_TNXB", "FB_VWA2",
+  #                                   "Mo.Macs_resident", 'Neu_DYSF',
+  #                                   "CM_Robo2", "CM_Cav3.1",  'CM_IS',
+  #                                   "Megakeryocytes", 'RBC')
+  # )
+  # 
+  # celltypes_interest = c()
+  # for(n in 1:length(condSpec_celltypes))
+  # {
+  #   celltypes_interest = unique(c(celltypes_interest, condSpec_celltypes[[n]]))
+  # }
+  # 
+  # condSpec_celltypes$d0 = celltypes_interest
   
   
   source('functions_Visium.R')
@@ -1595,6 +1595,11 @@ for(n in 1:length(times_slice))
                         "EC.NOS3")
     }
     
+    if(time == 'd14_183626'){
+      subtypes_sel = c("CM.ven.Robo2", "EC", "EC.NOS3", 'FB.IS.TNC', "Mo.Macs.resident")
+    }
+    
+    
     ii1 = which(!is.na(match(colnames(pairs), subtypes_sel)))
     jj1 = which(!is.na(match(rownames(pairs), subtypes_sel)))
     
@@ -1678,6 +1683,7 @@ for(n in 1:length(times_slice))
   
   for(ntop in c(100, 200, 300))
   {
+    # ntop = 100
     test = res[c(1:ntop), ]
     
     cells.of.interest = unique(c(test$source, test$target))
@@ -1695,7 +1701,6 @@ for(n in 1:length(times_slice))
   }
   
   dev.off()
-  
   
   
 }
