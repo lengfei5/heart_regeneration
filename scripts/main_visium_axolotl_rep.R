@@ -1358,15 +1358,13 @@ table(st$segmentation, st$condition)
 
 RCTD_out = paste0(resDir, '/RCTD_out', 
                   '/RCTD_subtype_out_41subtypes_ref.time.specific_v3.7_ventricleRegion')
-outDir = paste0(resDir, '/neighborhood_test/',  basename(RCTD_out), '_test/')
+outDir = paste0(resDir, '/neighborhood_test/',  basename(RCTD_out), '/')
 
 levels(refs$subtypes)
 
 
 Run_Neighborhood_Enrichment_Analysis = FALSE
 if(Run_Neighborhood_Enrichment_Analysis){
-  
-  
   
   # # condition-specific subtypes selected
   # #condSpec_celltypes = readxl::read_xlsx("../data/neighbourhood_analysis_list_short.xlsx")

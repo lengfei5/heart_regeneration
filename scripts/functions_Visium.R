@@ -1915,7 +1915,7 @@ summarize_cell_neighborhood_misty = function(st,
                                       )
 {
   # time = c('d1', 'd4', 'd7', 'd14'); segmentation_annots = c('all', 'BZ', 'RZ', 'Intact'); 
-  # misty_mode = c('density'); resolution = 0.6;
+  # misty_mode = c('density'); summary_method = 'median';
   cat(' -- significance test of celltype proximity for Misty output -- \n')
   cat(paste0('--- misty mode : ', misty_mode, '\n'))
   library("plyr")
@@ -1944,57 +1944,194 @@ summarize_cell_neighborhood_misty = function(st,
   
   Idents(st) = st$condition
   
+  ## process first the intact samples
+  ctl_intra = read.csv2(file = paste0(outDir, 'Plots_RCTD_', misty_mode, '/',
+                                      'Amex_d0_294946_Intact_summary_table_intra', '.csv'), row.names = c(1))
+  ctl_intra = transform_zscore(ctl_intra)
+  
+  ctl_juxta = read.csv2(file = paste0(outDir, 'Plots_RCTD_', misty_mode, '/',
+                                      'Amex_d0_294946_Intact_summary_table_juxta5.csv'), row.names = c(1))
+  ctl_juxta = get_comparable_matrix(ctl_intra, ctl_juxta)
+  ctl_juxta = transform_zscore(ctl_juxta)
+  
+  ctl_para = read.csv2(file = paste0(outDir, 'Plots_RCTD_', misty_mode, '/',
+                                     'Amex_d0_294946_Intact_summary_table_para15.csv'), row.names = c(1))
+  ctl_para = get_comparable_matrix(ctl_intra, ctl_para)
+  ctl_para = transform_zscore(ctl_para)
+  
+  ctl1 = summarize_misty_mode(ctl_intra, ctl_juxta, ctl_para, method = summary_method)
+  rm(list = c('ctl_intra', 'ctl_juxta', 'ctl_para'))
+  
+  prox_ctl = convert_tibble_for_save(sample = 'd0_294946', region = 'Intact', ctl1)
+  
+  write.table(ctl1, 
+              file = paste0(testDir, 'cell_cell_colocalization_summary_', 'Amex_d0_294946', '.txt'), 
+              quote = FALSE, row.names = TRUE, col.names = TRUE, sep = '\t')
+  
+  ## plot the heatmap of cell-cell colocalization
+  pdfname = paste0(testDir, 'Plot_', 'Amex_d0_294946', '.pdf')
+  pdf(pdfname, width=14, height = 10)
+  
+  for(cutoff in seq(0, max(ctl1, na.rm = TRUE)*0.6, by=0.1))
+  {
+    # cutoff = 0.
+    set2.blue <- "#8DA0CB"
+    
+    bz_allx = ctl1
+    bz_allx[bz_allx < cutoff] <- 0
+    plot.data = reshape2::melt(bz_allx, value.name = 'Importance')
+    colnames(plot.data)[1:2] = c('Target', 'Predictor')
+    
+    results.plot <- ggplot2::ggplot(
+      plot.data,
+      ggplot2::aes(
+        x = Predictor,
+        y = reorder(Target, desc(Target))
+      )
+    ) +
+      ggplot2::geom_tile(ggplot2::aes(fill = Importance)) + 
+      ggplot2::scale_fill_gradient2(
+        low = "white",
+        mid = "white",
+        high = set2.blue,
+        midpoint = 0.2
+      ) +
+      ggplot2::theme_classic() + 
+      ggplot2::theme(axis.text.x = ggplot2::element_text(angle = 90, hjust = 1)) +
+      ggplot2::labs(y = 'Target') +
+      ggplot2::coord_equal() +
+      ggplot2::ggtitle(paste0('colocalization heatmap with cutoff : ', cutoff))
+    
+    print(results.plot)
+    
+    . <- NULL
+    A = ctl1
+    A[A < cutoff | is.na(A)] <- 0
+    #A = A[c(nrow(A):1), ]
+    
+    #A[is.na(A)] <- 0
+    G <- igraph::graph.adjacency(A, mode = "plus", weighted = TRUE) %>%
+      igraph::set.vertex.attribute("name", value = names(igraph::V(.))) %>%
+      igraph::delete.vertices(which(igraph::degree(.) == 0))
+    
+    ## try make similar plot but the cellchat circle style
+    ## original code from cellchat function netVisual_circle
+    cols_C = scPalette(nrow(A))
+    names(cols_C) = colnames(A)
+    my_netVisual_circle(A,
+                        color.use = cols_C,
+                        #vertex.weight = groupSize, 
+                        weight.scale = TRUE, 
+                        label.edge= FALSE, 
+                        title.name = paste0("Cell-Cell colocalization with cutoff : ", cutoff))
+    
+    
+  }
+  
+  dev.off()
+  
+  
+  
+  ctl2 = read.csv2(file = paste0(outDir, 'Plots_RCTD_', misty_mode, '/',
+                                 'Amex_d0_294949_Intact_summary_table_intra', '.csv'), 
+                   row.names = c(1))
+  
+  ctl_intra = read.csv2(file = paste0(outDir, 'Plots_RCTD_', misty_mode, '/',
+                                      'Amex_d0_294949_Intact_summary_table_intra', '.csv'), 
+                        row.names = c(1))
+  ctl_intra = transform_zscore(ctl_intra)
+  
+  ctl_juxta = read.csv2(file = paste0(outDir, 'Plots_RCTD_', misty_mode, '/',
+                                      'Amex_d0_294949_Intact_summary_table_juxta5.csv'), 
+                        row.names = c(1))
+  ctl_juxta = get_comparable_matrix(ctl_intra, ctl_juxta)
+  ctl_juxta = transform_zscore(ctl_juxta)
+  
+  ctl_para = read.csv2(file = paste0(outDir, 'Plots_RCTD_', misty_mode, '/',
+                                     'Amex_d0_294949_Intact_summary_table_para15.csv'), 
+                       row.names = c(1))
+  ctl_para = get_comparable_matrix(ctl_intra, ctl_para)
+  ctl_para = transform_zscore(ctl_para)
+  
+  ctl2 = summarize_misty_mode(ctl_intra, ctl_juxta, ctl_para, method = summary_method)
+  rm(list = c('ctl_intra', 'ctl_juxta', 'ctl_para'))
+  
+  prox_ctl = bind_rows(prox_ctl, 
+                       convert_tibble_for_save(sample = 'd0_294949', region = 'Intact', ctl2))
+  
+  
+  write.table(ctl2, 
+              file = paste0(testDir, 'cell_cell_colocalization_summary_', 'Amex_d0_294949', '.txt'), 
+              quote = FALSE, row.names = TRUE, col.names = TRUE, sep = '\t')
+  
+  ## plot the heatmap of cell-cell colocalization
+  pdfname = paste0(testDir, 'Plot_', 'Amex_d0_294949', '.pdf')
+  pdf(pdfname, width=14, height = 10)
+  
+  for(cutoff in seq(0, max(ctl1, na.rm = TRUE)*0.6, by=0.1))
+  {
+    # cutoff = 0.
+    set2.blue <- "#8DA0CB"
+    
+    bz_allx = ctl2
+    bz_allx[bz_allx < cutoff] <- 0
+    plot.data = reshape2::melt(bz_allx, value.name = 'Importance')
+    colnames(plot.data)[1:2] = c('Target', 'Predictor')
+    
+    results.plot <- ggplot2::ggplot(
+      plot.data,
+      ggplot2::aes(
+        x = Predictor,
+        y = reorder(Target, desc(Target))
+      )
+    ) +
+      ggplot2::geom_tile(ggplot2::aes(fill = Importance)) + 
+      ggplot2::scale_fill_gradient2(
+        low = "white",
+        mid = "white",
+        high = set2.blue,
+        midpoint = 0.2
+      ) +
+      ggplot2::theme_classic() + 
+      ggplot2::theme(axis.text.x = ggplot2::element_text(angle = 90, hjust = 1)) +
+      ggplot2::labs(y = 'Target') +
+      ggplot2::coord_equal() +
+      ggplot2::ggtitle(paste0('colocalization heatmap with cutoff : ', cutoff))
+    
+    print(results.plot)
+    
+    . <- NULL
+    A = ctl2
+    A[A < cutoff | is.na(A)] <- 0
+    #A = A[c(nrow(A):1), ]
+    
+    #A[is.na(A)] <- 0
+    G <- igraph::graph.adjacency(A, mode = "plus", weighted = TRUE) %>%
+      igraph::set.vertex.attribute("name", value = names(igraph::V(.))) %>%
+      igraph::delete.vertices(which(igraph::degree(.) == 0))
+    
+    ## try make similar plot but the cellchat circle style
+    ## original code from cellchat function netVisual_circle
+    cols_C = scPalette(nrow(A))
+    names(cols_C) = colnames(A)
+    my_netVisual_circle(A,
+                        color.use = cols_C,
+                        #vertex.weight = groupSize, 
+                        weight.scale = TRUE, 
+                        label.edge= FALSE, 
+                        title.name = paste0("Cell-Cell colocalization with cutoff : ", cutoff))
+    
+    
+  }
+  
+  dev.off()
+  
+  
+  ## process the time points
   for(n in 1:length(time))
   {
     # n = 2
     kk = which(tt == time[n])
-    
-    ctl_intra = read.csv2(file = paste0(outDir, 'Plots_RCTD_', misty_mode, '/',
-                                   'Amex_d0_294946_Intact_summary_table_intra', '.csv'), row.names = c(1))
-    ctl_intra = transform_zscore(ctl_intra)
-    
-    ctl_juxta = read.csv2(file = paste0(outDir, 'Plots_RCTD_', misty_mode, '/',
-                                   'Amex_d0_294946_Intact_summary_table_juxta5.csv'), row.names = c(1))
-    ctl_juxta = get_comparable_matrix(ctl_intra, ctl_juxta)
-    ctl_juxta = transform_zscore(ctl_juxta)
-    
-    ctl_para = read.csv2(file = paste0(outDir, 'Plots_RCTD_', misty_mode, '/',
-                                   'Amex_d0_294946_Intact_summary_table_para15.csv'), row.names = c(1))
-    ctl_para = get_comparable_matrix(ctl_intra, ctl_para)
-    ctl_para = transform_zscore(ctl_para)
-    
-    ctl1 = summarize_misty_mode(ctl_intra, ctl_juxta, ctl_para, method = summary_method)
-    rm(list = c('ctl_intra', 'ctl_juxta', 'ctl_para'))
-    
-    prox_all = convert_tibble_for_save(sample = 'd0_294946', region = 'Intact', ctl1)
-    
-    ctl2 = read.csv2(file = paste0(outDir, 'Plots_RCTD_', misty_mode, '/',
-                                   'Amex_d0_294949_Intact_summary_table_intra', '.csv'), 
-                     row.names = c(1))
-    
-    ctl_intra = read.csv2(file = paste0(outDir, 'Plots_RCTD_', misty_mode, '/',
-                                        'Amex_d0_294949_Intact_summary_table_intra', '.csv'), 
-                          row.names = c(1))
-    ctl_intra = transform_zscore(ctl_intra)
-    
-    ctl_juxta = read.csv2(file = paste0(outDir, 'Plots_RCTD_', misty_mode, '/',
-                                        'Amex_d0_294949_Intact_summary_table_juxta5.csv'), 
-                          row.names = c(1))
-    ctl_juxta = get_comparable_matrix(ctl_intra, ctl_juxta)
-    ctl_juxta = transform_zscore(ctl_juxta)
-    
-    ctl_para = read.csv2(file = paste0(outDir, 'Plots_RCTD_', misty_mode, '/',
-                                       'Amex_d0_294949_Intact_summary_table_para15.csv'), 
-                         row.names = c(1))
-    ctl_para = get_comparable_matrix(ctl_intra, ctl_para)
-    ctl_para = transform_zscore(ctl_para)
-    
-    ctl2 = summarize_misty_mode(ctl_intra, ctl_juxta, ctl_para, method = summary_method)
-    rm(list = c('ctl_intra', 'ctl_juxta', 'ctl_para'))
-    
-    prox_all = bind_rows(prox_all, 
-                         convert_tibble_for_save(sample = 'd0_294949', region = 'Intact', ctl2))
-    
     
     for(k in kk)
     {
@@ -2020,7 +2157,7 @@ summarize_cell_neighborhood_misty = function(st,
       
       rm(list = c('intra', 'juxta', 'para'))
       
-      prox_all = bind_rows(prox_all, 
+      prox_all = bind_rows(prox_ctl, 
                            convert_tibble_for_save(sample = cc[k], 
                                                    region = 'BZ', 
                                                    bz))
@@ -2103,24 +2240,6 @@ summarize_cell_neighborhood_misty = function(st,
         G <- igraph::graph.adjacency(A, mode = "plus", weighted = TRUE) %>%
           igraph::set.vertex.attribute("name", value = names(igraph::V(.))) %>%
           igraph::delete.vertices(which(igraph::degree(.) == 0))
-        
-        #C <- igraph::cluster_leiden(G, resolution_parameter = resolution)
-        # layout <- igraph::layout_with_fr(G)
-        # 
-        # igraph::plot.igraph(G,
-        #                     layout = layout, 
-        #                     #mark.groups = C, 
-        #                     main = paste0('colocalization graph with cutoff : ', cutoff), 
-        #                     edge.weight=4, 
-        #                     edge.width=(E(G)$weight/2),
-        #                     vertex.size = 4,
-        #                     vertex.color = "black", 
-        #                     vertex.label.dist = 1,
-        #                     vertex.label.color = "black", 
-        #                     vertex.label.font = 2, 
-        #                     vertex.label.cex = 0.66
-        # )
-        # 
         
         ## try make similar plot but the cellchat circle style
         ## original code from cellchat function netVisual_circle
