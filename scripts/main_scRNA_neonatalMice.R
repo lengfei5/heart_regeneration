@@ -1730,6 +1730,7 @@ if(Check_Axl_inCM){
   #DefaultAssay(cms) = 'integrated'
   p1 = DimPlot(aa, group.by = 'celltype', label = TRUE, repel = TRUE)
   p2 = DimPlot(aa, group.by = 'condition',label = TRUE, repel = TRUE)
+  
   p1 / p2
   p3 = FeaturePlot(aa, features = c('Axl', 'Gas6', 'Nppa', 'Myh6'), max.cutoff = 'q99')
   
@@ -1753,7 +1754,6 @@ if(Check_Axl_inCM){
   ggsave(paste0(resDir, '/Ref_neonatalMice_CM.Cui2020_noCM.Wang2020_P1_integration_UMAP_',
                 '_afterFiltering_cl_Axl.pdf'), 
          width = 14, height = 6)
-  
   
   
 }
