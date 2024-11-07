@@ -35,12 +35,98 @@ mem_used()
 
 ########################################################
 ########################################################
-# Section I: cross-species co-embedding of scRNA-seq
+# Section I: prepare the 
 # 
 ########################################################
 ########################################################
+## axolotl scRNA-seq data
+refs_file = paste0('/groups/tanaka/Collaborations/Jingkui-Elad/scMultiome/aa_subtypes_final_20221117.rds')
+
+refs = readRDS(file = refs_file)
+table(refs$subtypes)
+length(table(refs$subtypes))
+
+refs$subtypes = droplevels(refs$subtypes) 
+length(table(refs$subtypes)) 
+
+## prepare the celltype to use and also specify the time-specific subtypes
+refs$celltype_toUse = as.character(refs$subtypes)
+length(table(refs$celltype_toUse))
+
+refs$condition = gsub('_scRNA', '', refs$condition)
+refs$celltype_toUse = gsub('Mo/Macs', 'Mo.Macs', refs$celltype_toUse)
+refs$celltype_toUse = gsub("[(]", '', refs$celltype_toUse)
+refs$celltype_toUse = gsub("[)]", '', refs$celltype_toUse)
+
+table(refs$celltype_toUse)
+length(table(refs$celltype_toUse))
+
+refs$subtypes = refs$celltype_toUse # clean the special symbols
+refs$celltypes = refs$celltype_toUse
+
+table(refs$subtypes)
+length(table(refs$subtypes))
+
+refs$subtypes = as.factor(refs$subtypes) 
+
+refs$celltypes = gsub('CM_ven_Robo2', 'CM_Robo2', refs$celltypes)
+refs$celltypes = gsub('CM_ven_Cav3_1', 'CM_Cav3.1', refs$celltypes)
+
+ax = refs 
+rm(refs)
+
+# neonatal scRNA-seq data
+nm = readRDS(file = paste0('../data/data_examples/ref_scRNAseq_neonatalMice_clean.v1.2.rds'))
+
+head(rownames(nm))
+
+#DefaultAssay(cms) = 'integrated'
+p1 = DimPlot(nm, group.by = 'celltype', label = TRUE, repel = TRUE)
+p2 = DimPlot(nm, group.by = 'condition',label = TRUE, repel = TRUE)
+
+p1 + p2
+
+ggsave(paste0(resDir, '/scRNAseq_neonatalMice.pdf'), 
+       width = 16, height = 6)
 
 
+DimPlot(nm, group.by = 'dataset', label = TRUE, repel = TRUE)
+
+ggsave(paste0(resDir, '/scRNAseq_dataSource_neonatalMice.pdf'), 
+       width = 8, height = 6)
+
+
+## adult mice 
+mm = readRDS(file = paste0('../data/data_examples/ref_scRNAseq_adultMice_clean.v1.rds'))
+head(rownames(mm))
+
+mm$condition = factor(mm$condition, levels = c('d0', 'd1', 'd3', 'd5', 'd7', 'd14', 'd28'))
+
+p1 = DimPlot(mm, reduction = 'umap', group.by = 'celltype', raster = T,shuffle= T, pt.size = 2, 
+             label = TRUE, repel = TRUE)
+
+p2 = DimPlot(mm, reduction = 'umap', group.by = 'condition',raster = T,shuffle= T, pt.size = 2, 
+       label = TRUE, repel = TRUE)
+#p2 = FeaturePlot(mm, features = 'Axl') +  
+#  scale_colour_gradientn(colours = rev(RColorBrewer::brewer.pal(n = 11, name = "RdBu")))
+
+p1 + p2
+
+#outDir = paste0(resDir, '/noCM.Forte2020_CM.Ren2020_integrated_LRanalysis/')
+#if(!dir.exists(outDir)) dir.create(outDir)
+
+ggsave(paste0(resDir, '/scRNAseq_adultMice_Forte2020_Ren2020_Integration.pdf'), 
+       width = 16, height = 6)
+
+DimPlot(mm, group.by = 'dataset', label = TRUE, repel = TRUE)
+
+ggsave(paste0(resDir, '/scRNAseq_dataSource_adultMice.pdf'), 
+       width = 8, height = 6)
+
+
+saveRDS(ax, file = paste0(RdataDir, 'ax_scRNAseq.rds'))
+saveRDS(nm, file = paste0(RdataDir, 'nm_scRNAseq.rds'))
+saveRDS(mm, file = paste0(RdataDir, 'mm_scRNAseq.rds'))
 
 ########################################################
 ########################################################
