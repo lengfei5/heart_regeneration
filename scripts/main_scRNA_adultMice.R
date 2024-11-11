@@ -271,7 +271,8 @@ if(Merge.adult.mice.cardiomyocyte.noncardiomyocyte){
       
     })
     
-    ref.anchors <- FindIntegrationAnchors(object.list = ref.list, anchor.features = features, reduction = "rpca", 
+    ref.anchors <- FindIntegrationAnchors(object.list = ref.list, anchor.features = features, 
+                                          reduction = "rpca", 
                                           k.anchor = 5)
     
     rm(ref.list)

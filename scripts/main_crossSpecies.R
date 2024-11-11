@@ -35,7 +35,7 @@ mem_used()
 
 ########################################################
 ########################################################
-# Section I: prepare the 
+# Section I: prepare the scRNA-seq for each species
 # 
 ########################################################
 ########################################################
@@ -128,12 +128,27 @@ saveRDS(ax, file = paste0(RdataDir, 'ax_scRNAseq.rds'))
 saveRDS(nm, file = paste0(RdataDir, 'nm_scRNAseq.rds'))
 saveRDS(mm, file = paste0(RdataDir, 'mm_scRNAseq.rds'))
 
+
+mm = readRDS(file = paste0(RdataDir, 'mm_scRNAseq.rds'))
+
+
 ########################################################
 ########################################################
-# Section II: cross-species cell type correlation and differential analysis
+# Section II: cross-species cell types/states alignment 
+# SAMAP 
+########################################################
+########################################################
+
+########################################################
+########################################################
+# Section III: cross-species cell types/states neighborhood comparison and differential analysis
 # 
 ########################################################
 ########################################################
+
+
+mm = readRDS(file = paste0(RdataDir, 'mm_scRNAseq.rds'))
+
 
 ########################################################
 ########################################################
@@ -141,7 +156,6 @@ saveRDS(mm, file = paste0(RdataDir, 'mm_scRNAseq.rds'))
 # 
 ########################################################
 ########################################################
-
 outDir = paste0(resDir, '/LR_differentialAnalysis/')
 if(!dir.exists(outDir)) dir.create(outDir)
 
