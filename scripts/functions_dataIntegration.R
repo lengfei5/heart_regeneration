@@ -110,7 +110,7 @@ IntegrateData_Seurat_RPCA = function(seuratObj, group.by = 'dataset', nfeatures 
                                      correct.all = FALSE,
                                      reference = NULL)
 {
-  # seuratObj = st; group.by = "dataset"; ndims = c(1:30); reference = NULL;nfeatures = 2000
+  # seuratObj = aa; group.by = "species"; ndims = c(1:30); reference = NULL;nfeatures = 2000
   ref.list <- SplitObject(seuratObj, split.by = group.by)
   
   # normalize and identify variable features for each dataset independently
@@ -131,7 +131,7 @@ IntegrateData_Seurat_RPCA = function(seuratObj, group.by = 'dataset', nfeatures 
     })
   }else{
     ref.list <- lapply(X = ref.list, FUN = function(x) {
-      x <- FindVariableFeatures(x, selection.method = "vst")
+      x <- FindVariableFeatures(x, selection.method = "vst", nfeatures = nfeatures)
     })
     
     # select features that are repeatedly variable across datasets for integration run PCA on each
@@ -339,14 +339,13 @@ IntegrateData_runHarmony = function(seuratObj, group.by = 'dataset', nfeatures =
   # ref = srat;
   # refs.merged = merge(aa, y = ref, add.cell.ids = c("mNT", "mouseGastrulation"), project = "RA_competence")
   if(redo.normalization.hvg.scale.pca){
-    refs.merged <- NormalizeData(seuratObj) %>% FindVariableFeatures() %>% ScaleData() %>% 
-      RunPCA(verbose = FALSE)
+    refs.merged <- NormalizeData(seuratObj) %>% FindVariableFeatures(nfeatures = nfeatures) %>% RunPCA(verbose = FALSE)
   }else{
-    refs.merged = seuratObj
+    refs.merged = FindVariableFeatures(seuratObj, nfeatures = nfeatures) %>% RunPCA(verbose = FALSE)
   }
   rm(seuratObj)
   
-  refs.merged <- RunHarmony(refs.merged, 
+  refs.merged <- RunHarmony(refs.merged,
                             group.by.vars = group.by,
                             reduction = 'pca',
                             dims.use = dims.use, 
