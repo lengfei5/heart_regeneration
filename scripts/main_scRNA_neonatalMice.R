@@ -904,7 +904,6 @@ if(Test_DataIntegration){
                                               nfeatures = 3000,
                                               merge.order = list(list(4,3,1,2), list(8,7,5,6)),
                                               correct.all = TRUE)
-      
       DefaultAssay(ref.combined) = 'mnn.reconstructed'
       
     }
