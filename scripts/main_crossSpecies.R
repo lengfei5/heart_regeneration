@@ -39,7 +39,9 @@ mem_used()
 # 
 ########################################################
 ########################################################
-## axolotl scRNA-seq data
+##########################################
+## axolotl snRNA-seq data with single batch 
+##########################################
 refs_file = paste0('/groups/tanaka/Collaborations/Jingkui-Elad/scMultiome/aa_subtypes_final_20221117.rds')
 
 refs = readRDS(file = refs_file)
@@ -49,45 +51,52 @@ length(table(refs$subtypes))
 refs$subtypes = droplevels(refs$subtypes) 
 length(table(refs$subtypes)) 
 
+refs$condition = gsub('_scRNA', '', refs$condition)
+
 ## prepare the celltype to use and also specify the time-specific subtypes
 refs$celltype_toUse = as.character(refs$subtypes)
 length(table(refs$celltype_toUse))
 
-refs$condition = gsub('_scRNA', '', refs$condition)
 refs$celltype_toUse = gsub('Mo/Macs', 'Mo.Macs', refs$celltype_toUse)
 refs$celltype_toUse = gsub("[(]", '', refs$celltype_toUse)
 refs$celltype_toUse = gsub("[)]", '', refs$celltype_toUse)
+refs$celltype_toUse = gsub('CM_ven_Robo2', 'CM_Robo2', refs$celltype_toUse)
+refs$celltype_toUse = gsub('CM_ven_Cav3_1', 'CM_Cav3.1', refs$celltype_toUse)
 
 table(refs$celltype_toUse)
 length(table(refs$celltype_toUse))
 
 refs$subtypes = refs$celltype_toUse # clean the special symbols
-refs$celltypes = refs$celltype_toUse
-
+refs$subtypes = as.factor(refs$subtypes) 
 table(refs$subtypes)
 length(table(refs$subtypes))
 
-refs$subtypes = as.factor(refs$subtypes) 
-
-refs$celltypes = gsub('CM_ven_Robo2', 'CM_Robo2', refs$celltypes)
-refs$celltypes = gsub('CM_ven_Cav3_1', 'CM_Cav3.1', refs$celltypes)
-
-refs$celltypes = as.character(refs$subtypes)
+refs$celltypes = as.character(refs$celltype_toUse)
 
 refs$celltypes[grep('CM_|CMs_|_CM|_CM_', refs$subtypes)] = 'CM'
 refs$celltypes[grep('EC_|_EC', refs$subtypes)] = 'EC'
 refs$celltypes[grep('FB_', refs$subtypes)] = 'FB'
 refs$celltypes[grep('B_cells', refs$subtypes)] = 'Bcell'
+refs$celltypes[grep('T_cells', refs$subtypes)] = 'Tcell'
 
 refs$celltypes[grep('Macrophages|_MF', refs$subtypes)] = 'Macrophages'
 refs$celltypes[grep('Megakeryocytes', refs$subtypes)] = 'Megakeryocytes'
 refs$celltypes[grep('RBC', refs$subtypes)] = 'RBC'
+refs$celltypes[grep('Neu_', refs$subtypes)] = 'Neutrophil'
+refs$celltypes[grep('Mo.Macs', refs$subtypes)] = 'Mo.Macs'
 
+table(refs$celltypes)
+length(table(refs$celltypes))
 
 ax = refs 
 rm(refs)
 
-# neonatal scRNA-seq data
+saveRDS(ax, file = paste0(RdataDir, 'ax_scRNAseq_saved_1batch.rds'))
+
+
+##########################################
+## neonatal scRNA-seq data
+##########################################
 nm = readRDS(file = paste0('../data/data_examples/ref_scRNAseq_neonatalMice_clean.v1.2.rds'))
 
 head(rownames(nm))
@@ -107,8 +116,12 @@ DimPlot(nm, group.by = 'dataset', label = TRUE, repel = TRUE)
 ggsave(paste0(resDir, '/scRNAseq_dataSource_neonatalMice.pdf'), 
        width = 8, height = 6)
 
+saveRDS(nm, file = paste0(RdataDir, 'nm_scRNAseq_8batchCorrected.rds'))
 
+
+##########################################
 ## adult mice 
+##########################################
 mm = readRDS(file = paste0('../data/data_examples/ref_scRNAseq_adultMice_clean.v1.rds'))
 head(rownames(mm))
 
@@ -136,8 +149,8 @@ ggsave(paste0(resDir, '/scRNAseq_dataSource_adultMice.pdf'),
        width = 8, height = 6)
 
 
-saveRDS(ax, file = paste0(RdataDir, 'ax_scRNAseq.rds'))
-saveRDS(nm, file = paste0(RdataDir, 'nm_scRNAseq.rds'))
+#saveRDS(ax, file = paste0(RdataDir, 'ax_scRNAseq.rds'))
+
 saveRDS(mm, file = paste0(RdataDir, 'mm_scRNAseq.rds'))
 
 
