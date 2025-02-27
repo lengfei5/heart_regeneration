@@ -93,9 +93,10 @@ rm(refs)
 
 saveRDS(ax, file = paste0(RdataDir, 'ax_scRNAseq_saved_1batch.rds'))
 
+rm(ax)
 
 ##########################################
-## neonatal scRNA-seq data
+## neonatal scRNA-seq data after batch correction
 ##########################################
 nm = readRDS(file = paste0('../data/data_examples/ref_scRNAseq_neonatalMice_clean.v1.2.rds'))
 
@@ -118,9 +119,59 @@ ggsave(paste0(resDir, '/scRNAseq_dataSource_neonatalMice.pdf'),
 
 saveRDS(nm, file = paste0(RdataDir, 'nm_scRNAseq_8batchCorrected.rds'))
 
+rm(nm)
 
 ##########################################
-## adult mice 
+# import the neonatal mouse data before batch correction
+##########################################
+aa = readRDS(file = paste0('../results/scRNAseq_neonatalMouse_20231108/Rdata/', 
+                           'Seurat.obj_neonatalMice_CM.Cui2020_noCM.Wang2020_P1_regress.nUMI.rds'))
+
+aa$species = 'nm'
+aa$dataset = factor(aa$dataset, levels = c('Wang2020', 'Cui2020'))
+aa$batch = paste0(aa$dataset, '_', aa$condition)
+aa$batch = factor(aa$batch)
+
+aa$time[which(aa$time == 'D1')] = 'd1'
+aa$time[which(aa$time == 'D3')] = 'd3'
+
+aa$timepoints = aa$time
+
+aa$celltype = aa$BroadID
+aa$subtype = aa$FineID
+
+aa = subset(aa, cells = colnames(aa)[which(aa$celltype != 'glial')])
+
+p1 = DimPlot(aa, group.by = 'subtype', label = TRUE, repel = TRUE, raster=FALSE)
+p2 = DimPlot(aa, group.by = 'batch', label = TRUE, repel = TRUE) 
+p3 = DimPlot(aa, group.by = 'celltype', label = TRUE, repel = TRUE, raster=FALSE)
+p4 = DimPlot(aa, group.by = 'dataset', label = TRUE, repel = TRUE, raster=FALSE)
+(p1 + p4) /(p3 + p2)
+
+ggsave(paste0(resDir, 'neonatalMice_CM.Cui2020_noCM.Wang2020_P1_overview.pdf'), 
+       width = 16, height = 12)
+
+aa = DietSeurat(aa, counts = TRUE, data = TRUE, scale.data = FALSE, assays = 'RNA')
+aa = NormalizeData(aa) %>% FindVariableFeatures(nfeatures = 3000) %>%  
+  ScaleData() %>% 
+  RunPCA(verbose = FALSE) %>%
+  RunUMAP(dims = 1:30)
+
+p1 = DimPlot(aa, group.by = 'subtype', label = TRUE, repel = TRUE, raster=FALSE)
+p2 = DimPlot(aa, group.by = 'batch', label = TRUE, repel = TRUE) 
+p3 = DimPlot(aa, group.by = 'celltype', label = TRUE, repel = TRUE, raster=FALSE)
+p4 = DimPlot(aa, group.by = 'dataset', label = TRUE, repel = TRUE, raster=FALSE)
+(p1 + p4) /(p3 + p2)
+
+ggsave(paste0(resDir, 'neonatalMice_CM.Cui2020_noCM.Wang2020_P1_overview_noBatchCorrection.pdf'), 
+       width = 16, height = 12)
+
+saveRDS(aa, file = paste0(resDir, 'nm_scRNAseq_8batches_noCorrection.rds'))
+
+rm(aa)
+
+##########################################
+## adult mice after batch correction 
 ##########################################
 mm = readRDS(file = paste0('../data/data_examples/ref_scRNAseq_adultMice_clean.v1.rds'))
 head(rownames(mm))
@@ -148,13 +199,64 @@ DimPlot(mm, group.by = 'dataset', label = TRUE, repel = TRUE)
 ggsave(paste0(resDir, '/scRNAseq_dataSource_adultMice.pdf'), 
        width = 8, height = 6)
 
+mm$batch = mm$dataset
 
 #saveRDS(ax, file = paste0(RdataDir, 'ax_scRNAseq.rds'))
+saveRDS(mm, file = paste0(RdataDir, 'mm_scRNAseq_2batches_withCorrection.rds'))
 
-saveRDS(mm, file = paste0(RdataDir, 'mm_scRNAseq.rds'))
+rm(mm)
 
+# mm = readRDS(file = paste0(RdataDir, 'mm_scRNAseq_2batches_withCorrection.rds'))
 
-mm = readRDS(file = paste0(RdataDir, 'mm_scRNAseq.rds'))
+##########################################
+# adult mice without batch correction 
+##########################################
+bb = readRDS(file = paste0('../results/Rdata/',
+                           'Forte2020_logNormalize_allgenes_majorCellTypes_subtypes.rds'))
+cms = readRDS(file =  paste0('../results/Rdata/', 
+                             'Seurat.obj_adultMiceHeart_week0.week2_Ren2020_seuratNormalization_umap_subtypes.rds'))
+
+bb$dataset = 'Forte2020'
+cms$dataset = 'Ren2020'
+
+features.common = intersect(rownames(bb), rownames(cms))
+length(union(rownames(bb), rownames(cms)))
+
+mm = merge(bb, y = cms, add.cell.ids = c("Forte2020", "Ren2020"), project = "adultHeart")
+
+rm(list=c('bb', 'cms'))
+
+mm$species = 'mm'
+jj = which(is.na(mm$timepoints))
+mm$timepoints[grep('0w_', mm$sample)] = 'd0'
+mm$timepoints[grep('2w_', mm$sample)] = 'd14'
+mm$condition = mm$timepoints
+mm$time = mm$timepoints
+
+mm = NormalizeData(mm)
+mm = FindVariableFeatures(mm, selection.method = "vst", nfeatures = 3000)
+mm <- ScaleData(mm, verbose = FALSE)
+mm <- RunPCA(mm, npcs = 30, verbose = FALSE)
+
+ElbowPlot(mm, ndims = 30)
+
+mm <- FindNeighbors(mm, reduction = "pca", dims = 1:20)
+#mm <- FindClusters(mm, resolution = 0.2)
+mm <- RunUMAP(mm, reduction = "pca", dims = 1:30, n.neighbors = 50, min.dist = 0.05) 
+
+p1 = DimPlot(mm, group.by = 'subtype', label = TRUE, repel = TRUE, raster=FALSE)
+p2 = DimPlot(mm, group.by = 'condition', label = TRUE, repel = TRUE) 
+p3 = DimPlot(mm, group.by = 'celltype', label = TRUE, repel = TRUE, raster=FALSE)
+p4 = DimPlot(mm, group.by = 'dataset', label = TRUE, repel = TRUE, raster=FALSE)
+(p1 + p4) /(p3 + p2)
+
+ggsave(paste0(resDir, 'adultMice_overview_noBatchCorrection.pdf'), 
+       width = 16, height = 12)
+
+mm$batch = mm$dataset
+
+saveRDS(mm, file = paste0(resDir, 'mm_scRNAseq_2batch_noCorrection.rds'))
+
 
 
 ########################################################
