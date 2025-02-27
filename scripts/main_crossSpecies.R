@@ -257,6 +257,9 @@ mm$batch = mm$dataset
 
 saveRDS(mm, file = paste0(resDir, 'mm_scRNAseq_2batch_noCorrection.rds'))
 
+rm(mm)
+
+
 
 
 ########################################################
