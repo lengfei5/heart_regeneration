@@ -72,6 +72,18 @@ refs$subtypes = as.factor(refs$subtypes)
 refs$celltypes = gsub('CM_ven_Robo2', 'CM_Robo2', refs$celltypes)
 refs$celltypes = gsub('CM_ven_Cav3_1', 'CM_Cav3.1', refs$celltypes)
 
+refs$celltypes = as.character(refs$subtypes)
+
+refs$celltypes[grep('CM_|CMs_|_CM|_CM_', refs$subtypes)] = 'CM'
+refs$celltypes[grep('EC_|_EC', refs$subtypes)] = 'EC'
+refs$celltypes[grep('FB_', refs$subtypes)] = 'FB'
+refs$celltypes[grep('B_cells', refs$subtypes)] = 'Bcell'
+
+refs$celltypes[grep('Macrophages|_MF', refs$subtypes)] = 'Macrophages'
+refs$celltypes[grep('Megakeryocytes', refs$subtypes)] = 'Megakeryocytes'
+refs$celltypes[grep('RBC', refs$subtypes)] = 'RBC'
+
+
 ax = refs 
 rm(refs)
 
@@ -138,6 +150,48 @@ mm = readRDS(file = paste0(RdataDir, 'mm_scRNAseq.rds'))
 # SAMAP 
 ########################################################
 ########################################################
+
+
+## define the one-on-one ortholog between axololt and mice
+an_orthologs = data.frame(ref = rownames(ax), query = rownames(ax))
+rownames(an_orthologs) = an_orthologs$ref
+an_orthologs$query = sapply(an_orthologs$query, 
+                            function(x){firstup(unlist(strsplit(as.character(x), '-'))[1])})
+
+jj = which(!is.na(match(an_orthologs$query, rownames(aa))))
+an_orthologs = an_orthologs[jj, ]
+
+counts = table(an_orthologs$query)
+gg_uniq = names(counts)[which(counts == 1)]
+jj2 = which(!is.na(match(an_orthologs$query, gg_uniq)))
+
+an_orthologs = an_orthologs[jj2, ]
+
+ax = subset(ax, features = an_orthologs$ref)
+
+aa = subset(aa, features = an_orthologs$query)
+
+
+counts = ax@assays$RNA@counts
+metadata = ax@meta.data
+counts = counts[match(an_orthologs$ref, rownames(counts)), ]
+rownames(counts) = an_orthologs$query
+
+new_ax <- CreateSeuratObject(counts=counts, assay = 'RNA', meta.data = metadata)
+
+rm(list = c('counts', 'metadata'))
+
+aa = merge(aa, y = new_ax, add.cell.ids = c("m", "ax"), project = "heartReg")
+
+rm(new_ax)
+#aa = DietSeurat(aa, counts = TRUE, data = TRUE, scale.data = FALSE, assays = 'RNA')
+#jj = which(is.na(aa$batch))
+#aa$batch[jj] = aa$dataset[]
+
+
+
+
+
 
 ########################################################
 ########################################################

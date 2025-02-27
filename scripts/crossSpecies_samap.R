@@ -90,7 +90,7 @@ p4 = DimPlot(aa, group.by = 'dataset', label = TRUE, repel = TRUE, raster=FALSE)
 ggsave(paste0(outDir, 'neonatalMice_CM.Cui2020_noCM.Wang2020_P1_overview_noBatchCorrection.pdf'), 
        width = 16, height = 12)
 
-saveRDS(aa, file = paste0(RdataDir, 'nm_scRNAseq_no.batchCorrection.rds'))
+saveRDS(aa, file = paste0(outDir, 'nm_scRNAseq_no.batchCorrection.rds'))
 
 ##########################################
 # import adult mice data and merge with neonatal mouse 
@@ -137,6 +137,11 @@ p4 = DimPlot(mm, group.by = 'dataset', label = TRUE, repel = TRUE, raster=FALSE)
 ggsave(paste0(outDir, 'adultMice_overview_noBatchCorrection.pdf'), 
        width = 16, height = 12)
 
+length(intersect(rownames(mm), rownames(aa)))
+length(union(rownames(mm), rownames(aa)))
+
+saveRDS(aa, file = paste0(outDir, 'mm_scRNAseq_no.batchCorrection.rds'))
+
 
 aa = merge(aa, y = mm, add.cell.ids = c("nm", "mm"), project = "heartReg")
 
@@ -160,21 +165,54 @@ p4 = DimPlot(aa, group.by = 'dataset', label = TRUE, repel = TRUE, raster=FALSE)
 ggsave(paste0(outDir, 'neonatalMice_adultMice_noBatchCorrection.pdf'), 
        width = 20, height = 16)
 
-saveRDS(aa, file = paste0(outDir, 'nm_mm_scRNAseq_merged_v1.rds'))
-
-
-saveFile = paste0(outDir, 'nm_mm_scRNAseq_merged_v1.h5Seurat')
-SaveH5Seurat(aa, filename = saveFile, overwrite = TRUE)
-Convert(saveFile, dest = "h5ad", overwrite = TRUE)
 
 ##########################################
 # transcript-to-gene mapping
 ##########################################
+aa = readRDS(file = paste0(outDir, 'nm_mm_scRNAseq_merged_v1.rds'))
+
+ggs = rtracklayer::import(paste0('/groups/tanaka/People/current/jiwang/Genomes/mouse/mm10_ens/',
+                                 'Mus_musculus.GRCm38.87.gtf'))
+
+ggs = ggs[which(ggs$type == 'transcript')]
+ggs = as.data.frame(ggs)
+ggs = ggs[, c(17, 10, 12)]
+
+cds = read.delim(file = paste0('/groups/tanaka/People/current/jiwang/src/samap_directory/example_data/',
+                               'transcriptomes/mm_transcript_gene.txt'), 
+                 sep = ' ', header = FALSE)
+cds = cds[, c(1, 4, 7)]
+cds$V1 = gsub('[>]', '', cds$V1)
+cds$V4 = gsub('gene:', '', cds$V4)
+cds$V7 = gsub('gene_symbol:', '', cds$V7)
+
+mm = match(rownames(aa), cds$V7)
+length(which(is.na(mm)))
+
+missed = (rownames(aa)[which(is.na(mm))])
+
+colnames(cds) = c('transcriptID', 'geneID', 'geneSymbol')
+cds = cds[, c(1, 3, 2)]
+
+write.table(cds, file = paste0(outDir, 'mice_transcript_gene.txt'), sep = '\t', row.names = FALSE, 
+            col.names = TRUE, quote = FALSE)
+
+mm = match(rownames(aa), cds$geneSymbol)
+length(which(is.na(mm)))
+features = rownames(aa)[which(!is.na(mm))]
+
+aa = subset(aa, features = features)
+
+saveRDS(aa, file = paste0(outDir, 'nm_mm_scRNAseq_merged.rds'))
+
+saveFile = paste0(outDir, 'nm_mm_scRNAseq_merged.h5Seurat')
+SaveH5Seurat(aa, filename = saveFile, overwrite = TRUE)
+Convert(saveFile, dest = "h5ad", overwrite = TRUE)
 
 
 ########################################################
 ########################################################
-# Section : axolotl data  
+# Section II: axolotl data  
 # 
 ########################################################
 ########################################################
@@ -213,7 +251,51 @@ ax = subset(ax, cells = colnames(ax)[which(ax$celltype != 'Neuronal' & ax$cellty
 
 ax = subset(ax, cells = colnames(ax)[which(ax$celltype != 'Neu_IL1R1')])
 
-saveRDS(ax, file = paste0(outDir, 'ax_scRNAseq.rds'))
+
+
+##########################################
+# transcript-to-gene mapping for axolotl
+##########################################
+ax = readRDS(file = paste0(outDir, 'ax_scRNAseq.rds'))
+
+ggs = read.delim(paste0('/groups/tanaka/People/current/jiwang/Genomes/axolotl/Transcriptomics/',
+                                 'AmexT_v47_transcripts_genes_t2g.txt'), sep = '\t', header = FALSE)
+
+cds = read.delim(file = paste0('/groups/tanaka/People/current/jiwang/src/samap_directory/example_data/',
+                               'transcriptomes/ax_transcript.txt'), 
+                 sep = '\t', header = FALSE)
+#cds = cds[, c(1, 4, 7)]
+cds$V1 = gsub('[>]', '', cds$V1)
+#cds$V4 = gsub('gene:', '', cds$V4)
+#cds$V7 = gsub('gene_symbol:', '', cds$V7)
+
+cds$geneID = ggs$V2[match(cds$V1, ggs$V1)]
+rm(ggs)
+
+ggs = data.frame(gene = rownames(ax))
+ggs$geneID = sapply(ggs$gene, get_geneID)
+
+cds$gene = ggs$gene[match(cds$geneID, ggs$geneID)] 
+
+cds = cds[which(!is.na(cds$gene)), ]
+
+mm = match(rownames(ax), cds$gene)
+length(which(is.na(mm)))
+
+missed = (rownames(aa)[which(is.na(mm))])
+
+colnames(cds) = c('transcriptID', 'geneID', 'geneSymbol')
+cds = cds[, c(1, 3, 2)]
+
+write.table(cds, file = paste0(outDir, 'ax_transcript_gene.txt'), sep = '\t', row.names = FALSE, 
+            col.names = TRUE, quote = FALSE)
+
+mm = match(rownames(ax), cds$geneSymbol)
+length(which(is.na(mm)))
+#features = rownames(aa)[which(!is.na(mm))]
+#aa = subset(aa, features = features)
+
+#saveRDS(ax, file = paste0(outDir, 'ax_scRNAseq.rds'))
 
 library(SeuratDisk)
 VariableFeatures(ax)
@@ -223,47 +305,14 @@ saveFile = paste0(outDir, 'ax_scRNAseq.h5Seurat')
 SaveH5Seurat(aa, filename = saveFile, overwrite = TRUE)
 Convert(saveFile, dest = "h5ad", overwrite = TRUE)
 
-##########################################
-# transcript-to-gene mapping
-##########################################
-## define the one-on-one ortholog between axololt and mice
-an_orthologs = data.frame(ref = rownames(ax), query = rownames(ax))
-rownames(an_orthologs) = an_orthologs$ref
-an_orthologs$query = sapply(an_orthologs$query, 
-                            function(x){firstup(unlist(strsplit(as.character(x), '-'))[1])})
-
-jj = which(!is.na(match(an_orthologs$query, rownames(aa))))
-an_orthologs = an_orthologs[jj, ]
-
-counts = table(an_orthologs$query)
-gg_uniq = names(counts)[which(counts == 1)]
-jj2 = which(!is.na(match(an_orthologs$query, gg_uniq)))
-
-an_orthologs = an_orthologs[jj2, ]
-
-ax = subset(ax, features = an_orthologs$ref)
-
-aa = subset(aa, features = an_orthologs$query)
 
 
-counts = ax@assays$RNA@counts
-metadata = ax@meta.data
-counts = counts[match(an_orthologs$ref, rownames(counts)), ]
-rownames(counts) = an_orthologs$query
-
-new_ax <- CreateSeuratObject(counts=counts, assay = 'RNA', meta.data = metadata)
-
-rm(list = c('counts', 'metadata'))
-
-aa = merge(aa, y = new_ax, add.cell.ids = c("m", "ax"), project = "heartReg")
-
-rm(new_ax)
-#aa = DietSeurat(aa, counts = TRUE, data = TRUE, scale.data = FALSE, assays = 'RNA')
-#jj = which(is.na(aa$batch))
-#aa$batch[jj] = aa$dataset[]
-
-
-
+########################################################
+########################################################
+# Section III:
+# 
+########################################################
+########################################################
 ##########################################
 # import the zebrafish data 
 ##########################################
@@ -292,6 +341,10 @@ SaveH5Seurat(aa, filename = saveFile, overwrite = TRUE)
 Convert(saveFile, dest = "h5ad", overwrite = TRUE)
 
 
-
-
+########################################################
+########################################################
+# Section IV: human scRNA-seq data
+# 
+########################################################
+########################################################
 

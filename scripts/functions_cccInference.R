@@ -98,6 +98,7 @@ run_LIANA = function(refs,
   Idents(refs) = as.factor(refs$celltypes)
   
   if(!timepoint_specific){
+    # celltypes = rownames(pairs)
     subref = subset(refs, cells = colnames(refs)[!is.na(match(refs$celltypes, celltypes))])
     subref$celltypes = droplevels(as.factor(subref$celltypes))
     table(subref$celltypes)
@@ -681,9 +682,8 @@ my_CircosPlot <- function(connectome,
   p1.base <- recordPlot()
   return(p1.base)
   
+  
 }
-
-
 
 
 ########################################################
