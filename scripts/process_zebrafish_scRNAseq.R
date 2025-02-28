@@ -1,148 +1,32 @@
-# global functions ####
-combine_plots <- function(...,
-                          title.text = NULL,
-                          title.color = "black",
-                          title.size = 16,
-                          title.vjust = 0.5,
-                          title.hjust = 0.5,
-                          title.fontface = "bold",
-                          caption.text = NULL,
-                          caption.color = "black",
-                          caption.size = 10,
-                          caption.vjust = 0.5,
-                          caption.hjust = 0.5,
-                          caption.fontface = "plain",
-                          sub.text = NULL,
-                          sub.color = "black",
-                          sub.size = 12,
-                          sub.vjust = 0.5,
-                          sub.hjust = 0.5,
-                          sub.fontface = "plain",
-                          sub.x = 0.5,
-                          sub.y = 0.5,
-                          sub.vpadding = ggplot2::unit(1, "lines"),
-                          sub.angle = 0,
-                          sub.lineheight = 0.9,
-                          title.rel.heights = c(0.1, 1.2),
-                          caption.rel.heights = c(1.2, 0.1),
-                          title.caption.rel.heights = c(0.1, 1.2, 0.1)) {
-  # preparing the basic plot
-  plot <- cowplot::plot_grid(...)
-  
-  # preparing the title
-  if (!is.null(title.text)) {
-    title <-
-      cowplot::ggdraw() +
-      cowplot::draw_label(
-        label = title.text,
-        colour = title.color,
-        size = title.size,
-        vjust = title.vjust,
-        hjust = title.hjust,
-        fontface = title.fontface
-      )
-  }
-  # preparing the caption
-  if (!is.null(caption.text)) {
-    caption <-
-      cowplot::ggdraw() +
-      cowplot::draw_label(
-        label = caption.text,
-        colour = caption.color,
-        size = caption.size,
-        vjust = caption.vjust,
-        hjust = caption.hjust,
-        fontface = caption.fontface
-      )
-  }
-  
-  # combining the basic plot with the either title or caption or title and
-  # caption
-  if (!is.null(title.text)) {
-    if (!is.null(caption.text)) {
-      # if both title and caption are needed
-      plot <-
-        cowplot::plot_grid(title,
-                           plot,
-                           caption,
-                           ncol = 1,
-                           rel_heights = title.caption.rel.heights
-        )
-    } else {
-      # if only title is needed
-      plot <-
-        cowplot::plot_grid(title,
-                           plot,
-                           ncol = 1,
-                           rel_heights = title.rel.heights
-        )
-    }
-  } else if (!is.null(caption.text)) {
-    # if only caption is needed
-    plot <-
-      cowplot::plot_grid(plot,
-                         caption,
-                         ncol = 1,
-                         rel_heights = caption.rel.heights
-      )
-  }
-  
-  # finally adding sub if it's needed
-  if (!is.null(sub.text)) {
-    plot <-
-      cowplot::ggdraw(
-        cowplot::add_sub(
-          plot = plot,
-          label = sub.text,
-          x = sub.x,
-          y = sub.y,
-          vpadding = sub.vpadding,
-          colour = sub.color,
-          size = sub.size,
-          vjust = sub.vjust,
-          hjust = sub.hjust,
-          fontface = sub.fontface,
-          angle = sub.angle,
-          lineheight = sub.lineheight
-        )
-      )
-  }
-  
-  # return the final, combined plot
-  return(plot)
-}
+##########################################################################
+##########################################################################
+# Project: heart regeneration 
+# Script purpose: process the zebrafish scRNA-seq data from the Junker's paper
+# Usage example: 
+# Author: Jingkui Wang (jingkui.wang@imp.ac.at)
+# Date of creation: Thu Feb 27 16:11:33 2025
+##########################################################################
+##########################################################################
+rm(list = ls())
 
-summarySE <- function(data=NULL, measurevar, groupvars=NULL, na.rm=FALSE,
-                      conf.interval=.95, .drop=TRUE) {
-  library(plyr)
-  length2 <- function (x, na.rm=FALSE) {
-    if (na.rm) sum(!is.na(x))
-    else       length(x)
-  }
-  datac <- ddply(data, groupvars, .drop=.drop,
-                 .fun = function(xx, col) {
-                   c(N    = length2(xx[[col]], na.rm=na.rm),
-                     mean = mean   (xx[[col]], na.rm=na.rm),
-                     sd   = sd     (xx[[col]], na.rm=na.rm)
-                   )
-                 },
-                 measurevar
-  )
-  # Rename the "mean" column    
-  datac <- rename(datac, c("mean" = measurevar))
-  datac$se <- datac$sd / sqrt(datac$N)  # Calculate standard error of the mean
-  # Confidence interval multiplier for standard error
-  # Calculate t-statistic for confidence interval: 
-  # e.g., if conf.interval is .95, use .975 (above/below), and use df=N-1
-  ciMult <- qt(conf.interval/2 + .5, datac$N-1)
-  datac$ci <- datac$se * ciMult
-  
-  return(datac)
-}
+version.analysis = '_scRNAseq_20250227'
 
+resDir = paste0("../results/scRNAseq_zebrafish", version.analysis,'/')
+RdataDir = paste0(resDir, 'Rdata/')
 
-## load and integrate data in one seurat object, calculate mito reads, filter cells, annotate cell types. ####
+if(!dir.exists(resDir)) dir.create(resDir)
+if(!dir.exists(RdataDir)) dir.create(RdataDir)
 
+# required libraries
+library(data.table)
+require(Seurat)
+library(SeuratObject)
+require(sctransform)
+require(ggplot2)
+library(dplyr)
+library(patchwork)
+require(tictoc)
+library(pryr) # monitor the memory usage
 library(Seurat)
 library(Matrix)
 library(ggplot2)
@@ -151,6 +35,24 @@ library(dplyr)
 library(gridExtra)
 library(ggrepel)
 library(reshape2)
+
+
+source('functions_scRNAseq.R')
+source('functions_Visium.R')
+source('utility_zebrafish.R')
+mem_used()
+
+dataDir = "../published_dataset/zebrafish/Hu_Junker_2022/zebrafish_heart_processing/"
+
+########################################################
+########################################################
+# Section I: import the data and prepare the scRNA-seq data
+# 
+########################################################
+########################################################
+## load and integrate data in one seurat object, calculate mito reads, filter cells, 
+## annotate cell types. ####
+
 
 #mito.genes names
 mito.genes <- read.table("Data/mito.genes.vs.txt",sep = ",")
@@ -184,7 +86,8 @@ for (i in batches) {
                                            min.cells = 3, min.features = 150,
                                            project = i)
     mito.genes.use <- setdiff(mito.genes,setdiff(mito.genes,rownames(gather.data[[i]][["RNA"]])))
-    gather.data[[i]][["percent.mito"]] <- PercentageFeatureSet(object = gather.data[[i]], features = mito.genes.use)
+    gather.data[[i]][["percent.mito"]] <- PercentageFeatureSet(object = gather.data[[i]], 
+                                                               features = mito.genes.use)
     gather.data[[i]] <- subset(x = gather.data[[i]], subset = percent.mito < 25 & nFeature_RNA < 4100)
     data.stats[i] <- length(colnames(x = gather.data[[i]]))
     
@@ -222,9 +125,11 @@ all.hearts@meta.data[all.hearts@meta.data$orig.ident %in% c("Hr1","Hr2a","Hr2b",
                                                             "Hr6a","Hr6v","Hr7a","Hr7v","Hr30","Hr31",
                                                             "Hr32","Hr33"),]$time <- "7dpi"
 
-all.hearts@meta.data[all.hearts@meta.data$orig.ident %in% c("Hr3","Hr4","Hr19","Hr20","Hr21"),]$time <- "30dpi"
+all.hearts@meta.data[all.hearts@meta.data$orig.ident %in% c("Hr3","Hr4","Hr19","Hr20","Hr21"),]$time <- 
+  "30dpi"
 
-all.hearts@meta.data$time <- factor(x = all.hearts@meta.data$time, levels = c("Ctrl","3dpi","7dpi","30dpi"))
+all.hearts@meta.data$time <- factor(x = all.hearts@meta.data$time, 
+                                    levels = c("Ctrl","3dpi","7dpi","30dpi"))
 
 all.hearts@meta.data$AV <- "Wholeheart"
 all.hearts@meta.data[all.hearts@meta.data$orig.ident %in% c("H8a","Hr6a","Hr7a"),]$AV <- "Atrium"
@@ -284,7 +189,8 @@ all.hearts$subtypes = all.hearts$subclustered.celltypes
 all.hearts <- NormalizeData(object = all.hearts)
 
 all.hearts <- FindVariableFeatures(object = all.hearts, selection.method = "vst",nfeatures = 3500)
-all.hearts <- ScaleData(object = all.hearts,vars.to.regress = c("nFeature_RNA","nCount_RNA","percent.mito"))
+all.hearts <- ScaleData(object = all.hearts, 
+                        vars.to.regress = c("nFeature_RNA","nCount_RNA","percent.mito"))
 
 all.hearts <- RunPCA(object = all.hearts, features = VariableFeatures(object = all.hearts),npcs = 100)
 ElbowPlot(object = all.hearts,ndims = 100)
@@ -348,11 +254,52 @@ if(Annotate_from_seurat.clusters){
   
   final.all.hearts$"first.line.annotation" <- final.all.hearts$"seurat_clusters"
   final.all.hearts@meta.data$first.line.annotation <- 
-    plyr::mapvalues(final.all.hearts@meta.data$first.line.annotation, from =ct$cluster, to = ct$Cell.type)
+    plyr::mapvalues(final.all.hearts@meta.data$first.line.annotation, from =ct$cluster, 
+                    to = ct$Cell.type)
   
   final.all.hearts <- SetIdent(final.all.hearts,value = "first.line.annotation")
   
-  #final.all.hearts <- SetIdent(final.all.hearts,cells = rownames(niche@meta.data),value = niche@meta.data$work.ident )
-  #final.all.hearts <- SetIdent(final.all.hearts,cells = rownames(immune@meta.data),value = immune@meta.data$work.ident )
+  #final.all.hearts <- SetIdent(final.all.hearts, 
+  # cells = rownames(niche@meta.data),value = niche@meta.data$work.ident )
+  #final.all.hearts <- SetIdent(final.all.hearts,
+  # cells = rownames(immune@meta.data),value = immune@meta.data$work.ident )
   
 }
+
+
+########################################################
+########################################################
+# Section II: reanalyze the processed data
+# 
+########################################################
+########################################################
+aa = readRDS(file = paste0(dataDir,
+                           'Rdata/all_heart_annotation_normalized.pca.umap_filtered.duplex.dead.rds'))
+
+#plot umap
+DimPlot(aa, group.by = "celltypes", label = TRUE, repel = TRUE, raster=FALSE)
+
+ggsave(filename = paste0(resDir, 'UMAP_celltypes.pdf'), height = 8, width = 16)
+
+
+DimPlot(aa, group.by = "batch", label = FALSE, raster=FALSE)
+
+ggsave(filename = paste0(resDir, 'UMAP_batch.pdf'), height = 8, width = 16)
+
+saveRDS(aa, file = paste0(RdataDir, 'dr_scRNAseq_39Batches_noCorrection.rds'))
+
+
+##########################################
+# Test batch correction  
+##########################################
+aa = readRDS(file = paste0(RdataDir, 'dr_scRNAseq_39Batches_noCorrection.rds'))
+
+p1 = DimPlot(aa, group.by = "celltypes", label = TRUE, repel = TRUE, raster=FALSE)
+p2 = DimPlot(aa, group.by = "batch", label = FALSE, raster=FALSE)
+
+p1 / p2
+
+ggsave(filename = paste0(resDir, 'UMAP_celltypes.original_39batch.pdf'), height = 8, width = 16)
+
+
+
