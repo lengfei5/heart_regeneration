@@ -291,6 +291,8 @@ saveRDS(aa, file = paste0(RdataDir, 'dr_scRNAseq_39Batches_noCorrection.rds'))
 
 ##########################################
 # Test batch correction  
+# from the previous analysis, the fastMNN reduction seems to be good
+# and also the batch-corrected expression from rpca were used 
 ##########################################
 aa = readRDS(file = paste0(RdataDir, 'dr_scRNAseq_39Batches_noCorrection.rds'))
 
@@ -299,7 +301,10 @@ p2 = DimPlot(aa, group.by = "batch", label = FALSE, raster=FALSE)
 
 p1 / p2
 
-ggsave(filename = paste0(resDir, 'UMAP_celltypes.original_39batch.pdf'), height = 8, width = 16)
+ggsave(filename = paste0(resDir, 'UMAP_celltypes.original_39batch.pdf'), height = 16, width = 12)
+
+
+
 
 
 
