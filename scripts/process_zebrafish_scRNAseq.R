@@ -44,6 +44,7 @@ mem_used()
 
 dataDir = "../published_dataset/zebrafish/Hu_Junker_2022/zebrafish_heart_processing/"
 
+
 ########################################################
 ########################################################
 # Section I: import the data and prepare the scRNA-seq data
@@ -294,6 +295,11 @@ saveRDS(aa, file = paste0(RdataDir, 'dr_scRNAseq_39Batches_noCorrection.rds'))
 # from the previous analysis, the fastMNN reduction seems to be good
 # and also the batch-corrected expression from rpca were used 
 ##########################################
+source('functions_dataIntegration.R')
+
+outDir = paste0(resDir, '/batch_correction/')
+if(!dir.exists(outDir)) dir.create(outDir)
+
 aa = readRDS(file = paste0(RdataDir, 'dr_scRNAseq_39Batches_noCorrection.rds'))
 
 p1 = DimPlot(aa, group.by = "celltypes", label = TRUE, repel = TRUE, raster=FALSE)
@@ -303,6 +309,63 @@ p1 / p2
 
 ggsave(filename = paste0(resDir, 'UMAP_celltypes.original_39batch.pdf'), height = 16, width = 12)
 
+## RPCA integration
+method = "Seurat_RPCA"
+ref.combined = IntegrateData_Seurat_RPCA(aa, 
+                                         group.by = 'batch', 
+                                         nfeatures = 3000,
+                                         #merge.order = 
+                                         redo.normalization.scaling = TRUE,
+                                         correct.all = TRUE)
+
+DefaultAssay(ref.combined) = 'integrated'
+saveRDS(ref.combined, file = paste0(outDir, 
+                                    'dr_scRNAseq_39Batches_correction_SeuratRPCA.rds'))
+
+
+source('functions_dataIntegration.R')
+ref.combined = IntegrateData_runFastMNN(aa, group.by = 'batch', 
+                                        nfeatures = 3000,
+                                        #merge.order = list(list(4,3,1,2), list(8,7,5,6)),
+                                        correct.all = TRUE)
+DefaultAssay(ref.combined) = 'mnn.reconstructed'
+
+saveRDS(ref.combined, file = paste0(outDir, 
+                                    'dr_scRNAseq_39Batches_correction_fastMNN.rds'))
+
+
+
+
+
+p1 = DimPlot(ref.combined, group.by = 'FineID', label = TRUE, repel = TRUE, raster=FALSE) + 
+  ggtitle(method)
+p2 = DimPlot(ref.combined, group.by = 'condition', label = TRUE, repel = TRUE) +
+  ggtitle(method)
+p3 = DimPlot(ref.combined, group.by = 'BroadID', label = TRUE, repel = TRUE, raster=FALSE) + 
+  ggtitle(method)
+
+p1 /(p3 + p2)
+
+ggsave(filename = paste0(outDir, '/CM_Cui2020_noCM_Wang2020_P1_merged_dataIntegration_', method, '.pdf'), 
+       width = 16, height = 12)
+
+DimPlot(ref.combined, group.by = 'FineID', split.by = 'dataset', label = TRUE, repel = TRUE)
+ggsave(filename = paste0(outDir, '/CM_Cui2020_noCM_Wang2020_P1_merged_subtypes.by.dataset', 
+                         '_dataIntegration_', method, '.pdf'), 
+       width = 16, height = 6)
+
+DimPlot(ref.combined, group.by = 'BroadID', split.by = 'dataset', label = TRUE, repel = TRUE)
+ggsave(filename = paste0(outDir, '/CM_Cui2020_noCM_Wang2020_P1_merged_celltypes.by.dataset', 
+                         '_dataIntegration_', method, '.pdf'), 
+       width = 16, height = 6)
+
+DimPlot(ref.combined, group.by = 'FineID', split.by = 'condition', label = TRUE, repel = TRUE, ncol = 2)
+ggsave(filename = paste0(outDir, '/CM_Cui2020_noCM_Wang2020_P1_merged_subtypes.by.conditions', 
+                         '_dataIntegration_', method, '.pdf'),  width = 16, height = 12)
+
+DimPlot(ref.combined, group.by = 'BroadID', split.by = 'condition', label = TRUE, repel = TRUE, ncol = 2)
+ggsave(filename = paste0(outDir, '/CM_Cui2020_noCM_Wang2020_P1_merged_celltypes.by.conditions', 
+                         '_dataIntegration_', method, '.pdf'),  width = 16, height = 12)
 
 
 

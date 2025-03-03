@@ -3,12 +3,12 @@
 #SBATCH --time=0-8:00:00
 #SBATCH --nodes=1
 #SBATCH --cpus-per-task=16
-#SBATCH --mem=64G
+#SBATCH --mem=240G
 #SBATCH --job-name="sc_Rscript"
 #SBATCH --output="logs/slurm_%x_%j.out"
 #SBATCH --error="logs/slurm_%x_%j.err"
 #SBATCH --qos=short
-#SBATCH --partition=c
+#SBATCH --partition=m
 
 mkdir -p logs/
 
@@ -23,4 +23,5 @@ ml load r-bundle-bioconductor/3.14-foss-2021b-r-4.1.2
 #Rscript script_scATAC_cisTopic_downsample.R
 #Rscript script_scATAC_cisTopic.R
 #Rscript run_LDA.R
-Rscript run_RCTD.R
+#Rscript run_RCTD.R
+Rscript run_zebrafish_batchCorrection.R

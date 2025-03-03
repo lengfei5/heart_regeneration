@@ -108,8 +108,24 @@ IntegrateData_Seurat_RPCA = function(seuratObj, group.by = 'dataset', nfeatures 
                                      merge.order = NULL,
                                      redo.normalization.scaling = TRUE,
                                      correct.all = FALSE,
-                                     reference = NULL)
+                                     reference = NULL,
+                                     use.parallelization = FALSE)
 {
+  
+  if(use.parallelization){
+    library(future)
+    cat('test if multicore is supported or not : \n')
+    print(supportsMulticore())
+    
+    #cat('use future package to paralle \n')
+    
+    plan()
+    # change the current plan to access parallelization
+    plan("multicore", workers = 16)
+    plan()
+    
+  }
+  
   # seuratObj = aa; group.by = "species"; ndims = c(1:30); reference = NULL;nfeatures = 2000
   ref.list <- SplitObject(seuratObj, split.by = group.by)
   

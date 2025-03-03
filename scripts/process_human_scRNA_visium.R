@@ -332,6 +332,7 @@ annot_file = list.files(path = paste0('../published_dataset/human/Kuppe_et_al_20
                         'processed_data_Robj/subtype_annot'),
                         pattern = '*.Rds', full.names = TRUE)
 
+batch = read.csv(file = paste0(dataD, ))
 ##########################################
 # manually add the batch information, those batch information were found in the subtype_annot files 
 ##########################################
