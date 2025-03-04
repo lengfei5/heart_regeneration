@@ -62,7 +62,6 @@ DefaultAssay(ref.combined) = 'integrated'
 saveRDS(ref.combined, file = paste0(outDir, 
                                     'dr_scRNAseq_39Batches_correction_SeuratRPCA.rds'))
 
-
 source('functions_dataIntegration.R')
 ref.combined = IntegrateData_runFastMNN(aa, group.by = 'batch', 
                                         nfeatures = 3000,
