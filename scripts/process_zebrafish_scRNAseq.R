@@ -309,6 +309,8 @@ p1 / p2
 
 ggsave(filename = paste0(resDir, 'UMAP_celltypes.original_39batch.pdf'), height = 16, width = 12)
 
+
+
 ## RPCA integration
 method = "Seurat_RPCA"
 ref.combined = IntegrateData_Seurat_RPCA(aa, 

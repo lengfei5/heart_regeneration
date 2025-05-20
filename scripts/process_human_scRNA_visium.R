@@ -502,16 +502,17 @@ subs <- RunUMAP(subs, dims = 1:30,
 p1 = DimPlot(subs, label = TRUE, repel = TRUE, group.by = 'annotation', raster=FALSE, reduction = 'umap')
 #p2 = DimPlot(subs, label = TRUE, repel = TRUE, group.by = 'annotation', raster=FALSE, 
 #             reduction = 'harmony_umap')
+
 p3 = DimPlot(subs, label = TRUE, repel = TRUE, group.by = 'annotation', raster=FALSE, 
              reduction = 'umap_harmony2')
 
 p1 + p3
 
 ggsave(filename = paste0(outDir, '/umap.no.integration_vs_umap.harmony.integration_',
-                         celltype, '.pdf'), width = 20, height = 8)
+                         celltype, '.pdf'), width = 16, height = 6)
+
 
 subs$condition = paste0(subs$sample, '_', subs$patient_region_id, '_', subs$batch)
-
 
 ref.combined = IntegrateData_Seurat_RPCA(subs, group.by = 'condition', 
                                          redo.normalization.scaling = TRUE,
