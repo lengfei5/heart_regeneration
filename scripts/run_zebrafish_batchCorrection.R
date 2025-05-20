@@ -99,11 +99,12 @@ ref.combined<- RunUMAP(ref.combined, dims = 1:30,
               verbose = FALSE,
               min.dist = 0.1)
 
-p1 = DimPlot(aa, group.by = "celltypes", label = TRUE, repel = TRUE, raster=FALSE,
+p1 = DimPlot(ref.combined, group.by = "celltypes", label = TRUE, repel = TRUE, raster=FALSE,
              reduction = 'umap_mnn')
-p2 = DimPlot(aa, group.by = "batch", label = FALSE, raster=FALSE, reduction = 'umap_mnn')
+p2 = DimPlot(ref.combined, group.by = "batch", label = FALSE, raster=FALSE, reduction = 'umap_mnn')
 
 p1 / p2
+
 ggsave(filename = paste0(resDir, 'UMAP_celltypes.original_39batch_dataIntegration_mnn.pdf'), 
        height = 16, width = 12)
 

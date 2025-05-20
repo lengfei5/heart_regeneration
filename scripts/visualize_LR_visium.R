@@ -126,7 +126,7 @@ for(n in 1:length(cc))
   ##########################################
   # # Impute and Run NICHES
   ##########################################
-  Use_ALRA_impuation = TRUE
+  Use_ALRA_impuation = FALSE
   if(Use_ALRA_impuation){
     DefaultAssay(stx) <- "Spatial"
     stx <- SeuratWrappers::RunALRA(stx)
@@ -236,11 +236,11 @@ for(n in 1:length(cc))
     stx2 <- Run_imputation_snRNAseq_visium(stx, refs, slice = slice, normalized_weights = FALSE)
     
     DefaultAssay(stx2) = 'imputated'
-    ggs = rownames(stx2)[grep('GAS6|AXL', rownames(stx2))]
+    ggs = rownames(stx2)[grep('GAS6|AXL|NRG1|ERBB2|AGRN|DAG1|POSTN|ITGB1', rownames(stx2))]
     SpatialFeaturePlot(stx2, features = ggs, images = slice)
     
-    ggsave(paste0(outDir, 'GAS6_AXL_expression_visium_snRNAimputation.pdf'), 
-           width = 14, height = 6)
+    ggsave(paste0(outDir, 'GAS6_AXL_otherExamples_expression_visium_snRNAimputation.pdf'), 
+           width = 14, height = 12)
     
     cat('change the feature names  \n')
     mat = stx2@assays$imputated@data
@@ -249,7 +249,10 @@ for(n in 1:length(cc))
     mat = mat[match(unique(ggs), ggs), ]
     rownames(mat) = get_geneName(rownames(mat))
     
-    srat <- CreateSeuratObject(counts = mat, data = mat,  assay = "imputation", meta.data = meta) # create object
+    ggs = rownames(mat)[grep('GAS6|AXL|NRG1|ERBB2|AGRN|DAG1|POSTN|ITGB1', rownames(mat))]
+    
+    srat <- CreateSeuratObject(counts = mat, data = mat,  assay = "imputation", 
+                               meta.data = meta) # create object
     # 
     # image <- Read10X_Image(image.dir = paste0(topdir, "mock/outs/spatial/"),
     #                        filter.matrix = FALSE) # read in the images
@@ -258,13 +261,16 @@ for(n in 1:length(cc))
     # srat[[keyname]] <- image # slice name might be changed
     # 
     NICHES_output <- RunNICHES(object = srat,
-                               LR.database = "fantom5",
+                               #LR.database = "fantom5",
+                               LR.database = "custom",
                                species = "human",
                                assay = "imputation",
                                position.x = 'x',
                                position.y = 'y',
                                k = 4, 
                                #blend = 'sum',
+                               custom_LR_database = data.frame(c('GAS6', 'NRG1', 'AGRN', 'POSTN'), 
+                                                               c('AXL', 'ERBB2', 'DAG1', 'ITGB1')), 
                                cell_types = "seurat_clusters",
                                min.cells.per.ident = 0,
                                min.cells.per.gene = NULL,
@@ -321,13 +327,14 @@ for(n in 1:length(cc))
     stx2 = readRDS(file = paste0(outDir, 'st_res_NICHES_NeighborhoodToCell_snRNA.imputation.rds'))
     
     SpatialFeaturePlot(stx2,
-                       features = c('GAS6—AXL', "NRG1—ERBB2"),
+                       #features = c('GAS6—AXL', "NRG1—ERBB2", "AGRN-DAG1", "POSTN-ITGB1"),
+                       features = rownames(stx2),
                        slot = 'scale.data', images = slice, 
                        min.cutoff = c(-1, -1),
                        max.cutoff = c(2, 3))
     
-    ggsave(paste0(outDir, 'GAS6_AXL_examples_interaction_visium_snRNAimputation', cc[n], '_v2.pdf'), 
-           width = 14, height = 6)
+    ggsave(paste0(outDir, 'LRexamples_interaction_visium_snRNAimputation', cc[n], '_v2.pdf'), 
+           width = 14, height = 12)
     
   
   }
