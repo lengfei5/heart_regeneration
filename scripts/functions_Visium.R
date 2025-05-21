@@ -682,7 +682,8 @@ plot.RCTD.results = function(st,
                              RCTD_out = '../results/RCTD_out',
                              RCTD_mode = 'multi',
                              plot.RCTD.summary = FALSE,
-                             PLOT.scatterpie = TRUE)
+                             PLOT.scatterpie = TRUE,
+                             celltypeProp_cutoff2show = 0.0)
 {
   library(spacexr)
   require(Matrix)
@@ -707,7 +708,7 @@ plot.RCTD.results = function(st,
   for(n in 1:length(cc))
   #for(n in c(1, 2, 4))
   {
-    # n = 3
+    # n = 1
     cat('slice -- ', cc[n], '\n')
     slice = cc[n]
     #stx = st[, which(st$condition == slice)]
@@ -951,11 +952,13 @@ plot.RCTD.results = function(st,
       pdf(pdfname, width=16, height = 10)
       
       for(m in 1:length(cell_types_plt)){
-        # m = 8
+        # m = 1;celltypeProp_cutoff2show = 0.2
         sub.spatial = spatial_coord[,c(1:3, (3+m))]
         colnames(sub.spatial)[ncol(sub.spatial)] = 'celltype'
         sub.spatial$celltype = as.numeric(as.character(sub.spatial$celltype))
         sub.spatial = data.frame(sub.spatial)
+        
+        sub.spatial = sub.spatial[which(sub.spatial$celltype >= celltypeProp_cutoff2show), ]
         
         p1 = ggplot(data = sub.spatial, aes(x = x, y = y)) +
           geom_point(aes(size = celltype), color = col_ct[m]) +  
