@@ -995,7 +995,10 @@ plot.RCTD.results = function(st,
   
 }
 
-Run_imputation_snRNAseq_visium = function(stx, refs, slice, normalized_weights = TRUE)
+Run_imputation_snRNAseq_visium = function(stx, refs, 
+                                          RCTD_out = paste0('../results/visium_axolotl_R12830_resequenced_20220308/',
+                                                            'RCTD_subtype_out_42subtypes_ref.time.specific_v4.3'), 
+                                          slice, normalized_weights = TRUE)
 {
   library(spacexr)
   require(Matrix)
@@ -1026,8 +1029,9 @@ Run_imputation_snRNAseq_visium = function(stx, refs, slice, normalized_weights =
   colnames(X) = cell_types_ref
   
   ## import the inferred cell type proportions
-  RCTD_out = paste0('../results/visium_axolotl_R12830_resequenced_20220308/',
-                    'RCTD_subtype_out_42subtypes_ref.time.specific_v4.3')
+  #RCTD_out = paste0('../results/visium_axolotl_R12830_resequenced_20220308/',
+  #                  'RCTD_subtype_out_42subtypes_ref.time.specific_v4.3')
+  
   resultsdir <- paste0(RCTD_out)
  
   myRCTD = readRDS(file = paste0(resultsdir, '/RCTD_out_doubletMode_', slice, '.rds'))

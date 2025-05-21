@@ -45,11 +45,24 @@ mem_used()
 ##########################################
 # Load Data, Normalize, Visualize
 ##########################################
+st = readRDS(file = paste0("../results/visium_axolotl_R17246_R12830_allVisium_20240905/Rdata/",
+                           'seuratObject_allVisiusmst_',
+                           'filtered.spots_time_conditions_manualSegmentation_ventricleRegions', 
+                           '_R17246_R12830_allVisium_20240905', '.rds'))
+
+Idents(st) = st$seg_ventricle
+st = subset(st, cells = colnames(st)[which(!is.na(st$seg_ventricle))])
+
+SpatialPlot(st, group.by = 'seg_ventricle', ncol = 4)
+
+table(st$condition)
+
 #InstallData("stxBrain")
 #brain <- LoadData("stxBrain", type = "anterior1")
-load(file = paste0('../results/Rdata/', 
-                   'seuratObject_design_variableGenes_umap.clustered', species, '.Rdata'))
-st$condition = factor(st$condition, levels = design$condition)
+#load(file = paste0('../results/Rdata/', 
+#                   'seuratObject_design_variableGenes_umap.clustered', species, '.Rdata'))
+
+st$condition = factor(st$condition)
 
 refs = readRDS(file = paste0(RdataDir, 'RCTD_refs_subtypes_final_20221117.rds'))
 refs$subtypes = refs$celltype_toUse # clean the special symbols
@@ -75,7 +88,7 @@ Idents(st) = st$condition
 
 for(n in 1:length(cc))
 {
-  # n = 2
+  # n = 5
   cat(n, '  slice -- ', cc[n], '\n')
   slice = cc[n]
   
@@ -91,8 +104,8 @@ for(n in 1:length(cc))
   ggs = rownames(stx)[grep('GAS6|AXL', rownames(stx))]
   SpatialFeaturePlot(stx, features = ggs, images = cc[n], max.cutoff = 'q5')
   
-  ggsave(paste0(outDir, 'GAS6_AXL_expression_SCT_v2.pdf'), 
-         width = 14, height = 6)
+  #ggsave(paste0(outDir, 'GAS6_AXL_expression_SCT_v2.pdf'), 
+  #       width = 14, height = 6)
   
   # Dimensional reduction with all cells
   stx <- RunPCA(stx, assay = "SCT", verbose = FALSE)
@@ -103,8 +116,7 @@ for(n in 1:length(cc))
   p2 <- SpatialDimPlot(stx, label = TRUE, group.by = 'seurat_clusters', label.size = 3, images = cc[n])
   p1 + p2
   
-  ggsave(paste0(outDir, 'visium_clusters_v2.pdf'), 
-         width = 14, height = 6)
+  #ggsave(paste0(outDir, 'visium_clusters_v2.pdf'), width = 14, height = 6)
   
   
   ##########################################
@@ -232,8 +244,12 @@ for(n in 1:length(cc))
     DefaultAssay(stx) <- "Spatial"
     # n = 3
     source('functions_Visium.R')
-    
-    stx2 <- Run_imputation_snRNAseq_visium(stx, refs, slice = slice, normalized_weights = FALSE)
+    RCTD_out = paste0("../results/visium_axolotl_R17246_R12830_allVisium_20240905/",
+                      "RCTD_out/RCTD_subtype_out_41subtypes_ref.time.specific_v3.7_ventricleRegion/", 
+                      slice)
+    stx2 <- Run_imputation_snRNAseq_visium(stx, refs, 
+                                           RCTD_out = RCTD_out,
+                                           slice = slice, normalized_weights = FALSE)
     
     DefaultAssay(stx2) = 'imputated'
     ggs = rownames(stx2)[grep('GAS6|AXL|NRG1|ERBB2|AGRN|DAG1|POSTN|ITGB1', rownames(stx2))]
@@ -285,6 +301,7 @@ for(n in 1:length(cc))
     
     # Scale and visualize
     niche <- ScaleData(niche)
+    
     niche <- FindVariableFeatures(niche,selection.method = "disp")
     niche <- RunPCA(niche)
     ElbowPlot(niche,ndims = 50)
@@ -322,7 +339,8 @@ for(n in 1:length(cc))
     # Plot celltype specific niche signaling
     DefaultAssay(stx2) <- "NeighborhoodToCell"
     stx2 <- ScaleData(stx2)
-    saveRDS(stx2, file = paste0(outDir, 'st_res_NICHES_NeighborhoodToCell_snRNA.imputation.rds'))
+    saveRDS(stx2, file = paste0(outDir, 
+                                'st_res_NICHES_NeighborhoodToCell_snRNA.imputation_LRexamples_batchAll.rds'))
     
     stx2 = readRDS(file = paste0(outDir, 'st_res_NICHES_NeighborhoodToCell_snRNA.imputation.rds'))
     
