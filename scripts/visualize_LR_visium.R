@@ -86,9 +86,10 @@ cc = names(table(st$condition))
 
 Idents(st) = st$condition
 
-for(n in 1:length(cc))
+#for(n in 1:length(cc))
+for(n in c(7, 8, 3, 2, 1))
 {
-  # n = 5
+  # n = 6
   cat(n, '  slice -- ', cc[n], '\n')
   slice = cc[n]
   
@@ -302,14 +303,16 @@ for(n in 1:length(cc))
     # Scale and visualize
     niche <- ScaleData(niche)
     
-    niche <- FindVariableFeatures(niche,selection.method = "disp")
-    niche <- RunPCA(niche)
-    ElbowPlot(niche,ndims = 50)
-    
-    niche <- RunUMAP(niche,dims = 1:10)
-    DimPlot(niche,reduction = 'umap',pt.size = 0.5,shuffle = T, label = T) +
-      ggtitle('Cellular Microenvironment') + 
-      NoLegend()
+    if(nrow(niche) > 500){
+      niche <- FindVariableFeatures(niche,selection.method = "disp")
+      niche <- RunPCA(niche)
+      ElbowPlot(niche,ndims = 50)
+      
+      niche <- RunUMAP(niche,dims = 1:10)
+      DimPlot(niche,reduction = 'umap',pt.size = 0.5,shuffle = T, label = T) +
+        ggtitle('Cellular Microenvironment') + 
+        NoLegend()
+    }
     
     # Find markers
     # mark <- FindAllMarkers(niche,min.pct = 0.25,only.pos = T, test.use = "roc")
@@ -342,19 +345,49 @@ for(n in 1:length(cc))
     saveRDS(stx2, file = paste0(outDir, 
                                 'st_res_NICHES_NeighborhoodToCell_snRNA.imputation_LRexamples_batchAll.rds'))
     
-    stx2 = readRDS(file = paste0(outDir, 'st_res_NICHES_NeighborhoodToCell_snRNA.imputation.rds'))
+    #stx2 = readRDS(file = paste0(outDir, 'st_res_NICHES_NeighborhoodToCell_snRNA.imputation.rds'))
+    
+    stx2 = readRDS(file =  paste0(outDir, 
+                  'st_res_NICHES_NeighborhoodToCell_snRNA.imputation_LRexamples_batchAll.rds'))
+    
+    library(RColorBrewer)
+    #colfunc<-colorRampPalette(c("#4CC9F0", "yellow","#C61010"))
+    
+    #SpatialColors <- colorRampPalette(colors = rev(x = brewer.pal(n = 11, name = "RdYlBu"))) 
+    #SpatialColors = colfunc(n = 21)
     
     SpatialFeaturePlot(stx2,
                        #features = c('GAS6—AXL', "NRG1—ERBB2", "AGRN-DAG1", "POSTN-ITGB1"),
                        features = rownames(stx2),
                        slot = 'scale.data', images = slice, 
-                       min.cutoff = c(-1, -1),
-                       max.cutoff = c(2, 3))
+                       min.cutoff = c(-1, -1, -1, -1),
+                       max.cutoff = c(4, 4, 4, 4)) & 
+      ggplot2::scale_fill_gradient2(low = "#313695", mid = "#FFFFBF", high = "#C61010", midpoint = 0.3)
+                                    #low = "#4CC9F0", mid = "#FEEFA7", high = "#C61010", midpoint = 1.5)
+      #scale_fill_gradientn(colours = SpatialColors(n = 21))
     
-    ggsave(paste0(outDir, 'LRexamples_interaction_visium_snRNAimputation', cc[n], '_v2.pdf'), 
+    ggsave(paste0('../results/visium_axolotl_R17246_R12830_allVisium_20240905/LR_visualization/', 
+                  'LRexamples_interaction_visium_snRNAimputation', cc[n], '_v2.pdf'), 
            width = 14, height = 12)
+      #ggplot2::scale_fill_gradient2(limits = c(-1, 4), breaks = c(0., 1, 2, 3),
+      #                              low = "#313695", mid = "#FFFFBF", high = "#C61010", midpoint = 1.5)
+      #                              #low = "#4CC9F0", mid = "#FEEFA7", high = "#C61010", midpoint = 1.5)
+      #scale_fill_viridis_c()
+      #scico::scale_fill_scico(palette = "vik")
+      #scale_fill_gradient(colours = SpatialColors)
+      #scale_fill_gradientn(colours = c("#4CC9F0", "#49A2F0", "#4361EE", "#941F56","#C61010"))
+      #ggplot2::scale_fill_gradient2(limits = c(-1, 4), breaks = c(0., 1, 2, 3, 4),
+      #                              low = "black", mid = "blue", high = "red", midpoint = 1.5)
     
-  
+    
+   
+    
+    
+    #cols = c("#4CC9F0", "#49A2F0", "#4361EE", "#941F56","#C61010", "#ABD9E9" "#C5E5F0" "#E0F3F8", 
+    #         "#EFF9DB" "#FFFFBF" "#FEEFA7" "#FEE090" "#FDC778", "#FDAE61" "#F88D52" "#F46D43")
+    #SpatialColors <- colorRampPalette(colors = rev(x = brewer.pal(n = 11, name = "Spectral"))) 
+    #scale_colour_brewer()
+    
   }
   
 }

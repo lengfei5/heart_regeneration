@@ -1740,7 +1740,22 @@ if(Check_Axl_inCM){
          width = 16, height = 16)
   
   
-  p1 = DimPlot(aa, group.by = 'celltype', label = TRUE, repel = TRUE)
+  DefaultAssay(aa) = 'RNA'
+  
+  kk = which(aa$celltype == 'Immune')
+  aa$celltype[kk] = aa$subtype[kk]
+  aa$celltype[which(aa$celltype == 'B cells')] = 'B'
+  aa$celltype[which(aa$celltype == 'T cells')] = 'T'
+  aa$celltype[grep('Macrophage', aa$celltype)] = "Macrophage"
+  
+  require(RColorBrewer)
+  cols = brewer.pal(9,"Set1")
+  cols = c(cols[c(1:3, 5, 6, 9)], brewer.pal(8,"Set2")[-c(2, 4)])
+  aa$celltype = factor(aa$celltype, levels = c('CM', "EC", 'FB',"B", 'Macrophage', 'T', 
+                                               'EPI', 'DC-like', "Monocyte", "Pericyte", 'SMC', "Gra" 
+  ))
+  
+  p1 = DimPlot(aa, group.by = 'celltype', label = TRUE, repel = TRUE, cols = cols)
   #p2 = DimPlot(aa, group.by = 'condition',label = TRUE, repel = TRUE)
   #p1 / p2
   #p3 = FeaturePlot(aa, features = c('Axl', 'Gas6', 'Nppa', 'Myh6'), max.cutoff = 'q99')
@@ -1751,7 +1766,7 @@ if(Check_Axl_inCM){
   p1 + p2
   
   ggsave(paste0(resDir, '/Ref_neonatalMice_CM.Cui2020_noCM.Wang2020_P1_integration_UMAP_',
-                '_afterFiltering_cl_Axl.pdf'), 
+                '_afterFiltering_cl_Axl_v2.pdf'), 
          width = 14, height = 6)
   
   

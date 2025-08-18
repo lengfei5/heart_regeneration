@@ -26,6 +26,7 @@ options(future.globals.maxSize = 120000 * 1024^2)
 
 mem_used()
 
+
 ########################################################
 ########################################################
 # Section I: import the processed visium data by nf from Tomas and 
@@ -538,6 +539,8 @@ st = readRDS(file = paste0(RdataDir, 'seuratObject_allVisiusmst_',
               version.analysis, '.rds'))
 
 Idents(st) = st$seg_ventricle
+
+## subset only the ventricle regions 
 st = subset(st, cells = colnames(st)[which(!is.na(st$seg_ventricle))])
 
 SpatialPlot(st, group.by = 'seg_ventricle', ncol = 4)
@@ -714,13 +717,13 @@ Run.celltype.deconvolution.RCTD(st = st,
 )
 
 
-
 ### plot the RCTD outputs
 source('functions_Visium.R')
 
 ## only ventricle 
 RCTD_out = paste0(resDir, '/RCTD_out', 
                   '/RCTD_subtype_out_41subtypes_ref.time.specific_v3.7_ventricleRegion') 
+
 ## whole heart
 RCTD_out = paste0(resDir, '/RCTD_out', 
                   '/RCTD_allVisium_subtype_out_41subtypes_ref.time.specific_v3.0') 
@@ -732,7 +735,7 @@ plot.RCTD.results(st = st,
                   RCTD_out = RCTD_out,
                   RCTD_mode = RCTD_mode,
                   plot.RCTD.summary = FALSE,
-                  celltypeProp_cutoff2show = 0.2
+                  celltypeProp_cutoff2show = 0.05
                   )
 
 

@@ -598,6 +598,7 @@ explore.umap.params.combination = function(sub.obj,
                                           with_legend = TRUE,
                                           weight.by.var = TRUE,
                                           nfeatures.sampling = c(5000, 8000, 10000),
+                                          features = NULL,
                                           nb.pcs.sampling = c(20, 30, 50), 
                                           n.neighbors.sampling = c(30, 50),
                                           min.dist.sampling = c(0.1, 0.3), 
@@ -624,15 +625,84 @@ explore.umap.params.combination = function(sub.obj,
   pdf(pdfname, width=12, height = 10)
   par(cex =0.7, mar = c(3,3,2,0.8)+0.1, mgp = c(1.6,0.5,0),las = 0, tcl = -0.3)
   
-  for(nfeatures in nfeatures.sampling)
-  {
+  if(is.null(features)){
+    for(nfeatures in nfeatures.sampling)
+    {
+      # nfeatures = nfeatures.sampling[1]
+      cat('------------- nfeatures - ', nfeatures, '\n')
+      sub.obj <- FindVariableFeatures(sub.obj, selection.method = "vst", nfeatures = nfeatures, 
+                                      verbose = FALSE)
+      # not scale every time
+      # sub.obj = ScaleData(sub.obj, verbose = FALSE)
+      sub.obj <- RunPCA(object = sub.obj, features = VariableFeatures(sub.obj), verbose = FALSE, 
+                        npcs = max(50, nb.pcs.sampling), 
+                        weight.by.var = weight.by.var)
+      
+      for(nb.pcs in nb.pcs.sampling)
+      {
+        for(n.neighbors in n.neighbors.sampling)
+        {
+          for(min.dist in min.dist.sampling)
+          {
+            for(spread in spread.sampling){
+              cat('--- nb.pcs - ', nb.pcs, ', n.neighbors - ', n.neighbors, 
+                  ', min.dist - ', min.dist, ', spread - ', spread,  '\n')
+              # nfeatures = 5000;
+              # nb.pcs = 50 # nb of pcs depends on the considered clusters or ids 
+              # n.neighbors = 50;
+              # min.dist = 0.05; spread = 1;
+              sub.obj <- RunUMAP(object = sub.obj, reduction = 'pca', reduction.name = "umap", 
+                                 dims = 1:nb.pcs, 
+                                 spread = spread, n.neighbors = n.neighbors, 
+                                 min.dist = min.dist, verbose = FALSE)
+              
+              if(with_legend){
+                if(is.null(cols)){
+                  pp = DimPlot(sub.obj, group.by = group.by, reduction = 'umap', label = TRUE, label.size = 6, 
+                               repel = TRUE) + 
+                    ggtitle(paste0('nfeatures - ', nfeatures,  ', nb.pcs - ', nb.pcs, ', n.neighbors - ', n.neighbors, 
+                                   ', min.dist - ', min.dist, ', spread - ', spread))
+                }else{
+                  pp = DimPlot(sub.obj, group.by = group.by, reduction = 'umap', label = TRUE, label.size = 6, 
+                               repel = TRUE, cols = cols) + 
+                    ggtitle(paste0('nfeatures - ', nfeatures,  ', nb.pcs - ', nb.pcs, ', n.neighbors - ', n.neighbors, 
+                                   ', min.dist - ', min.dist, ', spread - ', spread))
+                }
+                
+              }else{
+                if(is.null(cols)){
+                  pp = DimPlot(sub.obj, group.by = group.by, reduction = 'umap', label = TRUE, label.size = 6, 
+                               repel = TRUE) + 
+                    NoLegend() + 
+                    ggtitle(paste0('nfeatures - ', nfeatures,  ', nb.pcs - ', nb.pcs, ', n.neighbors - ', n.neighbors, 
+                                   ', min.dist - ', min.dist, ', spread - ', spread))
+                }else{
+                  pp = DimPlot(sub.obj, group.by = group.by, reduction = 'umap', label = TRUE, label.size = 6, 
+                               repel = TRUE, cols = cols) + 
+                    NoLegend() + 
+                    ggtitle(paste0('nfeatures - ', nfeatures,  ', nb.pcs - ', nb.pcs, ', n.neighbors - ', n.neighbors, 
+                                   ', min.dist - ', min.dist, ', spread - ', spread))
+                }
+                
+              }
+              
+              plot(pp)
+            }
+          }
+        }
+        
+      }
+      
+    }
+  }else{
     # nfeatures = nfeatures.sampling[1]
-    cat('------------- nfeatures - ', nfeatures, '\n')
-    sub.obj <- FindVariableFeatures(sub.obj, selection.method = "vst", nfeatures = nfeatures, 
-                                    verbose = FALSE)
+    cat('------------- use selected features - ', length(features), '\n')
+    nfeatures = length(features)
+    #sub.obj <- FindVariableFeatures(sub.obj, selection.method = "vst", nfeatures = nfeatures, 
+    #                                verbose = FALSE)
     # not scale every time
     # sub.obj = ScaleData(sub.obj, verbose = FALSE)
-    sub.obj <- RunPCA(object = sub.obj, features = VariableFeatures(sub.obj), verbose = FALSE, 
+    sub.obj <- RunPCA(object = sub.obj, features = features, verbose = FALSE, 
                       npcs = max(50, nb.pcs.sampling), 
                       weight.by.var = weight.by.var)
     
@@ -666,7 +736,7 @@ explore.umap.params.combination = function(sub.obj,
                   ggtitle(paste0('nfeatures - ', nfeatures,  ', nb.pcs - ', nb.pcs, ', n.neighbors - ', n.neighbors, 
                                  ', min.dist - ', min.dist, ', spread - ', spread))
               }
-             
+              
             }else{
               if(is.null(cols)){
                 pp = DimPlot(sub.obj, group.by = group.by, reduction = 'umap', label = TRUE, label.size = 6, 
@@ -676,12 +746,12 @@ explore.umap.params.combination = function(sub.obj,
                                  ', min.dist - ', min.dist, ', spread - ', spread))
               }else{
                 pp = DimPlot(sub.obj, group.by = group.by, reduction = 'umap', label = TRUE, label.size = 6, 
-                            repel = TRUE, cols = cols) + 
+                             repel = TRUE, cols = cols) + 
                   NoLegend() + 
                   ggtitle(paste0('nfeatures - ', nfeatures,  ', nb.pcs - ', nb.pcs, ', n.neighbors - ', n.neighbors, 
                                  ', min.dist - ', min.dist, ', spread - ', spread))
               }
-             
+              
             }
             
             plot(pp)

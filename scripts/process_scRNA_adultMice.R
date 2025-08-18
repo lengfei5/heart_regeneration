@@ -1400,8 +1400,17 @@ saveRDS(refs, file = paste0('../data/data_examples/ref_scRNAseq_adultMice_clean.
 # check adult mice scRNA-seq after integration  
 ##########################################
 refs = readRDS(file = paste0('../data/data_examples/ref_scRNAseq_adultMice_clean.v1.rds'))
+
+require(RColorBrewer)
+cols = brewer.pal(9,"Set1")
+
+refs$celltype = factor(refs$celltype, levels = c('CM', "EC", 'FB', 'GN', "B", 'MHCII.Mphage', 
+                                                 'Mphage.MCT', 'prolife.Mphage', 'NK.T'))
+
 p1 = DimPlot(refs, reduction = 'umap', group.by = 'celltype', raster = T,shuffle= T, pt.size = 2, 
-        label = TRUE, repel = TRUE)
+        label = TRUE, repel = TRUE, 
+        cols = cols)
+
 
 #DimPlot(refs, reduction = 'umap', group.by = 'subtype',raster = T,shuffle= T, pt.size = 2, 
 #       label = TRUE, repel = TRUE)
@@ -1413,8 +1422,9 @@ p1 + p2
 outDir = paste0(resDir, '/noCM.Forte2020_CM.Ren2020_integrated_LRanalysis/')
 if(!dir.exists(outDir)) dir.create(outDir)
 
-ggsave(paste0(outDir, '/Forte2020_Ren2020_Integration_celltypes_Axl.pdf'), 
+ggsave(paste0(outDir, '/Forte2020_Ren2020_Integration_celltypes_Axl_v2.pdf'), 
        width = 14, height = 6)
+
 
 
 
