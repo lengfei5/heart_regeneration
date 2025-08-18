@@ -570,6 +570,7 @@ refs$celltype_toUse = gsub("[)]", '', refs$celltype_toUse)
 table(refs$celltype_toUse)
 length(table(refs$celltype_toUse))
 
+
 ##########################################
 # double check the subtype similarity used by RCTD 
 ##########################################
@@ -717,12 +718,23 @@ Run.celltype.deconvolution.RCTD(st = st,
 )
 
 
+
 ### plot the RCTD outputs
 source('functions_Visium.R')
 
 ## only ventricle 
 RCTD_out = paste0(resDir, '/RCTD_out', 
-                  '/RCTD_subtype_out_41subtypes_ref.time.specific_v3.7_ventricleRegion') 
+                  '/RCTD_subtype_out_41subtypes_ref.time.specific_v3.7_ventricleRegion')
+
+RCTD_mode = 'doublet'
+
+plot.RCTD.results(st = st,
+                  RCTD_out = RCTD_out,
+                  RCTD_mode = RCTD_mode,
+                  plot.RCTD.summary = FALSE,
+                  celltypeProp_cutoff2show = 0.05
+)
+
 
 ## whole heart
 RCTD_out = paste0(resDir, '/RCTD_out', 

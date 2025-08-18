@@ -680,6 +680,7 @@ Run.celltype.deconvolution.RCTD = function(st, # spatial transcriptome seurat ob
 plot.RCTD.results = function(st, 
                              species = 'axolotl',
                              RCTD_out = '../results/RCTD_out',
+                             PLOT_out =  '../results/RCTD_out/plots',
                              RCTD_mode = 'multi',
                              plot.RCTD.summary = FALSE,
                              PLOT.scatterpie = TRUE,
@@ -708,7 +709,7 @@ plot.RCTD.results = function(st,
   for(n in 1:length(cc))
   #for(n in c(1, 2, 4))
   {
-    # n = 1
+    # n = 4
     cat('slice -- ', cc[n], '\n')
     slice = cc[n]
     #stx = st[, which(st$condition == slice)]
