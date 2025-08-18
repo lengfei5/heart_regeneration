@@ -726,10 +726,13 @@ source('functions_Visium.R')
 RCTD_out = paste0(resDir, '/RCTD_out', 
                   '/RCTD_subtype_out_41subtypes_ref.time.specific_v3.7_ventricleRegion')
 
+PLOT_out = paste0(RCTD_out, '/RCTD_out_plots_celltypeProp_cutoff_0.05')
+
 RCTD_mode = 'doublet'
 
 plot.RCTD.results(st = st,
                   RCTD_out = RCTD_out,
+                  PLOT_out =  '../results/RCTD_out/plots',
                   RCTD_mode = RCTD_mode,
                   plot.RCTD.summary = FALSE,
                   celltypeProp_cutoff2show = 0.05
