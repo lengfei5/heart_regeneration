@@ -718,8 +718,23 @@ Run.celltype.deconvolution.RCTD(st = st,
 )
 
 
+##########################################
+# ### plot the RCTD outputs
+##########################################
 
-### plot the RCTD outputs
+#### only select the ventricle part of hearts
+st = readRDS(file = paste0(RdataDir, 'seuratObject_allVisiusmst_',
+                           'filtered.spots_time_conditions_manualSegmentation_ventricleRegions', 
+                           version.analysis, '.rds'))
+Idents(st) = st$seg_ventricle
+
+## subset only the ventricle regions 
+st = subset(st, cells = colnames(st)[which(!is.na(st$seg_ventricle))])
+
+SpatialPlot(st, group.by = 'seg_ventricle', ncol = 4)
+
+table(st$condition)
+
 source('functions_Visium.R')
 
 ## only ventricle 
@@ -732,26 +747,32 @@ RCTD_mode = 'doublet'
 
 plot.RCTD.results(st = st,
                   RCTD_out = RCTD_out,
-                  PLOT_out =  '../results/RCTD_out/plots',
+                  PLOT_out =  PLOT_out,
                   RCTD_mode = RCTD_mode,
                   plot.RCTD.summary = FALSE,
                   celltypeProp_cutoff2show = 0.05
 )
 
 
-## whole heart
+#### whole heart only for day0
+st = readRDS(file = paste0(RdataDir, 'seuratObject_allVisiusmst_',
+                           'filtered.spots_time_conditions_manualSegmentation_ventricleRegions', 
+                           version.analysis, '.rds'))
+
 RCTD_out = paste0(resDir, '/RCTD_out', 
                   '/RCTD_allVisium_subtype_out_41subtypes_ref.time.specific_v3.0') 
 
+PLOT_out = paste0(RCTD_out, '/RCTD_out_plots_celltypeProp_cutoff_0.05')
 
 RCTD_mode = 'doublet'
 
 plot.RCTD.results(st = st,
                   RCTD_out = RCTD_out,
+                  PLOT_out =  PLOT_out,
                   RCTD_mode = RCTD_mode,
                   plot.RCTD.summary = FALSE,
                   celltypeProp_cutoff2show = 0.05
-                  )
+)
 
 
 ## prepare the parameters for RCTD coarse cell types
