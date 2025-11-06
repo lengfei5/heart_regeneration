@@ -227,7 +227,7 @@ if(method == 'Harmony'){
                                           #merge.order = matrix(c(-2, 1, -3, -1), ncol = 2),
                                           #redo.normalization.scaling = FALSE,
                                           redo.normalization.hvg.scale.pca = FALSE,
-                                          max.iter.harmony = 30
+                                          max.iter.harmony = 10
                                           #correct.all = FALSE
                                           )
   

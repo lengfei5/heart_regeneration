@@ -484,7 +484,7 @@ my_CircosPlot <- function(connectome,
                        title = NULL,...)
 {
   # connectome = test; weight.attribute = 'weight_norm'; sources.include = cells.of.interest;
-  # targets.include = cells.of.interest;min.z = NULL;cols.use = NULL;edge.color.by.source = T;
+  # targets.include = cells.of.interest;min.z = NULL;cols.use = cell_color;edge.color.by.source = T;
   # balanced.edges = T;small.gap = 1;big.gap = 10;lab.cex = 1;
   
   library(tidyverse)
@@ -612,7 +612,14 @@ my_CircosPlot <- function(connectome,
   
   # Make sector colors (grid.cols)
   sectors <- c(source.order.un$ligand, target.order.un$receptor)
-  sector.cols <- c(as.character(lig.cols.sect),as.character(rec.cols.sect))
+  sector.cols <- c(as.character(lig.cols.sect), as.character(rec.cols.sect))
+  
+  counts_sectors = table(sectors)
+  lig_rep = names(counts_sectors[which(counts_sectors >1)])
+  if(length(lig_rep) > 0){
+    cat('genes annotated as both ligand and receptor : ', lig_rep, '\n')
+    #stop()
+  }
   
   # Plotting
   # Decide edge order and edge color order
@@ -623,6 +630,7 @@ my_CircosPlot <- function(connectome,
     edge.color <- rec.cols.edges
     df.plot <- target.order
   }
+  
   # Decide weight attributes and balanced vs. not
   if (weight.attribute == 'weight_norm'){
     if (balanced.edges == T){

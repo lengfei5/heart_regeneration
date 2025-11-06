@@ -8,7 +8,9 @@
 ##########################################################################
 ##########################################################################
 IntegrateData_Seurat_CCA = function(seuratObj, group.by = 'dataset', nfeatures = 2000,
-                                    ndims = c(1:30), k.weight = 100,
+                                    ndims = c(1:30),
+                                    k.anchor = 5, 
+                                    k.weight = 100,
                                     merge.order = NULL,
                                     redo.normalization.scaling = TRUE,
                                     correct.all = FALSE,
@@ -55,7 +57,7 @@ IntegrateData_Seurat_CCA = function(seuratObj, group.by = 'dataset', nfeatures =
                                         anchor.features = features, 
                                         reference = reference,
                                         reduction = "cca",
-                                        #k.anchor = 5,
+                                        k.anchor = k.anchor,
                                         dims = ndims)
   
   # this command creates an 'integrated' data assay
@@ -346,7 +348,9 @@ IntegrateData_runHarmony = function(seuratObj, group.by = 'dataset', nfeatures =
                                     nclust = NULL,
                                     redo.normalization.hvg.scale.pca = TRUE,
                                     reference_values = NULL, 
-                                    max.iter.harmony = 20)
+                                    max.iter.harmony = 20, 
+                                    epsilon.harmony = 1e-04 #Set to -Inf to never stop early
+                                    )
 {
   library(harmony)
   library(Seurat)
@@ -368,6 +372,7 @@ IntegrateData_runHarmony = function(seuratObj, group.by = 'dataset', nfeatures =
                             nclust = nclust,
                             reference_values = reference_values,
                             max.iter.harmony = max.iter.harmony, 
+                            epsilon.harmony = epsilon.harmony,
                             verbose = TRUE,
                             plot_convergence = TRUE
                             )
