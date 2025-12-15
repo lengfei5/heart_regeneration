@@ -540,6 +540,8 @@ st = readRDS(file = paste0(RdataDir, 'seuratObject_allVisiusmst_',
 
 Idents(st) = st$seg_ventricle
 
+SpatialPlot(st, group.by = 'seg_ventricle', ncol = 4)
+
 ## subset only the ventricle regions 
 st = subset(st, cells = colnames(st)[which(!is.na(st$seg_ventricle))])
 
@@ -638,7 +640,8 @@ if(Import_manually_timeSpecific_celltypes){
   csc[which(csc<=0.25)] = NA
   #csc[which(!is.na(csc))] = 
   
-  csc[which(rownames(csc) == 'Neu_IL1R1'), ] = NA
+  csc[which(rownames(csc) == 'Neu_IL1R1'), c(1, 3:5)] = NA
+  csc[which(rownames(csc) == 'Neu_IL1R1'), c(2)] = 0.23541721
   
   ## further removing the proliferating cells
   csc[which(rownames(csc) == 'Proliferating_RBC'), ] = NA
@@ -686,7 +689,7 @@ condition.specific.ref = TRUE
 RCTD_mode = 'doublet'
 
 RCTD_out = paste0(resDir, '/RCTD_out', 
-                  '/RCTD_subtype_out_41subtypes_ref.time.specific_v3.7_ventricleRegion')
+                  '/RCTD_subtype_out_41subtypes_ref.time.specific_v3.7_ventricleRegion_06112025')
 system(paste0('mkdir -p ', RCTD_out))
 
 
@@ -702,6 +705,9 @@ saveRDS(condition.specific_celltypes,
 
 max_cores = 16
 cc = names(table(st$condition))
+
+st = subset(st, cells = colnames(st)[which(st$condition == 'Amex_d1_183623')])
+st$condition = droplevels(st$condition)
 
 source('functions_Visium.R')
 Run.celltype.deconvolution.RCTD(st = st,
