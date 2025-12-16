@@ -75,6 +75,9 @@ save(design, counts, file=paste0(RdataDir, 'design_rawCounts', version.analysis,
 ##########################################
 load(file=paste0(RdataDir, 'design_rawCounts', version.analysis, '.Rdata'))
 
+write.csv2(design, file = paste0('../GEO_submission/bulk_RNAseq_sampleInfos.csv'), 
+            col.names = TRUE, row.names = FALSE)
+
 colnames(counts)[-1] = design$SampleID
 
 ## convert gene names
