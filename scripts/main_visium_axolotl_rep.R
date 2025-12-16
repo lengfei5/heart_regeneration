@@ -747,7 +747,8 @@ source('functions_Visium.R')
 RCTD_out = paste0(resDir, '/RCTD_out', 
                   '/RCTD_subtype_out_41subtypes_ref.time.specific_v3.7_ventricleRegion')
 
-PLOT_out = paste0(RCTD_out, '/RCTD_out_plots_celltypeProp_cutoff_0.05')
+cutoff2show = 0.2
+PLOT_out = paste0(RCTD_out, '/RCTD_out_plots_celltypeProp_cutoff_', cutoff2show)
 
 RCTD_mode = 'doublet'
 
@@ -756,7 +757,7 @@ plot.RCTD.results(st = st,
                   PLOT_out =  PLOT_out,
                   RCTD_mode = RCTD_mode,
                   plot.RCTD.summary = FALSE,
-                  celltypeProp_cutoff2show = 0.05
+                  celltypeProp_cutoff2show = cutoff2show
 )
 
 
@@ -765,10 +766,22 @@ st = readRDS(file = paste0(RdataDir, 'seuratObject_allVisiusmst_',
                            'filtered.spots_time_conditions_manualSegmentation_ventricleRegions', 
                            version.analysis, '.rds'))
 
+#Idents(st) = st$seg_ventricle
+Idents(st) = st$time
+st = subset(st, cells = colnames(st)[which(st$time == 'Amex_d0')])
+
+SpatialPlot(st, group.by = 'seg_ventricle', ncol = 4)
+
 RCTD_out = paste0(resDir, '/RCTD_out', 
                   '/RCTD_allVisium_subtype_out_41subtypes_ref.time.specific_v3.0') 
 
-PLOT_out = paste0(RCTD_out, '/RCTD_out_plots_celltypeProp_cutoff_0.05')
+table(st$condition)
+
+source('functions_Visium.R')
+
+cutoff2show = 0.2
+PLOT_out = paste0(RCTD_out, '/RCTD_out_plots_celltypeProp_cutoff_', cutoff2show)
+#PLOT_out = paste0(RCTD_out, '/RCTD_out_plots_celltypeProp_cutoff_0.05')
 
 RCTD_mode = 'doublet'
 
@@ -777,42 +790,43 @@ plot.RCTD.results(st = st,
                   PLOT_out =  PLOT_out,
                   RCTD_mode = RCTD_mode,
                   plot.RCTD.summary = FALSE,
-                  celltypeProp_cutoff2show = 0.05
+                  celltypeProp_cutoff2show = cutoff2show
 )
 
 
+
 ## prepare the parameters for RCTD coarse cell types
-Run.RCTD.coarse.celltypes = FALSE
-if(Run.RCTD.coarse.celltypes){
-  # define coarse clusters
-  refs$celltypes = as.character(refs$subtypes)
-  
-  refs$celltypes[grep('CM_|CMs_|_CM|_CM_', refs$subtypes)] = 'CM'
-  refs$celltypes[grep('EC_|_EC', refs$subtypes)] = 'EC'
-  refs$celltypes[grep('FB_', refs$subtypes)] = 'FB'
-  refs$celltypes[grep('B_cells', refs$subtypes)] = 'Bcell'
-  
-  refs$celltypes[grep('Macrophages|_MF', refs$subtypes)] = 'Macrophages'
-  refs$celltypes[grep('Megakeryocytes', refs$subtypes)] = 'Megakeryocytes'
-  refs$celltypes[grep('RBC', refs$subtypes)] = 'RBC'
-  
-  refs$celltype_toUse = refs$celltypes
-  DefaultAssay(refs) = 'RNA'
-  DefaultAssay(st) = 'Spatial'
-  require_int_SpatialRNA = FALSE
-  RCTD_out = paste0(resDir, '/RCTD_coarse_out_v1')
-  
-  max_cores = 16
-  
-  source('functions_Visium.R')
-  
-  Run.celltype.deconvolution.RCTD(st, refs, 
-                                  require_int_SpatialRNA = require_int_SpatialRNA,
-                                  max_cores = max_cores,
-                                  RCTD_out = RCTD_out
-  )
-  
-}
+# Run.RCTD.coarse.celltypes = FALSE
+# if(Run.RCTD.coarse.celltypes){
+#   # define coarse clusters
+#   refs$celltypes = as.character(refs$subtypes)
+#   
+#   refs$celltypes[grep('CM_|CMs_|_CM|_CM_', refs$subtypes)] = 'CM'
+#   refs$celltypes[grep('EC_|_EC', refs$subtypes)] = 'EC'
+#   refs$celltypes[grep('FB_', refs$subtypes)] = 'FB'
+#   refs$celltypes[grep('B_cells', refs$subtypes)] = 'Bcell'
+#   
+#   refs$celltypes[grep('Macrophages|_MF', refs$subtypes)] = 'Macrophages'
+#   refs$celltypes[grep('Megakeryocytes', refs$subtypes)] = 'Megakeryocytes'
+#   refs$celltypes[grep('RBC', refs$subtypes)] = 'RBC'
+#   
+#   refs$celltype_toUse = refs$celltypes
+#   DefaultAssay(refs) = 'RNA'
+#   DefaultAssay(st) = 'Spatial'
+#   require_int_SpatialRNA = FALSE
+#   RCTD_out = paste0(resDir, '/RCTD_coarse_out_v1')
+#   
+#   max_cores = 16
+#   
+#   source('functions_Visium.R')
+#   
+#   Run.celltype.deconvolution.RCTD(st, refs, 
+#                                   require_int_SpatialRNA = require_int_SpatialRNA,
+#                                   max_cores = max_cores,
+#                                   RCTD_out = RCTD_out
+#   )
+#   
+# }
 
 
 ########################################################

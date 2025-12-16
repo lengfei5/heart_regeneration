@@ -709,17 +709,19 @@ plot.RCTD.results = function(st,
   
   cat('-- RCTD PLOT output folder : \n -- ', PLOT_out, '\n')
   if(!dir.exists(PLOT_out)) system(paste0('mkdir -p ', PLOT_out))
+  Idents(st) = st$condition
   
   for(n in 1:length(cc))
   #for(n in c(1, 2, 4))
   {
-    # n = 4
-    cat('slice -- ', cc[n], '\n')
+    # n = 1
     slice = cc[n]
+    
     #stx = st[, which(st$condition == slice)]
-    stx = subset(st, condition == slice)
+    stx = subset(st, cells = colnames(st)[which(st$condition == slice)])
     #stx@images = stx@images[[n]]
     
+    cat('slice -- ', cc[n],  '--spot nb : ', ncol(stx),  '\n')
     resultsdir <- paste0(PLOT_out, '/', slice)
     system(paste0('mkdir -p ', resultsdir))
     
