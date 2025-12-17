@@ -70,9 +70,9 @@ granges_axolotl$gene_biotype = "protein_coding"
 
 species = 'axloltl_scATAC'
 
-#design = data.frame(sampleID = seq(197254, 197258), 
-#                    condition = c(paste0('Amex_scATAC_d', c(0, 1, 4, 7, 14))), stringsAsFactors = FALSE)
-#design$timepoint = gsub('Amex_scATAC_', '', design$condition) 
+design = data.frame(sampleID = seq(197254, 197258), 
+                    condition = c(paste0('Amex_scATAC_d', c(0, 1, 4, 7, 14))), stringsAsFactors = FALSE)
+design$timepoint = gsub('Amex_scATAC_', '', design$condition) 
 
 
 ########################################################
