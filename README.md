@@ -4,7 +4,11 @@ The resolution of cardiac injury varies dramatically between species, ranging fr
 We generated the first comprehensive functional genomics analysis of axolotl heart regeneration following cryoinjury, including single-nucleus multiomics (RNA and ATAC-seq) and spatial transcriptomics. Leveraging the large size of the heart compared to other regenerative species, we performed spatial transcriptomic analysis and obtained the first-of-its-kind, spatially resolved “atlas” of axolotl heart regeneration. Using trajectory analysis, we identified a border zone cardiomyocyte population with a unique pro-regenerative transcriptomic signature. Using ligand-receptor analysis, we identified the Tyrosine-protein kinase receptor AXL, to be highly enriched in the injury-responsive cardiomyocytes, and its ligand Growth arrest-specific protein 6 (Gas6) in endothelial cells.  Dominant negative AXL expression in axolotl hearts reduced the expression of border zone markers and inhibited axolotl heart regeneration.  The AXL pathway is highly conserved in vertebrates and AXL overexpression in murine cardiomyocytes promoted robust dedifferentiation, metabolic rewiring and sarcomere disassembly but not proliferation, showing decoupling of dedifferentiation from proliferation. Our results provide an atlas the axolotl heart and a comprehensive analysis of transcriptional changes occurring during its regeneration. This led to identification of AXL as a new player, required for axolotl cardiac regeneration and sufficient to induce dedifferentiation of mammalian cardiomyocytes.
 
 <p align="center">
-  <img width="600" height="400" src="manuscripts/axolotl_heart.png">
+  <img width="600" height="400" src="./docs/axolotl_heart.png">
 </p>
+
+
+
+
 
 
