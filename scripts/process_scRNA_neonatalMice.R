@@ -1755,6 +1755,19 @@ if(Check_Axl_inCM){
                                                'EPI', 'DC-like', "Monocyte", "Pericyte", 'SMC', "Gra" 
   ))
   
+  cols = c("#BBDEFB",
+           "#4CC9F0",
+           "#4AAFF0",
+           "#49A2F0",
+           "#4895EF",
+           "#4361EE",
+           "#414CDC",
+           "#4042D3",
+           "#3F37C9",
+           "#941F56",
+           "#AD1833",
+           "#C61010")
+  cols = cols[length(cols):1]
   p1 = DimPlot(aa, group.by = 'celltype', label = TRUE, repel = TRUE, cols = cols)
   #p2 = DimPlot(aa, group.by = 'condition',label = TRUE, repel = TRUE)
   #p1 / p2
