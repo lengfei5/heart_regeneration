@@ -333,6 +333,10 @@ source('functions_Visium.R')
 st = readRDS(file = paste0("../results/visium_adultMice_R11934_20210827/Rdata/",
                            'seuratObject_mouse_adult_cell.gene.filtered_umap.clustered.rds'))
 
+
+SpatialFeaturePlot(st, features = c("Myh6", 'Axl'),image.alpha = 0.7)
+
+
 refs = readRDS(file = paste0('../data/data_examples/ref_scRNAseq_adultMice_clean.v1.rds'))
 
 #jj = which(refs$dataset == 'Ren2020')
