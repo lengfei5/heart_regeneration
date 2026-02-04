@@ -1915,5 +1915,3 @@ data_source_network = infer_supporting_datasources(signaling_graph_list = active
                                                    gr_network = gr_network)
 head(data_source_network) 
 
-
-
