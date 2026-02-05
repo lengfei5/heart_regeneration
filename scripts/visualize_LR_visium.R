@@ -86,14 +86,14 @@ cc = names(table(st$condition))
 
 Idents(st) = st$condition
 
-#for(n in 1:length(cc))
-for(n in c(7, 8, 3, 2, 1))
+for(n in 1:length(cc))
+#for(n in c(7, 8, 3, 2, 1))
 {
-  # n = 6
+  # n = 4
   cat(n, '  slice -- ', cc[n], '\n')
   slice = cc[n]
   
-  outDir = paste0(resDir, '/', slice, '/')
+  outDir = paste0(resDir, '/hbEGF_', slice, '/')
   if(!dir.exists(outDir)) dir.create(outDir)
   
   stx = subset(st, condition == slice)
@@ -129,11 +129,11 @@ for(n in c(7, 8, 3, 2, 1))
   DefaultAssay(stx) <- "Spatial"
   stx <- NormalizeData(stx)
   
-  ggs = rownames(stx)[grep('GAS6|AXL', rownames(stx))]
+  ggs = rownames(stx)[grep('HBEGF|EGFR|ERBB2|ERBB3|ERBB4', rownames(stx))]
   SpatialFeaturePlot(stx, features = ggs, images = cc[n])
   
-  ggsave(paste0(outDir, 'GAS6_AXL_expression_logNormalize_v2.pdf'), 
-         width = 14, height = 6)
+  ggsave(paste0(outDir, 'HBEGF_receptors_expression_logNormalize_v2.pdf'), 
+         width = 18, height = 12)
   
   
   ##########################################
@@ -253,10 +253,10 @@ for(n in c(7, 8, 3, 2, 1))
                                            slice = slice, normalized_weights = FALSE)
     
     DefaultAssay(stx2) = 'imputated'
-    ggs = rownames(stx2)[grep('GAS6|AXL|NRG1|ERBB2|AGRN|DAG1|POSTN|ITGB1', rownames(stx2))]
+    ggs = rownames(stx2)[grep('HBEGF|EGFR|ERBB2|ERBB3|ERBB4', rownames(stx2))]
     SpatialFeaturePlot(stx2, features = ggs, images = slice)
     
-    ggsave(paste0(outDir, 'GAS6_AXL_otherExamples_expression_visium_snRNAimputation.pdf'), 
+    ggsave(paste0(outDir, 'HBEGF_receptors_expression_visium_snRNAimputation.pdf'), 
            width = 14, height = 12)
     
     cat('change the feature names  \n')
@@ -266,7 +266,7 @@ for(n in c(7, 8, 3, 2, 1))
     mat = mat[match(unique(ggs), ggs), ]
     rownames(mat) = get_geneName(rownames(mat))
     
-    ggs = rownames(mat)[grep('GAS6|AXL|NRG1|ERBB2|AGRN|DAG1|POSTN|ITGB1', rownames(mat))]
+    ggs = rownames(mat)[grep('HBEGF|EGFR|ERBB2|ERBB3|ERBB4', rownames(mat))]
     
     srat <- CreateSeuratObject(counts = mat, data = mat,  assay = "imputation", 
                                meta.data = meta) # create object
@@ -286,8 +286,8 @@ for(n in c(7, 8, 3, 2, 1))
                                position.y = 'y',
                                k = 4, 
                                #blend = 'sum',
-                               custom_LR_database = data.frame(c('GAS6', 'NRG1', 'AGRN', 'POSTN'), 
-                                                               c('AXL', 'ERBB2', 'DAG1', 'ITGB1')), 
+                               custom_LR_database = data.frame(c('HBEGF', 'HBEGF', 'HBEGF', 'HBEGF'), 
+                                                               c('EGFR', 'ERBB2', 'ERBB3', 'ERBB4')), 
                                cell_types = "seurat_clusters",
                                min.cells.per.ident = 0,
                                min.cells.per.gene = NULL,
@@ -369,19 +369,15 @@ for(n in c(7, 8, 3, 2, 1))
     ggsave(paste0('../results/visium_axolotl_R17246_R12830_allVisium_20240905/LR_visualization/', 
                   'LRexamples_interaction_visium_snRNAimputation', cc[n], '_v2.pdf'), 
            width = 14, height = 12)
-      #ggplot2::scale_fill_gradient2(limits = c(-1, 4), breaks = c(0., 1, 2, 3),
-      #                              low = "#313695", mid = "#FFFFBF", high = "#C61010", midpoint = 1.5)
-      #                              #low = "#4CC9F0", mid = "#FEEFA7", high = "#C61010", midpoint = 1.5)
-      #scale_fill_viridis_c()
-      #scico::scale_fill_scico(palette = "vik")
-      #scale_fill_gradient(colours = SpatialColors)
-      #scale_fill_gradientn(colours = c("#4CC9F0", "#49A2F0", "#4361EE", "#941F56","#C61010"))
-      #ggplot2::scale_fill_gradient2(limits = c(-1, 4), breaks = c(0., 1, 2, 3, 4),
-      #                              low = "black", mid = "blue", high = "red", midpoint = 1.5)
-    
-    
-   
-    
+    #ggplot2::scale_fill_gradient2(limits = c(-1, 4), breaks = c(0., 1, 2, 3),
+    #                              low = "#313695", mid = "#FFFFBF", high = "#C61010", midpoint = 1.5)
+    #                              #low = "#4CC9F0", mid = "#FEEFA7", high = "#C61010", midpoint = 1.5)
+    #scale_fill_viridis_c()
+    #scico::scale_fill_scico(palette = "vik")
+    #scale_fill_gradient(colours = SpatialColors)
+    #scale_fill_gradientn(colours = c("#4CC9F0", "#49A2F0", "#4361EE", "#941F56","#C61010"))
+    #ggplot2::scale_fill_gradient2(limits = c(-1, 4), breaks = c(0., 1, 2, 3, 4),
+    #                              low = "black", mid = "blue", high = "red", midpoint = 1.5)
     
     #cols = c("#4CC9F0", "#49A2F0", "#4361EE", "#941F56","#C61010", "#ABD9E9" "#C5E5F0" "#E0F3F8", 
     #         "#EFF9DB" "#FFFFBF" "#FEEFA7" "#FEE090" "#FDC778", "#FDAE61" "#F88D52" "#F46D43")

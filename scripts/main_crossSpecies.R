@@ -260,16 +260,12 @@ saveRDS(mm, file = paste0(resDir, 'mm_scRNAseq_2batch_noCorrection.rds'))
 rm(mm)
 
 
-
-
 ########################################################
 ########################################################
 # Section II: cross-species cell types/states alignment 
-# SAMAP 
+# test SAMap 
 ########################################################
 ########################################################
-
-
 ## define the one-on-one ortholog between axololt and mice
 an_orthologs = data.frame(ref = rownames(ax), query = rownames(ax))
 rownames(an_orthologs) = an_orthologs$ref
