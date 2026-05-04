@@ -331,7 +331,7 @@ source('functions_Visium.R')
 st = readRDS(file = paste0(RdataDir,
                            'seuratObject_neonatalMouse_cell.gene.filtered_umap.clustered.rds'))
 
-
+SpatialFeaturePlot(st, features = c("Myh6", 'Axl'),image.alpha = 0.7)
 
 refs = readRDS(file = paste0('../data/data_examples/ref_scRNAseq_neonatalMice_clean.v1.2.rds'))
 
