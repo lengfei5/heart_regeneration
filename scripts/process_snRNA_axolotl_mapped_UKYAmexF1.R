@@ -42,10 +42,10 @@ mem_used()
 # check QCs 
 ########################################################
 ########################################################
+source('functions_scRNAseq.R')
+
 design = data.frame(sampleID = seq(197249, 197253), 
                     condition = c(paste0('Amex_scRNA_d', c(0, 1, 4, 7, 14))), stringsAsFactors = FALSE)
-
-source('functions_scRNAseq.R')
 
 for(n in 1:nrow(design))
 {
@@ -94,12 +94,15 @@ aa = CreateSeuratObject(counts = scn@assays$RNA@counts[, scn$iscell_dd],
 rm(scn)
 
 # Cell QC metrics: percentage of Mt, nb of counts, nb of genes 
-# get MT% (genes curated from NCBI chrMT genes)
-mtgenes = c("COX1", "COX2", "COX3", "ATP6", "ND1", "ND5", "CYTB", "ND2", "ND4", "ATP8", "MT-CO1", "COI", "LOC9829747")
-mtgenes = c(mtgenes, paste0("MT", mtgenes), paste0("MT-", mtgenes))
+# get MT% (genes from UKY_Amex annotation)
+mtgenes =  read.table(file = paste0('/groups/tanaka/People/current/jiwang/Genomes/axolotl_new/',
+                                    'UKY_AmexF1_1/annotations/RefSeq/',
+                                    'UKY_AmexF1_mitochondrion_genes.txt'), 
+                    header = TRUE, sep = '\t')
 
-ggs = sapply(rownames(aa), function(x) unlist(strsplit(as.character(x), '-'))[1])
-mtgenes = rownames(aa)[!is.na(match(ggs, mtgenes))]
+mtgenes = unique(mtgenes$gene)
+
+mtgenes = mtgenes[!is.na(match(mtgenes, rownames(aa)))]
 
 xx = PercentageFeatureSet(aa, col.name = "percent.mt", assay = "RNA", features = mtgenes)
 aa[['percent.mt']] = xx$percent.mt
@@ -135,6 +138,7 @@ FeatureScatter(aa, feature1 = "nCount_RNA", feature2 = "nFeature_RNA")
 FeatureScatter(aa, feature1 = "nCount_RNA", feature2 = "percent.mt")
 
 dev.off()
+
 
 ## second time cell filtering 
 aa <- subset(aa, subset = nFeature_RNA > 200 & nFeature_RNA < 10000 & percent.mt < 60)
