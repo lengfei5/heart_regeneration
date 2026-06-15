@@ -128,11 +128,11 @@ table(aa$condition) %>%
   labs( x = '', y = 'detected cell # from cellRanger barcodes' )  +
   theme(axis.text.x = element_text(angle = 0, size = 10))
 
-VlnPlot(aa, features = 'nFeature_RNA', y.max = 10000) +
-  geom_hline(yintercept = c(500, 2500, 3000))
+VlnPlot(aa, features = 'nFeature_RNA', y.max = 12000) +
+  geom_hline(yintercept = c(1000, 2500, 3000))
 
 VlnPlot(aa, features = 'nCount_RNA', y.max = 50000)
-VlnPlot(aa, features = 'percent.mt', y.max = 100)
+VlnPlot(aa, features = 'percent.mt', y.max = 20)
 
 FeatureScatter(aa, feature1 = "nCount_RNA", feature2 = "nFeature_RNA")
 FeatureScatter(aa, feature1 = "nCount_RNA", feature2 = "percent.mt")
@@ -141,6 +141,88 @@ dev.off()
 
 
 ## second time cell filtering 
-aa <- subset(aa, subset = nFeature_RNA > 200 & nFeature_RNA < 10000 & percent.mt < 60)
+aa <- subset(aa, subset = nFeature_RNA > 1000 & nFeature_RNA < 10000 & percent.mt < 20)
 
 saveRDS(aa, file = paste0(RdataDir, 'seuratObject_', species, version.analysis, '_QCs_cellFiltered.rds')) 
+
+
+##########################################
+# import the cell annotation from the previous analysis
+# keep only cells in the final version
+##########################################
+refs_file = paste0('/groups/tanaka/Collaborations/Jingkui-Elad/scMultiome/aa_subtypes_final_20221117.rds')
+
+refs = readRDS(file = refs_file)
+table(refs$subtypes)
+length(table(refs$subtypes))
+
+refs$subtypes = droplevels(refs$subtypes) 
+length(table(refs$subtypes)) 
+## only 41 subtype annotations from Elad, with additional annotation "doublet" with 0 cell
+
+## prepare the celltype to use and also specify the time-specific subtypes
+refs$celltype_toUse = as.character(refs$subtypes)
+length(table(refs$celltype_toUse))
+
+refs$condition = gsub('_scRNA', '', refs$condition)
+refs$celltype_toUse = gsub('Mo/Macs', 'Mo.Macs', refs$celltype_toUse)
+refs$celltype_toUse = gsub("[(]", '', refs$celltype_toUse)
+refs$celltype_toUse = gsub("[)]", '', refs$celltype_toUse)
+
+table(refs$celltype_toUse)
+length(table(refs$celltype_toUse))
+
+aa$condition = gsub('scRNA_','', aa$condition)
+aa$cellid = colnames(aa)
+aa$cellid = sapply(aa$cellid, function(x){unlist(strsplit(as.character(x), '-'))[1]})
+aa$cellid = paste0(aa$condition, '_', aa$cellid)
+
+refs$cellid = colnames(refs)
+refs$cellid = sapply(refs$cellid, function(x){unlist(strsplit(as.character(x), '-'))[1]})
+refs$cellid = paste0(refs$condition, '_', refs$cellid)
+
+mm = match(aa$cellid, refs$cellid)
+
+aa$subtypes = refs$celltype_toUse[mm]
+
+# define coarse clusters
+aa$celltypes = as.character(aa$subtypes)
+
+aa$celltypes[grep('CM_|CMs_|_CM|_CM_', aa$subtypes)] = 'CM'
+aa$celltypes[grep('EC_|_EC', aa$subtypes)] = 'EC'
+aa$celltypes[grep('FB_', aa$subtypes)] = 'FB'
+aa$celltypes[grep('B_cells', aa$subtypes)] = 'Bcell'
+aa$celltypes[grep('T_cells', aa$subtypes)] = 'Tcell'
+
+aa$celltypes[grep('Macrophages|_MF|Mo.Macs_', aa$subtypes)] = 'Macrophages'
+aa$celltypes[grep('Megakeryocytes', aa$subtypes)] = 'Megakeryocytes'
+aa$celltypes[grep('RBC', aa$subtypes)] = 'RBC'
+
+aa$celltypes[grep('Neu_', aa$subtypes)] = 'Neu'
+
+aa = subset(aa, cells = colnames(aa)[which(!is.na(aa$subtypes))])
+
+VlnPlot(aa, features = 'percent.mt', y.max = 10)
+
+aa <- NormalizeData(aa, normalization.method = "LogNormalize", scale.factor = 10000)
+
+aa <- FindVariableFeatures(aa, selection.method = "vst", nfeatures = 8000)
+all.genes <- rownames(aa)
+
+aa <- ScaleData(aa, features = all.genes)
+aa <- RunPCA(aa, features = VariableFeatures(object = aa), verbose = FALSE)
+ElbowPlot(aa, ndims = 50)
+
+aa <- FindNeighbors(aa, dims = 1:30)
+aa <- FindClusters(aa, verbose = FALSE, algorithm = 3, resolution = 0.7)
+
+aa <- RunUMAP(aa, dims = 1:30, n.neighbors = 30, min.dist = 0.1)
+
+p1 = DimPlot(aa, label = TRUE, group.by = 'subtypes',  repel = TRUE) + NoLegend()
+p2 = DimPlot(aa, label = TRUE, group.by = 'celltypes',  repel = TRUE) + NoLegend()
+
+p1 + p2
+
+ggsave(filename = paste0(resDir, '/umap_Elad_doubletRM_cleaned_manualAnnot.pdf'), width = 20, height = 8)
+
+saveRDS(aa, file = paste0(RdataDir, 'aa_annotated_no_doublets_Elad.rds'))
