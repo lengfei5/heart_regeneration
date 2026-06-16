@@ -12,7 +12,7 @@ rm(list = ls())
 library(pryr) # monitor the memory usage
 require(ggplot2)
 #library(nichenetr)
-library(Seurat) # please update to Seurat V4
+library(Seurat) # use Seurat V4
 library(tidyverse)
 library(circlize)
 library(RColorBrewer)
@@ -166,9 +166,34 @@ p4 = DimPlot(aa, group.by = 'dataset', label = TRUE, repel = TRUE, raster=FALSE)
 ggsave(paste0(resDir, 'neonatalMice_CM.Cui2020_noCM.Wang2020_P1_overview_noBatchCorrection.pdf'), 
        width = 16, height = 12)
 
-saveRDS(aa, file = paste0(resDir, 'nm_scRNAseq_8batches_noCorrection.rds'))
+saveRDS(aa, file = paste0(resDir, '/nm_scRNAseq_8batches_noCorrection.rds'))
 
 rm(aa)
+
+### plot the Axl in CM in neonatal mice
+aa = readRDS(file = paste0(RdataDir, 'nm_scRNAseq_8batches_noCorrection.rds'))
+
+aa = subset(aa, cells = colnames(aa)[which(aa$celltype == 'CM' & aa$dataset == 'Cui2020')])
+aa <- NormalizeData(aa, normalization.method = "LogNormalize", scale.factor = 10000)
+aa <- FindVariableFeatures(aa, selection.method = "vst", nfeatures = 3000)
+
+aa <- RunPCA(aa, verbose = FALSE, weight.by.var = TRUE)
+ElbowPlot(aa, ndims = 30)
+
+aa <- RunUMAP(aa, dims = 1:20, n.neighbors = 50, min.dist = 0.3)
+
+DimPlot(aa, label = TRUE, repel = TRUE, group.by = 'condition', raster=FALSE)
+
+p1 = DimPlot(aa, label = TRUE, repel = TRUE, group.by = 'condition', raster=FALSE)
+p2 = DimPlot(aa, label = TRUE, repel = TRUE, group.by = 'subtype', raster=FALSE)
+p3 = FeaturePlot(aa, features = c('Axl'))
+
+(p1 + p2)/p3 
+
+ggsave(filename = paste0('/groups/tanaka/Collaborations/Jingkui-Elad/Plots4manuscripts/revision_1/', 
+                         'neonatalMice_CM_Cui2020_Axl.pdf'), 
+       width = 12, height = 10)
+
 
 ##########################################
 ## adult mice after batch correction 
@@ -242,7 +267,7 @@ ElbowPlot(mm, ndims = 30)
 
 mm <- FindNeighbors(mm, reduction = "pca", dims = 1:20)
 #mm <- FindClusters(mm, resolution = 0.2)
-mm <- RunUMAP(mm, reduction = "pca", dims = 1:30, n.neighbors = 50, min.dist = 0.05) 
+mm <- RunUMAP(mm, reduction = "pca", dims = 1:30, n.neighbors = 50, min.dist = 0.05)
 
 p1 = DimPlot(mm, group.by = 'subtype', label = TRUE, repel = TRUE, raster=FALSE)
 p2 = DimPlot(mm, group.by = 'condition', label = TRUE, repel = TRUE) 
@@ -258,6 +283,31 @@ mm$batch = mm$dataset
 saveRDS(mm, file = paste0(resDir, 'mm_scRNAseq_2batch_noCorrection.rds'))
 
 rm(mm)
+
+
+### plot the Axl in CM in neonatal mice
+aa = readRDS(file = paste0(RdataDir, 'mm_scRNAseq_2batch_noCorrection.rds'))
+
+aa = subset(aa, cells = colnames(aa)[which(aa$celltype == 'CM' & aa$dataset == 'Ren2020')])
+aa <- NormalizeData(aa, normalization.method = "LogNormalize", scale.factor = 10000)
+aa <- FindVariableFeatures(aa, selection.method = "vst", nfeatures = 3000)
+
+aa <- RunPCA(aa, verbose = FALSE, weight.by.var = TRUE)
+ElbowPlot(aa, ndims = 30)
+
+aa <- RunUMAP(aa, dims = 1:20, n.neighbors = 50, min.dist = 0.3)
+
+DimPlot(aa, label = TRUE, repel = TRUE, group.by = 'condition', raster=FALSE)
+
+p1 = DimPlot(aa, label = TRUE, repel = TRUE, group.by = 'condition', raster=FALSE)
+p2 = DimPlot(aa, label = TRUE, repel = TRUE, group.by = 'subtype', raster=FALSE)
+p3 = FeaturePlot(aa, features = c('Axl'))
+
+(p1 + p2)/p3 
+
+ggsave(filename = paste0('/groups/tanaka/Collaborations/Jingkui-Elad/Plots4manuscripts/revision_1/', 
+                         'adultMice_Ren2020_CM_Axl.pdf'), 
+       width = 12, height = 10)
 
 
 ########################################################
@@ -314,9 +364,7 @@ rm(new_ax)
 ########################################################
 ########################################################
 
-
 mm = readRDS(file = paste0(RdataDir, 'mm_scRNAseq.rds'))
-
 
 ########################################################
 ########################################################

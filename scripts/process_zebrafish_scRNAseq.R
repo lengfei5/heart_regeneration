@@ -369,7 +369,3 @@ DimPlot(ref.combined, group.by = 'BroadID', split.by = 'condition', label = TRUE
 ggsave(filename = paste0(outDir, '/CM_Cui2020_noCM_Wang2020_P1_merged_celltypes.by.conditions', 
                          '_dataIntegration_', method, '.pdf'),  width = 16, height = 12)
 
-
-
-
-
