@@ -1,7 +1,7 @@
 ##########################################################################
 ##########################################################################
 # Project:
-# Script purpose:
+# Script purpose: 
 # Usage example: 
 # Author: Jingkui Wang (jingkui.wang@imp.ac.at)
 # Date of creation: Tue Oct  4 10:00:26 2022
@@ -14,6 +14,7 @@ version.analysis = '_R12830_resequenced_20220308'
 dataDir = '../R12830_visium_reseqenced/nf_out'
 resDir = paste0("../results/visium_axolotl", version.analysis)
 RdataDir = paste0('../results/Rdata/')
+
 
 if(!dir.exists(resDir)) dir.create(resDir)
 if(!dir.exists(RdataDir)) dir.create(RdataDir)

@@ -291,6 +291,46 @@ saveRDS(aa, file = paste0(RdataDir, 'dr_scRNAseq_39Batches_noCorrection.rds'))
 
 
 ##########################################
+# plot the Axl expression in CM
+##########################################
+source('functions_dataIntegration.R')
+
+aa = readRDS(file = paste0(RdataDir, 'dr_scRNAseq_39Batches_noCorrection.rds'))
+
+p1 = DimPlot(aa, group.by = "celltypes", label = TRUE, repel = TRUE, raster=FALSE)
+p2 = DimPlot(aa, group.by = "batch", label = FALSE, raster=FALSE)
+
+p1 / p2
+
+ggsave(filename = paste0(resDir, 'UMAP_celltypes.original_39batch.pdf'), height = 16, width = 12)
+
+
+Idents(aa) = aa$celltypes
+
+aa = subset(aa, cells = colnames(aa)[grep('Cardiomyocyt', aa$celltypes)])
+
+aa <- NormalizeData(aa, normalization.method = "LogNormalize", scale.factor = 10000)
+aa <- FindVariableFeatures(aa, selection.method = "vst", nfeatures = 3000)
+
+aa <- RunPCA(aa, verbose = FALSE, weight.by.var = TRUE)
+ElbowPlot(aa, ndims = 30)
+
+aa <- RunUMAP(aa, dims = 1:20, n.neighbors = 50, min.dist = 0.3)
+
+DimPlot(aa, label = TRUE, repel = TRUE, group.by = 'time', raster=FALSE)
+
+p1 = DimPlot(aa, label = TRUE, repel = TRUE, group.by = 'time', raster=FALSE)
+p2 = DimPlot(aa, label = TRUE, repel = TRUE, group.by = 'celltypes', raster=FALSE)
+p3 = FeaturePlot(aa, features = c('AXL'))
+
+(p1 + p2)/p3 
+
+ggsave(filename = paste0('/groups/tanaka/Collaborations/Jingkui-Elad/Plots4manuscripts/revision_1/', 
+                         'zebrafish_Hu2022_CM_AXL.pdf'), 
+       width = 12, height = 10)
+
+
+##########################################
 # Test batch correction  
 # from the previous analysis, the fastMNN reduction seems to be good
 # and also the batch-corrected expression from rpca were used 

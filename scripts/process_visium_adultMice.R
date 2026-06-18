@@ -560,12 +560,38 @@ if(Import.manual.spatial.domains){
                                  'seuratObject_mouse_adult_cell.gene.filtered_umap.clustered_manualSegmentation', 
                                  species, '.Rdata'))
   
+  ### plot the manual segmentation
+  figDir = '/groups/tanaka/Collaborations/Jingkui-Elad/Plots4manuscripts/revision_1/'
+  
+  load(file = paste0(RdataDir,
+                     'seuratObject_mouse_adult_cell.gene.filtered_umap.clustered_manualSegmentation', 
+                     species, '.Rdata'))
+  
+  st$segmentation = as.character(st$segmentation)
+  st$segmentation[which(is.na(st$segmentation) == TRUE)] = 'others'
+  
+  st$segmentation = as.factor(st$segmentation)
+  Idents(st) = as.factor(st$segmentation)
+  SpatialDimPlot(st)
+  
+  ggsave(paste0(figDir, 'Manual_segmentation_spata2_Elad_v2.pdf'), width = 16, height = 6)
+  
+  
+  SpatialFeaturePlot(st, features = c('Myh6', 'Nppa')) 
+  
+  ggsave(paste0(figDir, 'AdultMice_borderZone_markerGenes_v2.pdf'), width = 16, height = 12)
+  
   
 }else{ ### run bayesSpace to systematic spatial domain searching
+  
   source('functions_Visium.R')
   run_bayesSpace(st, outDir = paste0(resDir, '/bayesSpace/'))
   
+  
 }
+
+
+
 
 ##########################################
 # Step 2): cell neighborhood analysis
