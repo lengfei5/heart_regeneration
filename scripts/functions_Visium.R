@@ -1403,14 +1403,20 @@ run_bayesSpace = function(st,
   print(table(st$condition))
   cc = names(table(st$condition))
   
+  Idents(st) = st$condition
+  
+  st$condition
+  
+  
   for(n in 1:length(cc))
   {
-    # n = 1
+    # n = 2
     
-    cat('slice -- ', cc[n], '\n')
     slice = cc[n]
-    stx = st[, which(st$condition == slice)]
+    stx = st[, which(st$condition== slice)]
     DefaultAssay(stx) = 'Spatial'
+    
+    cat('slice -- ', cc[n],  ': ', ncol(stx), ' spots \n')
     
     #slice = names(table(stx$condition))
     scc <- as.SingleCellExperiment(stx, assay = 'Spatial')
@@ -1491,7 +1497,9 @@ run_bayesSpace = function(st,
       
       ggsave(filename =  paste0(resultsdir, "/BayesSpace_SpatialSlustered_", slice, "_cluster_", 
                                 q, ".pdf"), width = 16, height = 8)
-      saveRDS(scc, file = paste0(resultsdir, "/BayesSpace_SpatialClustered_", slice,  "_with_clusters_", q, ".rds"))
+      
+      saveRDS(scc, file = paste0(resultsdir, "/BayesSpace_SpatialClustered_", slice,  
+                                 "_with_clusters_", q, ".rds"))
       
       #aa$spatial_domain_bayeSpace = NA
       #aa$spatial_domain_bayeSpace[match(colnames(scc), colnames(aa))] = scc$spatial.cluster

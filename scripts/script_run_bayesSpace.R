@@ -9,11 +9,19 @@
 ##########################################################################
 rm(list = ls())
 
-species = 'axolotl'
-version.analysis = '_R12830_resequenced_20220308'
-dataDir = '../R12830_visium_reseqenced/nf_out'
-resDir = paste0("../results/visium_axolotl", version.analysis)
-RdataDir = paste0('../results/Rdata/')
+species = 'mouse_adult'
+version.analysis = '_R11934_20240131'
+resDir = paste0("../results/visium_adultMice", version.analysis)
+RdataDir = paste0(resDir, '/Rdata/')
+
+if(!dir.exists(resDir)) dir.create(resDir)
+if(!dir.exists(RdataDir)) dir.create(RdataDir)
+
+# species = 'axolotl'
+# version.analysis = '_R12830_resequenced_20220308'
+# dataDir = '../R12830_visium_reseqenced/nf_out'
+# resDir = paste0("../results/visium_axolotl", version.analysis)
+# RdataDir = paste0('../results/Rdata/')
 
 
 if(!dir.exists(resDir)) dir.create(resDir)
@@ -29,7 +37,11 @@ options(future.globals.maxSize = 64000 * 1024^2)
 ##########################################
 # main script
 ##########################################
-load(file = paste0(RdataDir, 'seuratObject_design_variableGenes_umap.clustered', species, '.Rdata'))
+load(file = paste0(RdataDir,
+                   'seuratObject_mouse_adult_cell.gene.filtered_umap.clustered_manualSegmentation', 
+                   species, '.Rdata'))
+
+#load(file = paste0(RdataDir, 'seuratObject_design_variableGenes_umap.clustered', species, '.Rdata'))
 st$condition = factor(st$condition, levels = design$condition)
 
 cat('visium conditions :\n')
@@ -37,5 +49,10 @@ print(table(st$condition))
 cc = design$condition
 
 source('functions_Visium.R')
+
+
 run_bayesSpace(st, outDir = paste0(resDir, '/bayesSpace/'))
+
+
+
 

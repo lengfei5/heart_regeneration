@@ -24,6 +24,7 @@ source('functions_cccInference.R')
 
 dataPath_nichenet = '../data/NicheNet/'
 
+species = 'mouse_neonadal'
 version.analysis = '_R11934_20210827_neonatal'
 
 resDir = paste0("../results/visium_neonatalMice", version.analysis)
@@ -33,8 +34,6 @@ if(!dir.exists(resDir)) dir.create(resDir)
 if(!dir.exists(RdataDir)) dir.create(RdataDir)
 
 dataDir = '../R11934_visium_mice'
-
-species = 'mouse_neonadal'
 
 
 ########################################################
@@ -404,4 +403,18 @@ if(Use_fineGrained_subtypes){
   
 }
 
+##########################################
+# predict Spatial domains (injury zone, border zone)
+##########################################
+figDir = '/groups/tanaka/Collaborations/Jingkui-Elad/Plots4manuscripts/revision_1/'
+
+st = readRDS(file = paste0(RdataDir,  'seuratObject_neonatalMouse_cell.gene.filtered_umap.clustered.rds'))
+
+st$condition = factor(st$condition, levels = c("neonatal.day1", "neonatal.day4", 
+                                               "neonatal.day7", "neonatal.day14"))
+
+SpatialFeaturePlot(st, features = c('Myh6', 'Nppa')) 
+
+
+ggsave(paste0(figDir,  species,  '_borderZone_markerGenes_v2.pdf'), width = 16, height = 12)
 
