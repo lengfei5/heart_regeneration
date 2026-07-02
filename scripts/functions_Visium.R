@@ -1386,6 +1386,7 @@ run_bayesSpace = function(st,
                           outDir = paste0(resDir, '/bayesSpace/'),
                           Find.top.markers.for.spatial.clusters = FALSE,
                           Run.bayesSpace.enhanced.clustering = FALSE,
+                          nb.clusters = c(5:15)
                           )
 {
   ## aa is a seurat objet with one slice / one image
@@ -1460,7 +1461,7 @@ run_bayesSpace = function(st,
     # sptial clustering 
     d <- 15  # Number of PCs recommended by the paper
     
-    for(q in c(5:15)){ # enumerate the number of clusters
+    for(q in nb.clusters){ # enumerate the number of clusters
       
       # q <- 13  # Number of clusters
       cat('---- nb of clusters : ', q, '----\n')

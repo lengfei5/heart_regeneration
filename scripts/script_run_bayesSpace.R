@@ -50,5 +50,6 @@ cc = design$condition
 
 source('functions_Visium.R')
 
-run_bayesSpace(st, outDir = paste0(resDir, '/bayesSpace_v2/'))
+run_bayesSpace(st, outDir = paste0(resDir, '/bayesSpace_v3/'),
+               nb.clusters = c(2:6) )
 
