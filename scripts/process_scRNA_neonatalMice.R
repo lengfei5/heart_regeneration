@@ -64,7 +64,6 @@ if(Process.Cardiomyocyte.Cui.et.al.2020){
   design$condition = sapply(design$condition, function(x){unlist(strsplit(x, '_'))[2]})
   
   
-  
   # import data from cellranger output
   for(n in 1:nrow(design))
   {
