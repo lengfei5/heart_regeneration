@@ -1385,7 +1385,8 @@ manual_selection_spots_image_Spata2 = function(st,
 run_bayesSpace = function(st, 
                           outDir = paste0(resDir, '/bayesSpace/'),
                           Find.top.markers.for.spatial.clusters = FALSE,
-                          Run.bayesSpace.enhanced.clustering = FALSE)
+                          Run.bayesSpace.enhanced.clustering = FALSE,
+                          )
 {
   ## aa is a seurat objet with one slice / one image
   require(SingleCellExperiment)
