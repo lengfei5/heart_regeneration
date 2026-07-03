@@ -501,7 +501,6 @@ if(Process.CM.Cui.et.al.2020_Shoval.version){
   saveRDS(aa, file = paste0(RdataDir, 
                             'Seurat.obj_neonatalMice_CM_Cui2020_shoval.version_integrated.rds'))
   
-  
 }
 
 ########################################################

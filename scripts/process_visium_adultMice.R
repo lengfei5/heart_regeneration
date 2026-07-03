@@ -584,14 +584,44 @@ if(Import.manual.spatial.domains){
   
 }else{ ### run bayesSpace to systematic spatial domain searching
   
+  figDir = '/groups/tanaka/Collaborations/Jingkui-Elad/Plots4manuscripts/revision_1/'
+  
   source('functions_Visium.R')
-  run_bayesSpace(st, outDir = paste0(resDir, '/bayesSpace/'))
+  #run_bayesSpace(st, outDir = paste0(resDir, '/bayesSpace/'))
+  
+  load(file = paste0(RdataDir,
+                     'seuratObject_mouse_adult_cell.gene.filtered_umap.clustered_manualSegmentation', 
+                     species, '.Rdata'))
+  
+  st$segmentation = as.character(st$segmentation)
+  st$segmentation[grep('Remote_', st$segmentation)] = 'others'
+  st$segmentation[which(is.na(st$segmentation) == TRUE)] = 'others'
+  
+  st$segmentation[grep('Distal_BZ|Proximal_BZ', st$segmentation)] = 'BZ'
+  
+  st$segmentation[grep('Mixed_Inj_BZ', st$segmentation)] = 'Injury'
+  
+  SpatialDimPlot(st, group.by = 'segmentation')
+  
+  st$segmentation = factor(st$segmentation, levels = c('Injury', 'BZ', 'others'))
+  #Idents(st) = as.factor(st$segmentation)
+  
+  #st$segmentation = as.character(st$segmentation)
+  SpatialDimPlot(st, group.by = 'segmentation')
+  
+  ggsave(paste0(figDir, species, '_spata2_manualSegmentationElad.pdf'), width = 16, height = 6)
   
   
+  SpatialFeaturePlot(st, features = c('Myh6', 'Nppa')) 
+  
+  ggsave(paste0(figDir, 'AdultMice_borderZone_markerGenes_v2.pdf'), width = 16, height = 12)
+  
+  
+  
+  
+    
+   
 }
-
-
-
 
 ##########################################
 # Step 2): cell neighborhood analysis
@@ -641,6 +671,8 @@ if(Run_Neighborhood_Enrichment_Analysis){
                                     RCTD_out = RCTD_out,
                                     condSpec_celltypes = NULL
   )
+  
+  
   
   
 }
