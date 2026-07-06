@@ -421,85 +421,79 @@ ggsave(paste0(figDir,  species,  '_borderZone_markerGenes_v2.pdf'), width = 16, 
 
 
 ###### import the bayesSpace output for the segmentation
-outDir_bayesSpace = paste0(resDir, '/bayesSpace_v3/')
+outDir_bayesSpace = paste0(resDir, '/bayesSpace_v2/')
 
 st$spatialDomain = 'domain_others'
-SpatialDimPlot(st, group.by = 'spatialDomain')
+
+SpatialDimPlot(st, group.by = 'spatialDomain', stroke = 0.5)
 
 res = readRDS(file = paste0(outDir_bayesSpace, 
-                            'adult.day1/BayesSpace_SpatialClustered_adult.day1_with_clusters_5.rds'))
+                            'neonatal.day1/BayesSpace_SpatialClustered_neonatal.day1_with_clusters_5.rds'))
 
 st$spatialDomain[match(colnames(res), colnames(st))] = paste0('domain_', res$spatial.cluster)
 
 SpatialDimPlot(st, group.by = 'spatialDomain')
 
-st$spatialDomain[which(st$spatialDomain == "domain_1")] = 'domain_Injury'
+st$spatialDomain[which(st$spatialDomain == "domain_3")] = 'domain_Injury'
 st$spatialDomain[which(st$spatialDomain == "domain_4")] = 'domain_BZ'
+st$spatialDomain[which(st$spatialDomain != "domain_BZ" & st$spatialDomain != "domain_Injury" &
+                         st$condition == "neonatal.day1")] = 'domain_others'
 
-st$spatialDomain[which(st$condition == 'adult.day1')] = paste0('d1_', st$spatialDomain[which(st$condition == 'adult.day1')])
 
 SpatialDimPlot(st, group.by = 'spatialDomain')
 
-res = readRDS(file = paste0(outDir_bayesSpace, 'adult.day4/',
-                            'BayesSpace_SpatialClustered_adult.day4_with_clusters_4.rds'))
+res = readRDS(file = paste0(outDir_bayesSpace, 'neonatal.day4/',
+                            'BayesSpace_SpatialClustered_neonatal.day4_with_clusters_5.rds'))
 
 st$spatialDomain[match(colnames(res), colnames(st))] = paste0('domain_', res$spatial.cluster)
 
 SpatialDimPlot(st, group.by = 'spatialDomain')
+
 
 st$spatialDomain[which(st$spatialDomain == "domain_2")] = 'domain_Injury'
-st$spatialDomain[which(st$spatialDomain == "domain_3")] = 'domain_BZ'
-
-SpatialDimPlot(st, group.by = 'spatialDomain')
-
-st$spatialDomain[which(st$condition == 'adult.day4')] = paste0('d4_', 
-                                                               st$spatialDomain[which(st$condition == 'adult.day4')])
-
-SpatialDimPlot(st, group.by = 'spatialDomain')
-
-
-res = readRDS(file = paste0(outDir_bayesSpace, 'adult.day7/',
-                            'BayesSpace_SpatialClustered_adult.day7_with_clusters_6.rds'))
-
-st$spatialDomain[match(colnames(res), colnames(st))] = paste0('domain_', res$spatial.cluster)
-
-SpatialDimPlot(st, group.by = 'spatialDomain')
-
-st$spatialDomain[which(st$spatialDomain == "domain_4")] = 'domain_Injury'
 st$spatialDomain[which(st$spatialDomain == "domain_5")] = 'domain_BZ'
 
+st$spatialDomain[which(st$spatialDomain != "domain_BZ" & st$spatialDomain != "domain_Injury" &
+                         st$condition == "neonatal.day4")] = 'domain_others'
+
+
 SpatialDimPlot(st, group.by = 'spatialDomain')
 
-st$spatialDomain[which(st$condition == 'adult.day7')] = paste0('d7_', 
-                                                               st$spatialDomain[which(st$condition == 'adult.day7')])
 
-SpatialDimPlot(st, group.by = 'spatialDomain')
-
-
-
-res = readRDS(file = paste0(outDir_bayesSpace, 'adult.day14/',
-                            'BayesSpace_SpatialClustered_adult.day14_with_clusters_6.rds'))
+res = readRDS(file = paste0(outDir_bayesSpace, 'neonatal.day7/',
+                            'BayesSpace_SpatialClustered_neonatal.day7_with_clusters_6.rds'))
 
 st$spatialDomain[match(colnames(res), colnames(st))] = paste0('domain_', res$spatial.cluster)
 
 SpatialDimPlot(st, group.by = 'spatialDomain')
 
-st$spatialDomain[which(st$spatialDomain == "domain_4")] = 'domain_Injury'
-st$spatialDomain[which(st$spatialDomain == "domain_6")] = 'domain_BZ'
+st$spatialDomain[which(st$spatialDomain == "domain_3")] = 'domain_Injury'
+st$spatialDomain[which(st$spatialDomain == "domain_5")] = 'domain_BZ'
+st$spatialDomain[which(st$spatialDomain != "domain_BZ" & st$spatialDomain != "domain_Injury" &
+                         st$condition == "neonatal.day7")] = 'domain_others'
+
 
 SpatialDimPlot(st, group.by = 'spatialDomain')
 
-st$spatialDomain[which(st$condition == 'adult.day14')] = paste0('d14_', 
-                                                                st$spatialDomain[which(st$condition == 'adult.day14')])
+
+res = readRDS(file = paste0(resDir, '/bayesSpace/', 'neonatal.day14/',
+                            'BayesSpace_SpatialClustered_neonatal.day14_with_clusters_9.rds'))
+
+st$spatialDomain[match(colnames(res), colnames(st))] = paste0('domain_', res$spatial.cluster)
 
 SpatialDimPlot(st, group.by = 'spatialDomain')
 
+st$spatialDomain[which(st$spatialDomain == "domain_9")] = 'domain_Injury'
+st$spatialDomain[which(st$spatialDomain == "domain_1")] = 'domain_BZ'
 
-st$spatialDomain[grep('domain_Injury', st$spatialDomain)] = 'domain_Injury'
 
-st$spatialDomain[grep('domain_BZ', st$spatialDomain)] = 'domain_BZ'
+st$spatialDomain[which(st$spatialDomain != "domain_BZ" & st$spatialDomain != "domain_Injury" &
+                         st$condition == "neonatal.day14")] = 'domain_others'
 
-st$spatialDomain[grep('domain_BZ|domain_Injury', st$spatialDomain, invert = TRUE)] = 'domain_others'
+
+SpatialDimPlot(st, group.by = 'spatialDomain')
+
+st$spatialDomain = factor(st$spatialDomain, levels = c('domain_Injury', 'domain_BZ', 'domain_others'))
 
 SpatialDimPlot(st, group.by = 'spatialDomain')
 
