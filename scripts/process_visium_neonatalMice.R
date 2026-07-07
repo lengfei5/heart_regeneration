@@ -500,3 +500,4 @@ SpatialDimPlot(st, group.by = 'spatialDomain')
 ggsave(paste0(figDir, species, '_bayesSpace_spatialDomains.pdf'), width = 16, height = 6)
 
 
+
