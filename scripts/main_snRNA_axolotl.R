@@ -494,7 +494,10 @@ refs$celltypes[grep('Megakeryocytes', refs$subtypes)] = 'Megakeryocytes'
 refs$celltypes[grep('RBC', refs$subtypes)] = 'RBC'
 
 DimPlot(refs, group.by = 'celltypes', label = TRUE, repel = TRUE) + NoLegend()
+
 ggsave(paste0(resDir, "/snRNAseq_umap_celltypes_overview.pdf"),  width = 10, height = 8)
+
+
 
 
 DimPlot(refs, group.by = 'subtypes', label = TRUE, repel = TRUE) + NoLegend()
@@ -504,6 +507,9 @@ ggsave(paste0(resDir, "/snRNAseq_umap_subtypes_overview.pdf"),  width = 12, heig
 aa = refs
 rm(refs)
 
+saveRDS(aa, file = paste0(RdataDir, 'aa_annotated_20221017_byElad_forPaper.rds'))
+
+header_
 aa <- NormalizeData(aa, normalization.method = "LogNormalize", scale.factor = 10000)
 
 aa <- FindVariableFeatures(aa, selection.method = "vst", nfeatures = 8000)
@@ -521,6 +527,7 @@ aa <- RunUMAP(aa, dims = 1:30, n.neighbors = 30, min.dist = 0.1)
 DimPlot(aa, label = TRUE, group.by = 'subtypes',  repel = TRUE) + NoLegend()
 
 ggsave(filename = paste0(resDir, '/umap_Elad_doubletRM_cleaned_manualAnnot.pdf'), width = 10, height = 8)
+
 
 ##########################################
 # macrophage subseting 
