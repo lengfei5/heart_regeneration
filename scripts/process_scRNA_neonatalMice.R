@@ -524,7 +524,9 @@ if(process_CM_P1){
   aa$injury = sapply(aa$condition, function(x){unlist(strsplit(x, '_'))[2]})
   aa$time = sapply(aa$condition, function(x){unlist(strsplit(x, '_'))[3]})
   
+  
   aa = subset(aa, cells = colnames(aa)[which(aa$age == 'P1')])
+  aa = subset(aa, cells = colnames(aa)[which(aa$age == 'P8')])
   
   DimPlot(aa)
   
@@ -552,6 +554,9 @@ if(process_CM_P1){
   aa$celltypes = paste0('CM', aa$seurat_clusters)
   
   saveRDS(aa, file = paste0(RdataDir, 'Seurat.obj_neonatalMice_CM_Cui2020_shoval.version_P1_clusterd.rds'))
+  
+  saveRDS(aa, file = paste0(RdataDir, 'Seurat.obj_neonatalMice_CM_Cui2020_shoval.version_P8_clusterd.rds'))
+  
   
   ##########################################
   # test batch correction with different integration methods

@@ -373,7 +373,8 @@ ggsave(filename = paste0(resDir, '/first_test_clusterMarkers_v2.pdf'), width = 4
 ########################################################
 ########################################################
 SeuratObj = '/groups/tanaka/Collaborations/Jingkui-Elad/scMultiome/Rdata_spliced/'
-bb = readRDS(file = paste0(SeuratObj, 'seuratObject_axloltl_scRNAseq_R13591_20220720_lognormamlized_pca_umap.rds'))
+bb = readRDS(file = paste0(SeuratObj, 
+                           'seuratObject_axloltl_scRNAseq_R13591_20220720_lognormamlized_pca_umap.rds'))
 
 
 
@@ -474,15 +475,31 @@ write.csv(x = refs@meta.data, file = '../data/snRNAseq_countMatrix_metadata.csv'
 ########################################################
 ########################################################
 # Section : double check the clustering results
-# to double check the FB subclusters
 ########################################################
 ########################################################
 # refined subtypes by Elad 
-refs_file = '/groups/tanaka/Collaborations/Jingkui-Elad/scMultiome/aa_annotated_no_doublets_2022_10_17.rds'
+refs_file = paste0('/groups/tanaka/Collaborations/Jingkui-Elad/scMultiome/aa_subtypes_final_20221117.rds')
+#refs_file = '/groups/tanaka/Collaborations/Jingkui-Elad/scMultiome/aa_annotated_no_doublets_2022_10_17.rds'
 refs = readRDS(file = refs_file)
 table(refs$subtypes)
 
+table(refs$subtypes)
+length(table(refs$subtypes))
+
+#refs$subtypes = droplevels(refs$subtypes) 
+#length(table(refs$subtypes)) 
+
 refs$celltypes = as.character(refs$subtypes)
+length(table(refs$celltypes))
+
+refs$condition = gsub('_scRNA', '', refs$condition)
+refs$celltypes = gsub('Mo/Macs', 'Mo.Macs', refs$celltypes)
+refs$celltypes = gsub("[(]", '', refs$celltypes)
+refs$celltypes = gsub("[)]", '', refs$celltypes)
+
+table(refs$celltypes)
+length(table(refs$celltypes))
+
 
 refs$celltypes[grep('CM_|CMs_|_CM|_CM_', refs$subtypes)] = 'CM'
 refs$celltypes[grep('EC_|_EC', refs$subtypes)] = 'EC'
@@ -493,44 +510,159 @@ refs$celltypes[grep('Macrophages|_MF', refs$subtypes)] = 'Macrophages'
 refs$celltypes[grep('Megakeryocytes', refs$subtypes)] = 'Megakeryocytes'
 refs$celltypes[grep('RBC', refs$subtypes)] = 'RBC'
 
+refs$celltypes[grep('Mo.Macs_', refs$subtypes)] = 'Mo.Macs'
+refs$celltypes[grep('Neu_', refs$subtypes)] = 'Neu'
+
 DimPlot(refs, group.by = 'celltypes', label = TRUE, repel = TRUE) + NoLegend()
 
-ggsave(paste0(resDir, "/snRNAseq_umap_celltypes_overview.pdf"),  width = 10, height = 8)
-
-
+ggsave(paste0(resDir, "/snRNAseq_umap_celltypes_overview_updated.pdf"),  width = 10, height = 8)
 
 
 DimPlot(refs, group.by = 'subtypes', label = TRUE, repel = TRUE) + NoLegend()
-ggsave(paste0(resDir, "/snRNAseq_umap_subtypes_overview.pdf"),  width = 12, height = 8)
+ggsave(paste0(resDir, "/snRNAseq_umap_subtypes_overview_updated.pdf"),  width = 12, height = 8)
 
 
 aa = refs
 rm(refs)
 
-saveRDS(aa, file = paste0(RdataDir, 'aa_annotated_20221017_byElad_forPaper.rds'))
+saveRDS(aa, file = paste0(RdataDir, 'aa_annotated_final_20221117_byElad_forPaper.rds'))
 
-header_
-aa <- NormalizeData(aa, normalization.method = "LogNormalize", scale.factor = 10000)
+##########################################
+# double check the marker genes for missing cell types and not well annotated cell types
+# to address the reviewers questions 
+# Smooth muscle, lymphatic/endothelial, conduction marker validation
+##########################################
+aa = readRDS(file = paste0(RdataDir, 'aa_annotated_final_20221117_byElad_forPaper.rds'))
 
-aa <- FindVariableFeatures(aa, selection.method = "vst", nfeatures = 8000)
-all.genes <- rownames(aa)
 
-aa <- ScaleData(aa, features = all.genes)
-aa <- RunPCA(aa, features = VariableFeatures(object = aa), verbose = FALSE)
-ElbowPlot(aa, ndims = 30)
+## marker genes of smooth muscle cells https://www.sciencedirect.com/science/article/pii/S1534580722006852
+ggs = paste0(toupper(c(#"Ppp1r12b",
+                       "^Lmod1", "Myl9", "Tpm2", "Actg2", "Dmpk", "^Cnn1",
+        "Tagln-", "Myh11", "Mylk-", "Acta2", "MYOCD")), collapse = '|')
+features = rownames(aa)[grep(ggs, rownames(aa))]
+features = features[order(features)]
 
-aa <- FindNeighbors(aa, dims = 1:30)
-aa <- FindClusters(aa, verbose = FALSE, algorithm = 3, resolution = 0.7)
+features = features[c(1, 2, 3, 5, 6, 11, 12)]
+FeaturePlot(aa, features = features, cols = c('gray', 'red'))
 
-aa <- RunUMAP(aa, dims = 1:30, n.neighbors = 30, min.dist = 0.1)
+ggsave(paste0(resDir, "/snRNAseq_featuresPlots_markerGenes_SMCs.pdf"),  width = 14, height = 10)
 
-DimPlot(aa, label = TRUE, group.by = 'subtypes',  repel = TRUE) + NoLegend()
 
-ggsave(filename = paste0(resDir, '/umap_Elad_doubletRM_cleaned_manualAnnot.pdf'), width = 10, height = 8)
+## prepare the data of CMs for Bonsai test
+sub.obj = subset(aa, cells = colnames(aa)[which(aa$celltypes == 'CM')])
+
+
+
+sub.obj = subset(sub.obj, cells = colnames(aa)[which(aa$subtypes == 'CM_IS'|
+                                                      aa$subtypes == 'CM_Prol_1'|
+                                                      aa$subtypes == 'CM_Prol_IS'| 
+                                                       aa$subtypes == 'CM_Prol_3'|
+                                                       aa$subtypes == ' CM_ven_(Cav3_1)'|
+                                                       aa$subtypes == 'CM_ven_(Robo2)'
+                                                       )])
+sub.obj$subtypes = droplevels(sub.obj$subtypes)
+
+counts = sub.obj@assays$RNA@counts
+counts = data.frame(GeneID = rownames(counts), as.matrix(counts), stringsAsFactors = FALSE)
+
+write.table(counts, file = paste0(resDir, '/CMs_countTable_4Bonsai.tsv'),
+            row.names = FALSE, col.names = TRUE, quote = FALSE, sep = '\t')
+
+metadata = sub.obj@meta.data
+metadata = data.frame(CellID = rownames(metadata), metadata)
+
+write.table(metadata, file = paste0(resDir, '/CMs_annotation_4Bonsai.tsv'),
+            row.names = FALSE, col.names = TRUE, quote = FALSE, sep = '\t')
+
+
+## markers of lymphatic-like ECs
+sub.obj = subset(aa, cells = colnames(aa)[which(aa$celltypes == 'EC')])
+
+sub.obj <- NormalizeData(sub.obj, normalization.method = "LogNormalize", scale.factor = 10000)
+sub.obj <- FindVariableFeatures(sub.obj, selection.method = "vst", nfeatures = 3000)
+
+sub.obj <- ScaleData(sub.obj, features = rownames(sub.obj))
+sub.obj <- RunPCA(sub.obj, features = VariableFeatures(object = sub.obj), verbose = FALSE)
+ElbowPlot(sub.obj, ndims = 30)
+
+#sub.obj <- FindNeighbors(sub.obj, dims = 1:30)
+#sub.obj <- FindClusters(sub.obj, verbose = FALSE, algorithm = 3, resolution = 0.7)
+
+sub.obj <- RunUMAP(sub.obj, dims = 1:30, n.neighbors = 30, min.dist = 0.1)
+
+DimPlot(sub.obj, label = TRUE, group.by = 'subtypes',  repel = TRUE) + NoLegend()
+
+ggsave(filename = paste0(resDir, '/umap_Elad_subset_Endo.pdf'), width = 10, height = 8)
+
+
+ggs = paste0(toupper(c("Ccl21a",
+  "Mmrn1", "Flt4", 'Prox1', "Lyve1", 'Pdpn')), 
+  collapse = '|')
+features = rownames(aa)[grep(ggs, rownames(aa))]
+features = features[order(features)]
+
+features = features[c(1, 2, 3, 5, 6, 11, 12)]
+
+DotPlot(sub.obj, features = features, cols = c("lightgrey", "#007BB7")) +
+  theme(axis.text.x = element_text(angle = 60, size = 12, hjust = 1), 
+        axis.text.y = element_text(angle = 0, size = 12), 
+        axis.title =  element_text(size = 14),
+        legend.text = element_text(size=12),
+        legend.title = element_text(size = 14)
+        #legend.position=c(0.2, 0.8),
+        #plot.margin = margin()
+        #legend.key.size = unit(1, 'cm')
+        #legend.key.width= unit(1, 'cm')
+  )
+
+ggsave(paste0(resDir, "/snRNAseq_featuresPlots_markerGenes_LECs.pdf"),  width = 10, height = 6)
+
+
+## double check the CCS marker genes
+sub.obj = subset(aa, cells = colnames(aa)[which(aa$celltypes == 'CM')])
+
+sub.obj <- NormalizeData(sub.obj, normalization.method = "LogNormalize", scale.factor = 10000)
+sub.obj <- FindVariableFeatures(sub.obj, selection.method = "vst", nfeatures = 3000)
+
+sub.obj <- ScaleData(sub.obj, features = rownames(sub.obj))
+sub.obj <- RunPCA(sub.obj, features = VariableFeatures(object = sub.obj), verbose = FALSE)
+ElbowPlot(sub.obj, ndims = 30)
+
+#sub.obj <- FindNeighbors(sub.obj, dims = 1:30)
+#sub.obj <- FindClusters(sub.obj, verbose = FALSE, algorithm = 3, resolution = 0.7)
+
+sub.obj <- RunUMAP(sub.obj, dims = 1:30, n.neighbors = 30, min.dist = 0.1)
+
+DimPlot(sub.obj, label = TRUE, group.by = 'subtypes',  repel = TRUE) + NoLegend()
+
+ggsave(filename = paste0(resDir, '/umap_Elad_subset_CMs.pdf'), width = 10, height = 8)
+
+
+ggs = paste0(toupper(c("ISl1", 'Tbx3', 'Hcn4', 'Shox2',  
+                       'Cacna2ad2', "Cacna1g")), 
+             collapse = '|')
+features = rownames(aa)[grep(ggs, rownames(aa))]
+features = features[order(features)]
+
+features = features[c(3,4, 8:9)]
+
+DotPlot(sub.obj, features = features, cols = c("lightgrey", "#007BB7")) +
+  theme(axis.text.x = element_text(angle = 60, size = 12, hjust = 1), 
+        axis.text.y = element_text(angle = 0, size = 12), 
+        axis.title =  element_text(size = 14),
+        legend.text = element_text(size=12),
+        legend.title = element_text(size = 14)
+        #legend.position=c(0.2, 0.8),
+        #plot.margin = margin()
+        #legend.key.size = unit(1, 'cm')
+        #legend.key.width= unit(1, 'cm')
+  )
+
+ggsave(paste0(resDir, "/snRNAseq_featuresPlots_markerGenes_CCS.pdf"),  width = 10, height = 6)
 
 
 ##########################################
-# macrophage subseting 
+# double check macrophage subseting 
 ##########################################
 celltype.sels = 'Macrophages'
 sub.obj = subset(aa, cells = colnames(aa)[!is.na(match(aa$celltypes, celltype.sels))])
@@ -554,7 +686,7 @@ DimPlot(sub.obj, split.by = 'condition', group.by = 'subtypes', repel = TRUE, la
 ggsave(filename = paste0(resDir, '/umap_macrophages_perTimepoint.pdf'), width = 18, height = 4)
 
 ##########################################
-# FB subseting
+# double check FB subseting
 ##########################################
 celltype.sels = 'FB'
 sub.obj = subset(refs, cells = colnames(refs)[!is.na(match(refs$celltypes, celltype.sels))])

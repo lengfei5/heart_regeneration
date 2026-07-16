@@ -170,7 +170,7 @@ saveRDS(aa, file = paste0(resDir, '/nm_scRNAseq_8batches_noCorrection.rds'))
 
 rm(aa)
 
-### plot the Axl in CM in neonatal mice
+### plot the Axl in CM in neonatal mice P1
 aa = readRDS(file = paste0(RdataDir, 'nm_scRNAseq_8batches_noCorrection.rds'))
 
 aa = subset(aa, cells = colnames(aa)[which(aa$celltype == 'CM' & aa$dataset == 'Cui2020')])
@@ -193,6 +193,24 @@ p3 = FeaturePlot(aa, features = c('Axl'))
 ggsave(filename = paste0('/groups/tanaka/Collaborations/Jingkui-Elad/Plots4manuscripts/revision_1/', 
                          'neonatalMice_CM_Cui2020_Axl.pdf'), 
        width = 12, height = 10)
+
+
+## plot the Axl in CM in neonatal mice P8
+aa = readRDS(file = paste0(RdataDir, 'Seurat.obj_neonatalMice_CM_Cui2020_shoval.version_P8_clusterd.rds'))
+
+p1 = DimPlot(aa, label = TRUE, repel = TRUE, group.by = 'condition', raster=FALSE)
+#p2 = DimPlot(aa, label = TRUE, repel = TRUE, group.by = 'subtype', raster=FALSE)
+p3 = FeaturePlot(aa, features = c('Axl'))
+
+(p1 + p3) 
+
+ggsave(filename = paste0('/groups/tanaka/Collaborations/Jingkui-Elad/Plots4manuscripts/revision_1/', 
+                         'neonatalMice_CM_Cui2020_Axl_P8.pdf'), 
+       width = 14, height = 6)
+
+
+
+
 
 
 ##########################################
@@ -285,7 +303,7 @@ saveRDS(mm, file = paste0(resDir, 'mm_scRNAseq_2batch_noCorrection.rds'))
 rm(mm)
 
 
-### plot the Axl in CM in neonatal mice
+### plot the Axl in CM in adult mice from Ren2020
 aa = readRDS(file = paste0(RdataDir, 'mm_scRNAseq_2batch_noCorrection.rds'))
 
 aa = subset(aa, cells = colnames(aa)[which(aa$celltype == 'CM' & aa$dataset == 'Ren2020')])
@@ -308,6 +326,10 @@ p3 = FeaturePlot(aa, features = c('Axl'))
 ggsave(filename = paste0('/groups/tanaka/Collaborations/Jingkui-Elad/Plots4manuscripts/revision_1/', 
                          'adultMice_Ren2020_CM_Axl.pdf'), 
        width = 12, height = 10)
+
+
+
+
 
 
 ########################################################
