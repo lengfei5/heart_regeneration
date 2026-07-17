@@ -180,31 +180,52 @@ combined <- ScaleData(combined, features = rownames(aa)) %>%
 
 combined <- FindClusters(combined, resolution = 0.25)
 
-DimPlot(combined, reduction = "umap", pt.size = 1.)
+DimPlot(combined, reduction = "umap", pt.size = 1., label = TRUE)
 
 
 saveRDS(combined, file = paste0(RdataDir, 'seuratObject_CCAIntegrated',  version.analysis, '.rds'))
 
 
 ##########################################
-# subset the CMs 
+# subset the CMs
 ##########################################
-combined = readRDS
+combined = readRDS(file = paste0(RdataDir, 'seuratObject_CCAIntegrated',  version.analysis, '.rds'))
+
+combined <- FindClusters(combined, resolution = 0.2)
+
 DefaultAssay(combined) <- "RNA"
 
+p1 = DimPlot(combined, reduction = "umap", pt.size = 1., label = TRUE)
+
+p2 = FeaturePlot(combined, features= c('Myh6', 'Nppa', 'Nppb', 'Tnni3','Tnnt2', 'Actc1', 'Ttn',
+                                       'Acta1', 'Myl2', 'Tnnc1', 'Actn2'))
+
+p1 + p2
 
 
+ggsave(paste0(resDir, 'UMAP_clusters_CMmarkers.pdf'), 
+       width = 20, height = 8)
 
-CM <- subset(combined, idents = c("0"))
-CM <- FindVariableFeatures(CM, selection.method = "vst", nfeatures = 500) %>% 
+
+CM <- subset(combined, idents = c("0", "4"))
+
+CM <- FindVariableFeatures(CM, selection.method = "vst", nfeatures = 1000) %>% 
   ScaleData(features = rownames(CM))
-CM <- RunPCA(CM, npcs = 30, features = VariableFeatures(CM)) %>% RunUMAP(reduction = "pca", dims = 1:5, umap.method = 'umap-learn') %>% FindNeighbors(reduction = "pca", dims = 1:5)
+
+CM <- RunPCA(CM, npcs = 30, features = VariableFeatures(CM))
+ElbowPlot(aa, ndims = 30)
+
+CM =  RunUMAP(reduction = "pca", dims = 1:20) %>% FindNeighbors(reduction = "pca", dims = 1:20)
+
 CM <- FindClusters(CM, resolution = 0.2)
 
 DimPlot(CM, reduction = "umap", pt.size = 1.5)
 
-cluster0_marker <- FindMarkers(CM, ident.1 = 0, only.pos = TRUE, logfc.threshold = 0.25) %>% dplyr::filter(p_val_adj < 0.05)
-cluster1_marker <- FindMarkers(CM, ident.1 = 1, only.pos = TRUE, logfc.threshold = 0.25) %>% dplyr::filter(p_val_adj < 0.05)
-cluster2_marker <- FindMarkers(CM, ident.1 = 2, only.pos = TRUE, logfc.threshold = 0.25) %>% dplyr::filter(p_val_adj < 0.05)
+cluster0_marker <- FindMarkers(CM, ident.1 = 0, only.pos = TRUE, logfc.threshold = 0.25) %>% 
+  dplyr::filter(p_val_adj < 0.05)
+cluster1_marker <- FindMarkers(CM, ident.1 = 1, only.pos = TRUE, logfc.threshold = 0.25) %>% 
+  dplyr::filter(p_val_adj < 0.05)
+cluster2_marker <- FindMarkers(CM, ident.1 = 2, only.pos = TRUE, logfc.threshold = 0.25) %>% 
+  dplyr::filter(p_val_adj < 0.05)
 
 
