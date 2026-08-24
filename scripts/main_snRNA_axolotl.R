@@ -552,7 +552,6 @@ ggsave(paste0(resDir, "/snRNAseq_featuresPlots_markerGenes_SMCs.pdf"),  width = 
 sub.obj = subset(aa, cells = colnames(aa)[which(aa$celltypes == 'CM')])
 
 
-
 sub.obj = subset(sub.obj, cells = colnames(aa)[which(aa$subtypes == 'CM_IS'|
                                                       aa$subtypes == 'CM_Prol_1'|
                                                       aa$subtypes == 'CM_Prol_IS'| 

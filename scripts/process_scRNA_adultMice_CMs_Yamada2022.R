@@ -213,19 +213,34 @@ CM <- FindVariableFeatures(CM, selection.method = "vst", nfeatures = 1000) %>%
   ScaleData(features = rownames(CM))
 
 CM <- RunPCA(CM, npcs = 30, features = VariableFeatures(CM))
-ElbowPlot(aa, ndims = 30)
+ElbowPlot(CM, ndims = 30)
 
-CM =  RunUMAP(reduction = "pca", dims = 1:20) %>% FindNeighbors(reduction = "pca", dims = 1:20)
+CM =  RunUMAP(CM, reduction = "pca", dims = 1:20) %>% FindNeighbors(reduction = "pca", dims = 1:20)
 
 CM <- FindClusters(CM, resolution = 0.2)
 
-DimPlot(CM, reduction = "umap", pt.size = 1.5)
+DimPlot(CM, reduction = "umap", pt.size = 1.0)
 
-cluster0_marker <- FindMarkers(CM, ident.1 = 0, only.pos = TRUE, logfc.threshold = 0.25) %>% 
-  dplyr::filter(p_val_adj < 0.05)
-cluster1_marker <- FindMarkers(CM, ident.1 = 1, only.pos = TRUE, logfc.threshold = 0.25) %>% 
-  dplyr::filter(p_val_adj < 0.05)
-cluster2_marker <- FindMarkers(CM, ident.1 = 2, only.pos = TRUE, logfc.threshold = 0.25) %>% 
-  dplyr::filter(p_val_adj < 0.05)
+aa = CM
+
+
+p1 = DimPlot(aa, label = FALSE, repel = TRUE, group.by = 'condition', raster=FALSE)
+p2 = DimPlot(aa, label = TRUE, repel = TRUE, group.by = 'seurat_clusters', raster=FALSE)
+p3 = FeaturePlot(aa, features = c('Axl'))
+
+(p1 + p2)/p3 
+
+ggsave(filename = paste0('/groups/tanaka/Collaborations/Jingkui-Elad/Plots4manuscripts/revision_1/', 
+                         'adultMice_Yamada2022_CM_Axl.pdf'), 
+       width = 12, height = 10)
+
+
+
+# cluster0_marker <- FindMarkers(CM, ident.1 = 0, only.pos = TRUE, logfc.threshold = 0.25) %>% 
+#   dplyr::filter(p_val_adj < 0.05)
+# cluster1_marker <- FindMarkers(CM, ident.1 = 1, only.pos = TRUE, logfc.threshold = 0.25) %>% 
+#   dplyr::filter(p_val_adj < 0.05)
+# cluster2_marker <- FindMarkers(CM, ident.1 = 2, only.pos = TRUE, logfc.threshold = 0.25) %>% 
+#   dplyr::filter(p_val_adj < 0.05)
 
 
