@@ -550,16 +550,19 @@ ggsave(paste0(resDir, "/snRNAseq_featuresPlots_markerGenes_SMCs.pdf"),  width = 
 
 ## prepare the data of CMs for Bonsai test
 sub.obj = subset(aa, cells = colnames(aa)[which(aa$celltypes == 'CM')])
-
+sub.obj$subtypes = droplevels(sub.obj$subtypes)
 
 sub.obj = subset(sub.obj, cells = colnames(aa)[which(aa$subtypes == 'CM_IS'|
                                                       aa$subtypes == 'CM_Prol_1'|
                                                       aa$subtypes == 'CM_Prol_IS'| 
                                                        aa$subtypes == 'CM_Prol_3'|
-                                                       aa$subtypes == ' CM_ven_(Cav3_1)'|
+                                                       aa$subtypes == 'CM_ven_(Cav3_1)'|
                                                        aa$subtypes == 'CM_ven_(Robo2)'
                                                        )])
 sub.obj$subtypes = droplevels(sub.obj$subtypes)
+
+## six CM subtypes to keep
+table(sub.obj$subtypes)
 
 counts = sub.obj@assays$RNA@counts
 counts = data.frame(GeneID = rownames(counts), as.matrix(counts), stringsAsFactors = FALSE)
@@ -572,6 +575,7 @@ metadata = data.frame(CellID = rownames(metadata), metadata)
 
 write.table(metadata, file = paste0(resDir, '/CMs_annotation_4Bonsai.tsv'),
             row.names = FALSE, col.names = TRUE, quote = FALSE, sep = '\t')
+
 
 
 ## markers of lymphatic-like ECs
