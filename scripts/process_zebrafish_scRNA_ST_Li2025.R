@@ -46,9 +46,9 @@ dataDir = "../published_dataset/zebrafish/Li_et_al_2025/"
 
 
 #mito.genes names
-mito.genes <- read.table("Data/mito.genes.vs.txt",sep = ",")
-mito.genes <- mito.genes$V3
-mito.genes <- as.character(mito.genes)
+#mito.genes <- read.table("Data/mito.genes.vs.txt",sep = ",")
+#mito.genes <- mito.genes$V3
+#mito.genes <- as.character(mito.genes)
 
 ########################################################
 ########################################################
@@ -57,8 +57,9 @@ mito.genes <- as.character(mito.genes)
 ########################################################
 ########################################################
 ## load and integrate data in one seurat object, calculate mito reads, filter cells, 
+
 ## the chamber scRNAseq data is from the Fig 5 in the original paper to construct a 3D map
-aa = readRDS(file = paste0(dataDir, 'scRNA-seq-chamber.rds'))
+#aa = readRDS(file = paste0(dataDir, 'scRNA-seq-chamber.rds'))
 
 ## the 206719 cells of regeneration is from Fig 1, the main dataset of regeneration
 aa = readRDS(file = paste0(dataDir, 'scRNA-seq-regeneration.rds'))
@@ -87,10 +88,18 @@ ggsave(filename = paste0('/groups/tanaka/Collaborations/Jingkui-Elad/Plots4manus
 
 aa$condition = aa$time_points
 
-saveRDS(aa, file = paste0(RdataDir, 'zebrafish_Li2025_scRNAseq_regeneration.rds'))
+p1 = DimPlot(aa, reduction = 'umap', raster = FALSE, group.by = 'celltypes', label = TRUE, repel = TRUE) 
+p2 = DimPlot(aa, label = TRUE, repel = TRUE, group.by = 'annotation', raster=FALSE)
+
+p1 + p2
+
+ggsave(filename = paste0(resDir, 'zebrafish_Li2025_umap_celltypes_annotation.pdf'), 
+       width = 20, height = 8)
+
+saveRDS(aa, file = paste0(RdataDir, 'zebrafish_Li2025_scRNAseq_regeneration_all.rds'))
 
 
-## select only the CMs
+## select only the CMs and plot AXL
 aa = subset(aa, cells = colnames(aa)[which(aa$celltypes == 'CMs')])
 
 aa <- NormalizeData(aa, normalization.method = "LogNormalize", scale.factor = 10000)
@@ -113,5 +122,17 @@ p3 = FeaturePlot(aa, features = c('AXL'))
 
 ggsave(filename = paste0('/groups/tanaka/Collaborations/Jingkui-Elad/Plots4manuscripts/revision_1/', 
                          'zebrafish_Li2025_CMs_Axl.pdf'), width = 12, height = 10)
+
+
+
+##########################################
+# an overview of zebrafish scRNA-seq data 
+##########################################
+aa = readRDS(file = paste0(RdataDir, 'zebrafish_Li2025_scRNAseq_regeneration.rds'))
+
+p1 = DimPlot(aa, label = TRUE, repel = TRUE, group.by = 'condition', raster=FALSE)
+p2 = DimPlot(aa, label = TRUE, repel = TRUE, group.by = 'annotation', raster=FALSE)
+
+p1 + p2
 
 
