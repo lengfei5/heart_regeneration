@@ -145,4 +145,13 @@ ElbowPlot(aa, ndims = 30)
 
 aa <- RunUMAP(aa, dims = 1:20, n.neighbors = 50, min.dist = 0.3)
 
+p1 = DimPlot(aa, label = TRUE, repel = TRUE, group.by = 'condition', raster=FALSE)
+p2 = DimPlot(aa, label = TRUE, repel = TRUE, group.by = 'annotation', raster=FALSE)
+
+p1 + p2
+
+ggsave(filename = paste0(resDir, 'zebrafish_Li2025_noblood_umap_condition_annotation.pdf'), 
+       width = 20, height = 8)
+
+saveRDS(aa, file = paste0(RdataDir, 'zebrafish_Li2025_scRNAseq_regeneration_all_noblood.rds'))
 
