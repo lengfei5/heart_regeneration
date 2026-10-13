@@ -75,7 +75,6 @@ rm(aa)
 save(design, scn, 
      file = paste0(RdataDir, 'seuratObject_design_variableGenes_', species, version.analysis, '.Rdata'))
 
-
 ##########################################
 # General QCs and gene filtering
 # 
